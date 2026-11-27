@@ -290,6 +290,91 @@ export function calculateAutoYScaling(matrix: number[][]): number {
 }
 
 /**
+ * Returns raw RGB `[r, g, b]` components in `[0, 255]` for a palette & value.
+ */
+export function getPaletteRgb(
+  value: number,
+  min: number,
+  max: number,
+  palette: SurfacePalette = 'classic'
+): [number, number, number] {
+  if (!Number.isFinite(value) || !Number.isFinite(min) || !Number.isFinite(max) || min === max) {
+    return [30, 41, 59];
+  }
+
+  const t = Math.max(0, Math.min(1, (value - min) / (max - min)));
+
+  switch (palette) {
+    case 'classic': {
+      const { r, g, b } = getHeatmapRgb(value, min, max);
+      return [r, g, b];
+    }
+
+    case 'thermal': {
+      if (t < 0.33) {
+        const seg = t / 0.33;
+        return [
+          Math.round(11 + (153 - 11) * seg),
+          Math.round(9 + (27 - 9) * seg),
+          Math.round(43 + (27 - 43) * seg),
+        ];
+      }
+      if (t < 0.66) {
+        const seg = (t - 0.33) / 0.33;
+        return [
+          Math.round(153 + (234 - 153) * seg),
+          Math.round(27 + (88 - 27) * seg),
+          Math.round(27 + (12 - 27) * seg),
+        ];
+      }
+      const seg = (t - 0.66) / 0.34;
+      return [
+        Math.round(234 + (255 - 234) * seg),
+        Math.round(88 + (250 - 88) * seg),
+        Math.round(12 + (200 - 12) * seg),
+      ];
+    }
+
+    case 'spectrum': {
+      // Blue (240 deg) -> Green (120 deg) -> Red (0 deg), s=0.90, l=0.50
+      const hue = (1 - t) * 240;
+      const c = 0.9;
+      const x = c * (1 - Math.abs(((hue / 60) % 2) - 1));
+      const m = 0.05;
+      let r1 = 0;
+      let g1 = 0;
+      let b1 = 0;
+      if (hue < 60) {
+        r1 = c;
+        g1 = x;
+      } else if (hue < 120) {
+        r1 = x;
+        g1 = c;
+      } else if (hue < 180) {
+        g1 = c;
+        b1 = x;
+      } else {
+        g1 = x;
+        b1 = c;
+      }
+      return [
+        Math.round((r1 + m) * 255),
+        Math.round((g1 + m) * 255),
+        Math.round((b1 + m) * 255),
+      ];
+    }
+
+    case 'monochrome': {
+      return [
+        Math.round(15 + (240 - 15) * t),
+        Math.round(23 + (245 - 23) * t),
+        Math.round(42 + (255 - 42) * t),
+      ];
+    }
+  }
+}
+
+/**
  * Generates an RGBA color string according to the selected palette.
  */
 export function getPaletteColor(
@@ -302,53 +387,94 @@ export function getPaletteColor(
   if (!Number.isFinite(value) || !Number.isFinite(min) || !Number.isFinite(max) || min === max) {
     return `rgba(30, 41, 59, ${alpha})`;
   }
+  const [r, g, b] = getPaletteRgb(value, min, max, palette);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
 
-  const t = Math.max(0, Math.min(1, (value - min) / (max - min)));
+/**
+ * Computes a directional Lambertian illumination factor in `[0.72, 1.18]` from a quad's
+ * upward surface normal so ridges, peaks, and valleys read clearly without neon glare.
+ */
+export function computeQuadShade(quad: Quad3D, yScaling: number = 1): number {
+  const ux = quad.p1.x - quad.p0.x;
+  const uy = (quad.p1.y - quad.p0.y) * yScaling;
+  const uz = quad.p1.z - quad.p0.z;
 
-  switch (palette) {
-    case 'classic': {
-      const { r, g, b } = getHeatmapRgb(value, min, max);
-      return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-    }
+  const vx = quad.p3.x - quad.p0.x;
+  const vy = (quad.p3.y - quad.p0.y) * yScaling;
+  const vz = quad.p3.z - quad.p0.z;
 
-    case 'thermal': {
-      // 4-stop thermal ramp: Dark Navy -> Deep Red -> Amber/Orange -> Yellow-White
-      let r = 0;
-      let g = 0;
-      let b = 0;
-      if (t < 0.33) {
-        const seg = t / 0.33;
-        r = Math.round(11 + (153 - 11) * seg);
-        g = Math.round(9 + (27 - 9) * seg);
-        b = Math.round(43 + (27 - 43) * seg);
-      } else if (t < 0.66) {
-        const seg = (t - 0.33) / 0.33;
-        r = Math.round(153 + (234 - 153) * seg);
-        g = Math.round(27 + (88 - 27) * seg);
-        b = Math.round(27 + (12 - 27) * seg);
-      } else {
-        const seg = (t - 0.66) / 0.34;
-        r = Math.round(234 + (255 - 234) * seg);
-        g = Math.round(88 + (250 - 88) * seg);
-        b = Math.round(12 + (200 - 12) * seg);
-      }
-      return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-    }
+  // v x u yields a +Y-facing normal in our (X=col, Y=value, Z=row) grid space.
+  const nx = vy * uz - vz * uy;
+  const ny = vz * ux - vx * uz;
+  const nz = vx * uy - vy * ux;
+  const nLen = Math.hypot(nx, ny, nz);
+  if (nLen <= 1e-9 || !Number.isFinite(nLen)) return 1.0;
 
-    case 'spectrum': {
-      // Blue (240 deg) -> Green (120 deg) -> Red (0 deg)
-      const hue = Math.round((1 - t) * 240);
-      return `hsla(${hue}, 90%, 50%, ${alpha})`;
-    }
+  const lx = 0.42;
+  const ly = 0.84;
+  const lz = 0.34;
+  const lLen = Math.hypot(lx, ly, lz);
+  const dot = (nx * lx + ny * ly + nz * lz) / (nLen * lLen);
+  const clampedDot = Math.max(0, Math.min(1, dot));
+  return 0.72 + clampedDot * 0.46;
+}
 
-    case 'monochrome': {
-      // Dark slate -> Ice Cyan -> White
-      const r = Math.round(15 + (240 - 15) * t);
-      const g = Math.round(23 + (245 - 23) * t);
-      const b = Math.round(42 + (255 - 42) * t);
-      return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-    }
+/**
+ * Returns an RGBA string shaded by directional relief factor in `[0.72, 1.18]`.
+ */
+export function getShadedPaletteColor(
+  value: number,
+  min: number,
+  max: number,
+  palette: SurfacePalette = 'classic',
+  shade: number = 1.0,
+  alpha: number = 1.0
+): string {
+  const [r, g, b] = getPaletteRgb(value, min, max, palette);
+  const clampByte = (v: number) => Math.max(0, Math.min(255, Math.round(v)));
+  return `rgba(${clampByte(r * shade)}, ${clampByte(g * shade)}, ${clampByte(b * shade)}, ${alpha})`;
+}
+
+/**
+ * Picks evenly distributed axis tick indices always including first (`0`) and last (`count - 1`).
+ */
+export function computeAxisTickIndices(count: number, maxTicks: number = 6): number[] {
+  if (count <= 0 || maxTicks <= 0) return [];
+  if (count === 1) return [0];
+  if (count <= maxTicks) {
+    return Array.from({ length: count }, (_, i) => i);
   }
+  const ticks = new Set<number>([0, count - 1]);
+  const steps = Math.max(1, maxTicks - 1);
+  for (let i = 1; i < steps; i++) {
+    ticks.add(Math.round((i * (count - 1)) / steps));
+  }
+  return Array.from(ticks).sort((a, b) => a - b);
+}
+
+/**
+ * Converts `1xN` / `Nx1` 1D curves into a clean `2xN` ribbon so 1D tables render meaningfully in 3D.
+ */
+export function normalizeMatrixFor3D(matrix: number[][]): {
+  matrix: number[][];
+  is1DRibbon: boolean;
+  transpose1D: boolean;
+} {
+  if (!matrix || matrix.length === 0 || !matrix[0] || matrix[0].length === 0) {
+    return { matrix: [], is1DRibbon: false, transpose1D: false };
+  }
+  const rows = matrix.length;
+  const cols = matrix[0].length;
+  if (rows === 1 && cols >= 2) {
+    const row = [...matrix[0]];
+    return { matrix: [row, [...row]], is1DRibbon: true, transpose1D: false };
+  }
+  if (rows >= 2 && cols === 1) {
+    const colVals = matrix.map((r) => r[0] ?? 0);
+    return { matrix: [colVals, [...colVals]], is1DRibbon: true, transpose1D: true };
+  }
+  return { matrix, is1DRibbon: false, transpose1D: false };
 }
 
 /**

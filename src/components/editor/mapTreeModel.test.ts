@@ -4,12 +4,16 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   UNCATEGORISED,
+  buildMapFolderTree,
   classifyMapParamType,
+  collectFolderPaths,
   countMaps,
   countMapsByParamType,
   filterMapTree,
   filterMapTreeByParamType,
+  findFolderPathsForMap,
   groupMapsByCategory,
+  splitCategoryPath,
 } from './mapTreeModel.ts';
 import type { MapDef } from '../../types/kivi';
 
@@ -145,4 +149,36 @@ test('classifyMapParamType, countMapsByParamType, and filterMapTreeByParamType s
   assert.equal(filterMapTreeByParamType(tree, 'scalar')[0].maps[0].name, 'RevLimit');
   assert.equal(filterMapTreeByParamType(tree, '1d')[0].maps[0].name, 'WOTSpark');
   assert.equal(filterMapTreeByParamType(tree, '2d')[0].maps[0].name, 'MainFuel');
+});
+
+test('buildMapFolderTree constructs nested folders, counts, and selected-map ancestor paths', () => {
+  assert.deepEqual(splitCategoryPath('Auto-Detected / 2D Tables (16-bit)'), [
+    'Auto-Detected',
+    '2D Tables (16-bit)',
+  ]);
+  assert.deepEqual(splitCategoryPath('Fuel > Main'), ['Fuel', 'Main']);
+
+  const maps = [
+    { ...map('Fuel Table A', 'Auto-Detected / 2D Tables (16-bit)'), id: 'm1' },
+    { ...map('Curve A', 'Auto-Detected / 1D Curves (16-bit)'), id: 'm2' },
+    { ...map('Spark Main', 'Ignition'), id: 'm3' },
+    { ...map('Loose Map', ''), id: 'm4' },
+  ];
+  const folders = buildMapFolderTree(groupMapsByCategory(maps));
+  assert.deepEqual(
+    folders.map((f) => [f.name, f.totalCount]),
+    [
+      ['Auto-Detected', 2],
+      ['Ignition', 1],
+      [UNCATEGORISED, 1],
+    ]
+  );
+
+  const autoNode = folders[0];
+  assert.equal(autoNode.folders.length, 2);
+  assert.deepEqual(findFolderPathsForMap(folders, 'm1'), [
+    'Auto-Detected',
+    'Auto-Detected/2D Tables (16-bit)',
+  ]);
+  assert.equal(collectFolderPaths(folders).length, 5);
 });

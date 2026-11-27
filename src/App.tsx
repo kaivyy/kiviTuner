@@ -4,6 +4,7 @@ import { useTelemetryStore } from './stores/useTelemetryStore';
 import { useCorrelationStore } from './stores/useCorrelationStore';
 import { useThemeStore, applyThemeToDocument } from './stores/useThemeStore';
 import { useWorkspaceTabsStore } from './stores/useWorkspaceTabsStore';
+import { useUpdateStore } from './stores/useUpdateStore';
 import {
   groupMapsByCategory,
   filterMapTree,
@@ -25,6 +26,7 @@ import {
   CalibrationWorkbenchModal,
   AboutModal,
   MapPropertiesModal,
+  UpdateModal,
 } from './components/modals';
 import { AutoTuneReviewModal } from './components/autotune';
 import { TelemetryDevPanel } from './components/telemetry/TelemetryDevPanel';
@@ -36,6 +38,10 @@ import {
   saveRomBytesToDisk,
   serializeMapToCsv,
 } from './lib/exportHelpers';
+import {
+  emitWorkspaceSyncEvent,
+  subscribeWorkspaceSyncEvents,
+} from './lib/workspaceSyncBridge';
 import {
   isDesktopApp,
   bridgeScanRomHeuristics,
@@ -128,11 +134,21 @@ export const App: React.FC = () => {
     activateTab,
     closeTab,
     togglePinTab,
+    setTabKind,
     openInSplit,
     closeSplit,
     toggleSplitView,
     syncMapTab,
   } = useWorkspaceTabsStore();
+
+  const updateStatus = useUpdateStore((s) => s.status);
+  const updateInfo = useUpdateStore((s) => s.info);
+  const updateBannerDismissed = useUpdateStore((s) => s.bannerDismissed);
+  const checkForUpdates = useUpdateStore((s) => s.checkForUpdates);
+  const openUpdateModal = useUpdateStore((s) => s.openModal);
+  const dismissUpdateBanner = useUpdateStore((s) => s.dismissBanner);
+  const downloadAndInstallUpdate = useUpdateStore((s) => s.downloadAndInstall);
+  const restartToApplyUpdate = useUpdateStore((s) => s.restartToApply);
 
   const isEcuConnected = useTelemetryStore((s) => s.connectionState.state === 'Connected');
   const ecuDriverId = useTelemetryStore((s) => s.selectedDriverId);
@@ -229,11 +245,17 @@ export const App: React.FC = () => {
     return () => window.removeEventListener('focus', onFocus);
   }, [isDesktop, hasRom, refreshRomSession]);
 
-  const mapTree = useMemo(
-    () => filterMapTree(groupMapsByCategory(maps), mapFilter),
-    [maps, mapFilter]
-  );
-  const totalMaps = useMemo(() => countMaps(groupMapsByCategory(maps)), [maps]);
+  useEffect(() => {
+    if (!isDesktop) return;
+    const timer = setTimeout(() => {
+      void checkForUpdates(true);
+    }, 3500);
+    return () => clearTimeout(timer);
+  }, [isDesktop, checkForUpdates]);
+
+  const groupedMaps = useMemo(() => groupMapsByCategory(maps), [maps]);
+  const mapTree = useMemo(() => filterMapTree(groupedMaps, mapFilter), [groupedMaps, mapFilter]);
+  const totalMaps = useMemo(() => countMaps(groupedMaps), [groupedMaps]);
 
   const [isScannerDrawerOpen, setIsScannerDrawerOpen] = useState<boolean>(false);
   const [isScanning, setIsScanning] = useState<boolean>(false);
@@ -372,11 +394,39 @@ export const App: React.FC = () => {
     (id: string) => {
       activateTab(id);
       const tab = tabs.find((t) => t.id === id);
+      if (tab?.kind === 'map-table' || tab?.kind === 'map-3d' || tab?.kind === 'map-split') {
+        setLayoutPreset(
+          tab.kind === 'map-3d'
+            ? 'full_3d'
+            : tab.kind === 'map-split'
+              ? 'split_3d'
+              : 'standard'
+        );
+      } else if (tab?.kind === 'waveform') {
+        setLayoutPreset('full_waveform');
+      }
       if (tab?.mapId && tab.mapId !== selectedMapId) {
         selectMap(tab.mapId);
       }
     },
     [activateTab, tabs, selectedMapId, selectMap]
+  );
+
+  const handleOpenWorkbench = useCallback(
+    () => void openToolOrFloating('workbench', () => setIsWorkbenchOpen(true)),
+    []
+  );
+  const handleOpenDiff = useCallback(
+    () => void openToolOrFloating('diff', () => setIsDiffModalOpen(true)),
+    []
+  );
+  const handleOpenShortcuts = useCallback(
+    () => void openToolOrFloating('shortcuts', () => setIsShortcutsOpen(true)),
+    []
+  );
+  const handleOpenAutoTune = useCallback(
+    () => void openToolOrFloating('autotune', () => setIsAutoTuneReviewOpen(true)),
+    []
   );
 
   const handleOpenHexTab = useCallback(() => {
@@ -619,6 +669,56 @@ export const App: React.FC = () => {
     [handleOpenWaveformTab]
   );
 
+  useEffect(() => {
+    if (!isDesktop) return;
+    if (maps.length === 0 && diffRegions.length === 0 && selectedMapId === null) return;
+    void emitWorkspaceSyncEvent({
+      type: 'workspace-snapshot',
+      maps,
+      selectedMapId,
+      diffs: diffRegions,
+    });
+  }, [isDesktop, maps, selectedMapId, diffRegions]);
+
+  useEffect(() => {
+    const unsub = subscribeWorkspaceSyncEvents((ev) => {
+      if (ev.type === 'request-snapshot') {
+        const st = useMapStore.getState();
+        void emitWorkspaceSyncEvent({
+          type: 'workspace-snapshot',
+          maps: st.maps,
+          selectedMapId: st.selectedMapId,
+          diffs: diffRegions,
+        });
+      } else if (ev.type === 'add-maps') {
+        addMaps(ev.maps);
+        if (ev.selectFirst && ev.maps.length > 0) {
+          selectMap(ev.maps[0].id);
+          syncMapTab(ev.maps[0], 'map-table');
+        }
+      } else if (ev.type === 'select-map') {
+        selectMap(ev.mapId);
+        const found = useMapStore.getState().maps.find((m) => m.id === ev.mapId);
+        if (found) syncMapTab(found, 'map-table');
+      } else if (ev.type === 'update-map-scaling') {
+        const target = useMapStore.getState().maps.find((m) => m.id === ev.mapId);
+        if (target) {
+          void updateMapDef({ ...target, scaling: { ...target.scaling, equation: ev.equation } });
+        }
+      } else if (ev.type === 'jump-waveform') {
+        handleJumpToWaveform(ev.startAddr, ev.endAddr);
+      } else if (ev.type === 'diffs-updated') {
+        setDiffRegions(ev.diffs);
+      } else if (ev.type === 'rom-updated') {
+        if (isDesktopApp()) void refreshRomSession();
+        if (ev.checksumOk !== undefined) {
+          useMapStore.getState().setChecksumStatus(ev.checksumOk ? 'valid' : 'invalid');
+        }
+      }
+    });
+    return unsub;
+  }, [addMaps, selectMap, syncMapTab, updateMapDef, handleJumpToWaveform, diffRegions, refreshRomSession]);
+
   const handleJumpToHex = useCallback(
     (address: number) => {
       setHexJumpAddress(address);
@@ -776,8 +876,8 @@ export const App: React.FC = () => {
   );
 
   const handleQuickDiff = useCallback(async () => {
-    setIsDiffModalOpen(true);
-  }, []);
+    handleOpenDiff();
+  }, [handleOpenDiff]);
 
   const handleLayoutChange = useCallback(
     (layout: string) => {
@@ -798,19 +898,23 @@ export const App: React.FC = () => {
       }
       if (l === 'table' || l === 'standard') {
         setLayoutPreset('standard');
-        if (selectedMap) syncMapTab(selectedMap, 'map-table');
+        if (activeTab?.kind.startsWith('map-')) setTabKind(activeTab.id, 'map-table');
+        if (selectedMap) syncMapTab(selectedMap, 'map-table', true);
       } else if (l === 'split' || l === 'split_3d') {
         setLayoutPreset('split_3d');
-        if (selectedMap) syncMapTab(selectedMap, 'map-split');
+        if (activeTab?.kind.startsWith('map-')) setTabKind(activeTab.id, 'map-split');
+        if (selectedMap) syncMapTab(selectedMap, 'map-split', true);
       } else if (l === 'split_waveform') {
         setLayoutPreset('split_waveform');
-        if (selectedMap) syncMapTab(selectedMap, 'map-table');
+        if (activeTab?.kind.startsWith('map-')) setTabKind(activeTab.id, 'map-table');
+        if (selectedMap) syncMapTab(selectedMap, 'map-table', true);
       } else if (l === 'surface3d' || l === 'full_3d') {
         setLayoutPreset('full_3d');
-        if (selectedMap) syncMapTab(selectedMap, 'map-3d');
+        if (activeTab?.kind.startsWith('map-')) setTabKind(activeTab.id, 'map-3d');
+        if (selectedMap) syncMapTab(selectedMap, 'map-3d', true);
       }
     },
-    [activeTab, tabs, activateTab, closeTab, selectedMap, syncMapTab, handleOpenWaveformTab]
+    [activeTab, tabs, activateTab, closeTab, selectedMap, setTabKind, syncMapTab, handleOpenWaveformTab]
   );
 
   const handleDisplayModeChange = useCallback((mode: string) => {
@@ -890,9 +994,20 @@ export const App: React.FC = () => {
     binFileInputRef,
     xdfFileInputRef,
     setLayoutPreset,
-    setIsWorkbenchOpen,
-    setIsDiffModalOpen,
-    setIsShortcutsOpen,
+    onToggleSplit3D: () =>
+      handleLayoutChange(layoutPreset === 'split_3d' ? 'standard' : 'split_3d'),
+    setIsWorkbenchOpen: (open) => {
+      if (open) handleOpenWorkbench();
+      else setIsWorkbenchOpen(false);
+    },
+    setIsDiffModalOpen: (open) => {
+      if (open) handleOpenDiff();
+      else setIsDiffModalOpen(false);
+    },
+    setIsShortcutsOpen: (open) => {
+      if (open) handleOpenShortcuts();
+      else setIsShortcutsOpen(false);
+    },
     onRunScanner: handleRunScanner,
     onSaveRom: () => void handleSaveRom(false),
     onSaveAsRom: () => void handleSaveRom(true),
@@ -930,13 +1045,14 @@ export const App: React.FC = () => {
         onOpenWaveform: handleOpenWaveformTab,
         onToggleSplit: handleToggleSplitView,
         onRunScanner: () => void handleRunScanner(),
-        onOpenWorkbench: () => setIsWorkbenchOpen(true),
+        onOpenWorkbench: handleOpenWorkbench,
         onOpenFlash: () => void openToolOrFloating('flash', () => setIsFlashPanelOpen(true)),
-        onOpenDiff: () => setIsDiffModalOpen(true),
+        onOpenDiff: handleOpenDiff,
         onFixChecksum: () => void fixChecksum(),
         onExportDef: (fmt) => void handleExportDef(fmt),
         onToggleTheme: () => toggleTheme(),
         onOpenHowToUse: () => void openToolOrFloating('guide', () => setIsHowToUseOpen(true)),
+        onCheckForUpdates: () => void checkForUpdates(false),
       }),
     [
       hasRom,
@@ -954,9 +1070,12 @@ export const App: React.FC = () => {
       handleOpenWaveformTab,
       handleToggleSplitView,
       handleRunScanner,
+      handleOpenWorkbench,
+      handleOpenDiff,
       fixChecksum,
       handleExportDef,
       toggleTheme,
+      checkForUpdates,
     ]
   );
 
@@ -1001,7 +1120,14 @@ export const App: React.FC = () => {
         onVerifyChecksum={() => verifyChecksum()}
         onFixChecksum={() => fixChecksum()}
         deltaCount={totalDeltaBytes}
-        onDeltaClick={() => setIsDiffModalOpen(true)}
+        onDeltaClick={handleOpenDiff}
+        updateStatus={
+          updateStatus === 'available' || updateStatus === 'ready-to-restart'
+            ? updateStatus
+            : null
+        }
+        updateVersion={updateInfo?.latestVersion ?? null}
+        onUpdateClick={openUpdateModal}
         displayModeText={
           selectedMap
             ? `${selectedMap.dtype.toUpperCase()} ${
@@ -1011,7 +1137,7 @@ export const App: React.FC = () => {
         }
         romName={hasRom ? activeDocLabel : undefined}
         romSizeBytes={romSize}
-        onOpenShortcuts={() => void openToolOrFloating('shortcuts', () => setIsShortcutsOpen(true))}
+        onOpenShortcuts={handleOpenShortcuts}
         callbacks={{
           onOpenRom: () => binFileInputRef.current?.click(),
           onOpenRecent: (id) => void handleOpenRecentRom(id),
@@ -1019,7 +1145,7 @@ export const App: React.FC = () => {
             clearRecentRoms();
             notify('Cleared recent ROM list');
           },
-          onReferenceSlot: () => setIsDiffModalOpen(true),
+          onReferenceSlot: handleOpenDiff,
           onClearReferences: () => {
             setDiffRegions([]);
             notify('Cleared diff comparison regions');
@@ -1041,7 +1167,7 @@ export const App: React.FC = () => {
             if (selectedMap) {
               setMapPropsModal({ open: true, mode: 'edit', map: selectedMap });
             } else {
-              setIsWorkbenchOpen(true);
+              handleOpenWorkbench();
             }
           },
           onUndo: () => void undoEdit(),
@@ -1069,23 +1195,23 @@ export const App: React.FC = () => {
           onOpenCommandPalette: () => setIsCommandPaletteOpen(true),
           onToggleTheme: () => toggleTheme(),
           onResetLayout: () => {
-            setLayoutPreset('standard');
+            handleLayoutChange('standard');
             closeSplit();
           },
           onExtractWaveformMap: handleExtractMap,
           onRunScanner: handleRunScanner,
           onScannerSensitivityChange: (s) => setScannerSensitivity(s),
           onClearScanner: () => setDetectedCandidates([]),
-          onOpenDiffModal: () => setIsDiffModalOpen(true),
+          onOpenDiffModal: handleOpenDiff,
           onQuickDiff: handleQuickDiff,
           onExtractDiffs: () =>
             handleExtractAllDiffTables(diffRegions.filter((d) => d.classification.type === 'Table2D')),
           onVerifyChecksum: () => verifyChecksum(),
           onFixChecksum: () => fixChecksum(),
           onOpenHowToUse: () => void openToolOrFloating('guide', () => setIsHowToUseOpen(true)),
-          onOpenShortcuts: () => void openToolOrFloating('shortcuts', () => setIsShortcutsOpen(true)),
+          onOpenShortcuts: handleOpenShortcuts,
           onResetSettings: () => {
-            setLayoutPreset('standard');
+            handleLayoutChange('standard');
             setDisplayMode('engineering');
             setPalette('classic');
             setScannerSensitivity('balanced');
@@ -1094,6 +1220,7 @@ export const App: React.FC = () => {
             clearRecentRoms();
             notify('Reset workspace view and settings');
           },
+          onCheckForUpdates: () => void checkForUpdates(false),
           onAbout: () => void openToolOrFloating('about', () => setIsAboutOpen(true)),
           onDriverChange: (driver) => selectEcuDriver(driver),
           onConnectEcu: () => connectEcu(),
@@ -1105,7 +1232,7 @@ export const App: React.FC = () => {
               return !v;
             });
           },
-          onAfrAutoTune: () => setIsAutoTuneReviewOpen(true),
+          onAfrAutoTune: handleOpenAutoTune,
           onStartLogging: () => startRecording(),
           onStopLogging: () => stopRecording(),
           onExportLogCsv: handleExportLogCsv,
@@ -1113,7 +1240,7 @@ export const App: React.FC = () => {
           onReadFlash: () => void openToolOrFloating('flash', () => setIsFlashPanelOpen(true)),
           onWriteFlash: () => void openToolOrFloating('flash', () => setIsFlashPanelOpen(true)),
           onOpenCatalogue: () => void openToolOrFloating('catalogue', () => setIsCatalogueOpen(true)),
-          onOpenWorkbench: () => setIsWorkbenchOpen(true),
+          onOpenWorkbench: handleOpenWorkbench,
         }}
         state={{
           romLoaded: hasRom,
@@ -1169,6 +1296,58 @@ export const App: React.FC = () => {
         onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
       />
 
+      {((updateStatus === 'available' && !updateBannerDismissed) ||
+        updateStatus === 'ready-to-restart') &&
+        updateInfo && (
+          <div
+            role="status"
+            aria-live="polite"
+            className="flex flex-wrap items-center justify-between gap-2 border-b border-kiviAccent/30 bg-kiviAccent/10 px-4 py-1 text-xs text-kiviInk"
+          >
+            <span>
+              {updateStatus === 'ready-to-restart'
+                ? `kiviTuner v${updateInfo.latestVersion} is ready. Restart to finish updating.`
+                : `New kiviTuner release available: v${updateInfo.latestVersion} (installed v${updateInfo.currentVersion}).`}
+            </span>
+            <div className="flex items-center gap-2">
+              {updateStatus === 'available' ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    openUpdateModal();
+                    void downloadAndInstallUpdate();
+                  }}
+                  className="rounded bg-kiviAccent px-2.5 py-0.5 text-[11px] font-semibold text-kiviAccentFg hover:opacity-90"
+                >
+                  Update &amp; Download
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => void restartToApplyUpdate()}
+                  className="rounded bg-kiviGreen px-2.5 py-0.5 text-[11px] font-semibold text-white hover:opacity-90"
+                >
+                  Restart Now
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={openUpdateModal}
+                className="text-[11px] font-medium text-kiviAccent hover:underline"
+              >
+                Details
+              </button>
+              <button
+                type="button"
+                onClick={dismissUpdateBanner}
+                className="text-[11px] text-kiviMuted hover:text-kiviInk"
+              >
+                Later
+              </button>
+            </div>
+          </div>
+        )}
+
       {appNotice && (
         <div
           role="status"
@@ -1209,9 +1388,9 @@ export const App: React.FC = () => {
           activeTabKind={activeTab?.kind ?? null}
           onOpenHex={handleOpenHexTab}
           onOpenWaveform={handleOpenWaveformTab}
-          onOpenWorkbench={() => setIsWorkbenchOpen(true)}
+          onOpenWorkbench={handleOpenWorkbench}
           onOpenFlash={() => void openToolOrFloating('flash', () => setIsFlashPanelOpen(true))}
-          onOpenDiff={() => setIsDiffModalOpen(true)}
+          onOpenDiff={handleOpenDiff}
           onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
           theme={theme}
           onToggleTheme={() => toggleTheme()}
@@ -1350,7 +1529,7 @@ export const App: React.FC = () => {
         activeTabKind={activeTab?.kind ?? null}
         onOpenHex={handleOpenHexTab}
         onOpenWaveform={handleOpenWaveformTab}
-        onOpenWorkbench={() => setIsWorkbenchOpen(true)}
+        onOpenWorkbench={handleOpenWorkbench}
         theme={theme}
         onToggleTheme={() => toggleTheme()}
       />
@@ -1485,6 +1664,7 @@ export const App: React.FC = () => {
         isOpen={isAutoTuneReviewOpen}
         onClose={() => setIsAutoTuneReviewOpen(false)}
       />
+      <UpdateModal />
       {isTelemetryPanelOpen && (
         <TelemetryDevPanel onClose={() => toggleTelemetryPanel(false)} />
       )}

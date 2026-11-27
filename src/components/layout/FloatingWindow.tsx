@@ -10,6 +10,7 @@ import { ExternalLink, Pin, PinOff } from 'lucide-react';
 import {
   bridgeOpenToolWindow,
   bridgeSetWindowAlwaysOnTop,
+  bridgeWindowStartDragging,
   bridgeWindowToggleMaximize,
   type ToolWindowId,
 } from '../../lib/windowControlsBridge';
@@ -25,8 +26,9 @@ import {
   getTopFloatingWindowId,
   getWindowZIndex,
   registerFloatingWindow,
+  setFloatingWindowMinimized,
+  subscribeWindowRestore,
   subscribeWindowStack,
-  TITLEBAR_HEIGHT,
   unregisterFloatingWindow,
   type ResizeEdge,
   type WindowDock,
@@ -168,8 +170,15 @@ export const FloatingWindow: React.FC<FloatingWindowProps> = ({
     registerFloatingWindow(windowId);
     focusFloatingWindow(windowId);
     const unsub = subscribeWindowStack(() => setStackTick((t) => t + 1));
+    const unsubRestore = subscribeWindowRestore((restoredId) => {
+      if (restoredId === windowId) {
+        setIsMinimized(false);
+        focusFloatingWindow(windowId);
+      }
+    });
     return () => {
       unsub();
+      unsubRestore();
       unregisterFloatingWindow(windowId);
     };
   }, [
@@ -338,7 +347,13 @@ export const FloatingWindow: React.FC<FloatingWindowProps> = ({
     });
   }, [alwaysOnTop]);
 
+  useEffect(() => {
+    if (standalone || !isOpen) return;
+    setFloatingWindowMinimized(windowId, title, isMinimized);
+  }, [standalone, isOpen, windowId, title, isMinimized]);
+
   if (!isOpen) return null;
+  if (!standalone && isMinimized) return null;
 
   const activeWidth = standalone ? viewportSize.w : rect.width;
   const ctxValue: FloatingWindowContextValue = {
@@ -372,21 +387,30 @@ export const FloatingWindow: React.FC<FloatingWindowProps> = ({
                 left: rect.x,
                 top: rect.y,
                 width: rect.width,
-                height: isMinimized ? TITLEBAR_HEIGHT : rect.height,
+                height: rect.height,
                 zIndex,
               }
         }
         className={
           standalone
-            ? 'fixed inset-0 flex h-screen w-screen flex-col overflow-hidden bg-kiviSurface font-mono text-kiviInk'
+            ? 'fixed inset-0 flex h-screen w-screen flex-col overflow-hidden border border-kiviBorderStrong bg-kiviSurface font-mono text-kiviInk'
             : 'kivi-floating-window fixed flex flex-col overflow-hidden rounded-2xl bg-kiviSurface font-mono text-kiviInk'
         }
       >
-        {/* Slim Borderless macOS Tahoe Titlebar */}
+        {/* Slim Borderless Window Titlebar */}
         <div
           data-testid={`window-titlebar-${windowId}`}
-          data-tauri-drag-region={standalone ? true : undefined}
+          data-tauri-drag-region={standalone ? '' : undefined}
           onPointerDown={standalone ? undefined : handleDragStart}
+          onMouseDown={
+            standalone
+              ? (e) => {
+                  if (e.button === 0 && e.detail === 1) {
+                    void bridgeWindowStartDragging();
+                  }
+                }
+              : undefined
+          }
           onDoubleClick={() => {
             if (standalone) {
               void bridgeWindowToggleMaximize(false);
@@ -394,11 +418,14 @@ export const FloatingWindow: React.FC<FloatingWindowProps> = ({
               handleToggleMaximize();
             }
           }}
-          className={`flex h-8 shrink-0 select-none items-center justify-between gap-2 px-3 backdrop-blur-sm ${
-            titlebarTone === 'sidebar' ? 'bg-kiviBg/95' : 'bg-kiviSurface/95'
+          className={`flex h-8 shrink-0 select-none items-center justify-between gap-2 border-b border-kiviBorder px-3 ${
+            titlebarTone === 'sidebar' ? 'bg-kiviBg' : 'bg-kiviSurface'
           } ${standalone ? 'cursor-default' : 'cursor-grab active:cursor-grabbing'}`}
         >
-          <div className="flex min-w-0 flex-1 items-center gap-2">
+          <div
+            data-tauri-drag-region={standalone ? '' : undefined}
+            className="flex min-w-0 flex-1 items-center gap-2"
+          >
             {standalone ? (
               <WindowTrafficLights
                 closeLabel={closeLabel}
@@ -415,16 +442,18 @@ export const FloatingWindow: React.FC<FloatingWindowProps> = ({
               />
             )}
             {icon && (
-              <span className="flex shrink-0 items-center text-kiviAccent">{icon}</span>
+              <span className="pointer-events-none flex shrink-0 items-center text-kiviAccent">
+                {icon}
+              </span>
             )}
             <h2
               id={titleId}
-              className="min-w-0 truncate whitespace-nowrap text-[11px] font-semibold text-kiviInk"
+              className="pointer-events-none min-w-0 truncate whitespace-nowrap text-[11px] font-semibold text-kiviInk"
             >
               {title}
             </h2>
             {showBadge && (
-              <span className="shrink-0 whitespace-nowrap rounded border border-kiviBorder/80 bg-kiviBg/80 px-1.5 py-0.2 text-[9px] text-kiviMuted">
+              <span className="pointer-events-none shrink-0 whitespace-nowrap rounded border border-kiviBorder/80 bg-kiviBg/80 px-1.5 py-0.5 text-[9px] text-kiviMuted">
                 {badge}
               </span>
             )}

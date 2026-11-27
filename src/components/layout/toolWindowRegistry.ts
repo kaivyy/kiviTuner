@@ -65,7 +65,7 @@ export const TOOL_WINDOW_SPECS: Record<ToolWindowId, ToolWindowPreset> = {
     minWidth: 520,
     minHeight: 440,
     dock: 'center',
-    supportsDesktopPopout: false,
+    supportsDesktopPopout: true,
   },
   workbench: {
     toolId: 'workbench',
@@ -75,7 +75,7 @@ export const TOOL_WINDOW_SPECS: Record<ToolWindowId, ToolWindowPreset> = {
     minWidth: 520,
     minHeight: 440,
     dock: 'center',
-    supportsDesktopPopout: false,
+    supportsDesktopPopout: true,
   },
   autotune: {
     toolId: 'autotune',
@@ -85,7 +85,7 @@ export const TOOL_WINDOW_SPECS: Record<ToolWindowId, ToolWindowPreset> = {
     minWidth: 520,
     minHeight: 440,
     dock: 'center',
-    supportsDesktopPopout: false,
+    supportsDesktopPopout: true,
   },
     'map-props': {
     toolId: 'map-props',

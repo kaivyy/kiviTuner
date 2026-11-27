@@ -128,3 +128,118 @@ export function filterMapTreeByParamType(
 export function countMaps(groups: MapTreeGroup[]): number {
   return groups.reduce((n, g) => n + g.maps.length, 0);
 }
+
+/** Hierarchical folder node rendered by Map Explorer. */
+export interface MapFolderNode {
+  id: string;
+  name: string;
+  path: string;
+  folders: MapFolderNode[];
+  maps: MapDef[];
+  totalCount: number;
+}
+
+/** Splits XDF / category paths (`Fuel / Main`, `Boost > Limiters`) into clean folder segments. */
+export function splitCategoryPath(category: string): string[] {
+  const trimmed = category.trim();
+  if (!trimmed || trimmed === UNCATEGORISED) return [UNCATEGORISED];
+  const parts = trimmed
+    .split(/\s*(?:\/|>|\\|\|)\s*/)
+    .map((p) => p.trim())
+    .filter((p) => p.length > 0);
+  return parts.length > 0 ? parts : [UNCATEGORISED];
+}
+
+interface MutableFolder {
+  name: string;
+  path: string;
+  children: Map<string, MutableFolder>;
+  maps: MapDef[];
+}
+
+function finalizeFolderNode(node: MutableFolder): MapFolderNode {
+  const folders = Array.from(node.children.values()).map(finalizeFolderNode);
+  folders.sort((a, b) => {
+    if (a.name === UNCATEGORISED) return 1;
+    if (b.name === UNCATEGORISED) return -1;
+    return a.name.localeCompare(b.name);
+  });
+  const maps = [...node.maps].sort((a, b) => a.name.localeCompare(b.name));
+  const totalCount = maps.length + folders.reduce((sum, f) => sum + f.totalCount, 0);
+  return {
+    id: node.path,
+    name: node.name,
+    path: node.path,
+    folders,
+    maps,
+    totalCount,
+  };
+}
+
+/** Builds a nested folder hierarchy from category groups while keeping `Uncategorised` last. */
+export function buildMapFolderTree(groups: MapTreeGroup[]): MapFolderNode[] {
+  const roots = new Map<string, MutableFolder>();
+
+  for (const group of groups) {
+    const segments = splitCategoryPath(group.category);
+    let currentMap = roots;
+    let currentNode: MutableFolder | null = null;
+    let pathAcc = '';
+
+    for (const seg of segments) {
+      pathAcc = pathAcc ? `${pathAcc}/${seg}` : seg;
+      let next = currentMap.get(seg);
+      if (!next) {
+        next = {
+          name: seg,
+          path: pathAcc,
+          children: new Map<string, MutableFolder>(),
+          maps: [],
+        };
+        currentMap.set(seg, next);
+      }
+      currentNode = next;
+      currentMap = next.children;
+    }
+
+    if (currentNode) {
+      currentNode.maps.push(...group.maps);
+    }
+  }
+
+  const out = Array.from(roots.values()).map(finalizeFolderNode);
+  out.sort((a, b) => {
+    if (a.name === UNCATEGORISED) return 1;
+    if (b.name === UNCATEGORISED) return -1;
+    return a.name.localeCompare(b.name);
+  });
+  return out;
+}
+
+/** Collects every folder path in the tree for Expand All / filter expansion. */
+export function collectFolderPaths(nodes: MapFolderNode[]): string[] {
+  const paths: string[] = [];
+  const walk = (list: MapFolderNode[]) => {
+    for (const node of list) {
+      paths.push(node.path);
+      if (node.folders.length > 0) walk(node.folders);
+    }
+  };
+  walk(nodes);
+  return paths;
+}
+
+/** Returns all ancestor folder paths containing `mapId`, used to reveal the selected map. */
+export function findFolderPathsForMap(nodes: MapFolderNode[], mapId: string | null): string[] {
+  if (!mapId) return [];
+  for (const node of nodes) {
+    if (node.maps.some((m) => m.id === mapId)) {
+      return [node.path];
+    }
+    const sub = findFolderPathsForMap(node.folders, mapId);
+    if (sub.length > 0) {
+      return [node.path, ...sub];
+    }
+  }
+  return [];
+}

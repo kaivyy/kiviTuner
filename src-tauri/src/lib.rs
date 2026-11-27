@@ -6,6 +6,7 @@ pub mod flash_diag;
 pub mod flash_stream;
 pub mod telemetry_manager;
 pub mod toolkit;
+pub mod updater;
 pub mod window_manager;
 
 pub use commands::AppState;
@@ -14,9 +15,26 @@ pub use flash_commands::FlashEngineState;
 pub use telemetry_manager::TelemetryManager;
 
 pub fn run() {
-    tauri::Builder::default()
+    let context = tauri::generate_context!();
+    let enable_signed_updater = context
+        .config()
+        .plugins
+        .0
+        .get("updater")
+        .and_then(|v| v.get("pubkey"))
+        .and_then(|v| v.as_str())
+        .is_some_and(|s| !s.trim().is_empty());
+
+    let mut builder = tauri::Builder::default()
+        .plugin(tauri_plugin_process::init())
         .manage(AppState::default())
-        .manage(FlashEngineState::default())
+        .manage(FlashEngineState::default());
+
+    if enable_signed_updater {
+        builder = builder.plugin(tauri_plugin_updater::Builder::new().build());
+    }
+
+    builder
         .invoke_handler(tauri::generate_handler![
             commands::load_bin_data,
             commands::load_bin_file,
@@ -239,7 +257,11 @@ pub fn run() {
             window_manager::open_tool_window,
             window_manager::close_tool_window,
             window_manager::set_current_window_always_on_top,
+            window_manager::broadcast_workspace_event,
+            updater::check_app_update,
+            updater::download_and_install_update,
+            updater::restart_app,
         ])
-        .run(tauri::generate_context!())
+        .run(context)
         .expect("error while running tauri application");
 }

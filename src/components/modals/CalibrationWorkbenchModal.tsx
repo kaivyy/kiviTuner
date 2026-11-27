@@ -72,6 +72,7 @@ export interface CalibrationWorkbenchModalProps {
   onRomUpdated: (nextRom: Uint8Array, checksumOk?: boolean) => Promise<void> | void;
   onMatrixUpdated: (mapDef: MapDef, nextMatrix: number[][]) => Promise<void> | void;
   onUpdateMapScaling: (mapId: string, equation: string) => void;
+  standalone?: boolean;
 }
 
 type WorkbenchTab = 'blind' | 'defs' | 'similar' | 'checksum' | 'edit' | 'tools';
@@ -122,6 +123,7 @@ export const CalibrationWorkbenchModal: React.FC<CalibrationWorkbenchModalProps>
   onRomUpdated,
   onMatrixUpdated,
   onUpdateMapScaling,
+  standalone = false,
 }) => {
   const storeRomLoaded = useMapStore((s) => s.romLoaded);
   const storeRomSize = useMapStore((s) => s.romSize);
@@ -543,7 +545,7 @@ export const CalibrationWorkbenchModal: React.FC<CalibrationWorkbenchModalProps>
   };
 
   const tabButtons: Array<{ id: WorkbenchTab; label: string; icon: React.ReactNode }> = [
-    { id: 'blind', label: 'Blind V2', icon: <Activity className="h-3.5 w-3.5" /> },
+    { id: 'blind', label: 'Auto-Scan', icon: <Activity className="h-3.5 w-3.5" /> },
     { id: 'defs', label: 'A2L / DAMOS / XDF', icon: <FileCode className="h-3.5 w-3.5" /> },
     { id: 'similar', label: 'Similar & Migration', icon: <GitCompare className="h-3.5 w-3.5" /> },
     { id: 'checksum', label: 'Auto Checksums', icon: <ShieldCheck className="h-3.5 w-3.5" /> },
@@ -565,6 +567,8 @@ export const CalibrationWorkbenchModal: React.FC<CalibrationWorkbenchModalProps>
       minWidth={TOOL_WINDOW_SPECS.workbench.minWidth}
       minHeight={TOOL_WINDOW_SPECS.workbench.minHeight}
       dock={TOOL_WINDOW_SPECS.workbench.dock}
+      standalone={standalone}
+      popoutToolId="workbench"
       titlebarTone="sidebar"
       closeLabel="Close calibration workbench"
     >

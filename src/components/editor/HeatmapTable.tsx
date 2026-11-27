@@ -103,9 +103,10 @@ export interface HeatmapTableProps {
   actionRef?: React.RefObject<HeatmapTableHandle | null>;
   onRevertToOriginal?: (selection?: SelectionRange | null) => void;
   onEditMapProperties?: () => void;
+  fillHeight?: boolean;
 }
 
-export const HeatmapTable: React.FC<HeatmapTableProps> = ({
+export const HeatmapTable: React.FC<HeatmapTableProps> = React.memo(({
   title,
   tableId,
   correlatedCell: propCorrelatedCell,
@@ -132,6 +133,7 @@ export const HeatmapTable: React.FC<HeatmapTableProps> = ({
   actionRef,
   onRevertToOriginal,
   onEditMapProperties,
+  fillHeight = false,
 }) => {
   const numRows = matrix.length;
   const numCols = matrix[0]?.length ?? 0;
@@ -914,7 +916,9 @@ export const HeatmapTable: React.FC<HeatmapTableProps> = ({
       tabIndex={0}
       onKeyDown={handleKeyDown}
       onPaste={handleContainerPaste}
-      className="relative flex flex-col rounded-lg border border-kiviBorder bg-kiviSurface shadow-md focus-visible:outline-2 focus-visible:outline-kiviAccent"
+      className={`relative flex w-full min-w-0 flex-col rounded-lg border border-kiviBorder bg-kiviSurface shadow-md focus-visible:outline-2 focus-visible:outline-kiviAccent ${
+        fillHeight ? 'h-full min-h-0 flex-1 overflow-hidden' : ''
+      }`}
     >
       <HeatmapAnalysisBar
         showChecksum={checksumRom !== undefined}
@@ -1014,15 +1018,17 @@ export const HeatmapTable: React.FC<HeatmapTableProps> = ({
         onScroll={(e) => {
           if (virtualizeRows) setTableScrollTop(e.currentTarget.scrollTop);
         }}
-        className="relative overflow-auto max-h-[500px] select-none p-1"
+        className={`relative min-w-0 overflow-auto select-none p-1 ${
+          fillHeight ? 'min-h-0 flex-1' : 'max-h-[540px]'
+        }`}
       >
-        <table className="border-collapse text-xs text-center font-mono w-full table-fixed">
+        <table className="w-max min-w-full border-collapse text-center font-mono text-xs">
           <thead>
             <tr>
               <th
                 onClick={handleSelectAll}
                 title="Click to select entire matrix [Ctrl+A]"
-                className="sticky top-0 left-0 z-30 p-1.5 px-3 bg-kiviSurface border border-kiviBorder text-[11px] text-kiviSecondary cursor-pointer hover:bg-kiviElevated hover:text-kiviInk transition-colors"
+                className="sticky top-0 left-0 z-30 min-w-[68px] whitespace-nowrap border border-kiviBorder bg-kiviSurface px-2.5 py-1.5 text-[11px] text-kiviSecondary cursor-pointer hover:bg-kiviElevated hover:text-kiviInk transition-colors"
               >
                 <div className="flex flex-col items-center leading-tight">
                   <span className="text-[10px] text-kiviSecondary">{yAxisName}</span>
@@ -1038,7 +1044,7 @@ export const HeatmapTable: React.FC<HeatmapTableProps> = ({
                     key={colIdx}
                     onClick={() => handleColHeaderClick(colIdx)}
                     title={`Column ${colIdx} (${xAxisName}): Click to select column`}
-                    className={`sticky top-0 z-20 p-1 px-2 border border-kiviBorder cursor-pointer tabular-nums transition-colors ${
+                    className={`sticky top-0 z-20 min-w-[56px] whitespace-nowrap border border-kiviBorder px-2 py-1 cursor-pointer tabular-nums transition-colors ${
                       isColInSelection
                         ? 'bg-kiviAccent/20 text-kiviAccent font-semibold'
                         : 'bg-kiviSurface text-kiviSecondary hover:bg-kiviElevated hover:text-kiviInk'
@@ -1182,4 +1188,4 @@ export const HeatmapTable: React.FC<HeatmapTableProps> = ({
       )}
     </div>
   );
-};
+});

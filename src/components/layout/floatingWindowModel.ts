@@ -191,7 +191,14 @@ export function computeMaximizedRect(viewportW: number, viewportH: number): Wind
 // ---------------------------------------------------------------------------
 
 let stackOrder: string[] = [];
+const minimizedMap = new Map<string, string>();
 const stackListeners = new Set<() => void>();
+const restoreListeners = new Set<(id: string) => void>();
+
+export interface MinimizedWindowEntry {
+  id: string;
+  title: string;
+}
 
 function notifyStack(): void {
   for (const listener of stackListeners) {
@@ -206,6 +213,13 @@ export function subscribeWindowStack(listener: () => void): () => void {
   };
 }
 
+export function subscribeWindowRestore(listener: (id: string) => void): () => void {
+  restoreListeners.add(listener);
+  return () => {
+    restoreListeners.delete(listener);
+  };
+}
+
 export function registerFloatingWindow(id: string): number {
   if (!stackOrder.includes(id)) {
     stackOrder = [...stackOrder, id];
@@ -215,9 +229,36 @@ export function registerFloatingWindow(id: string): number {
 }
 
 export function unregisterFloatingWindow(id: string): void {
-  if (!stackOrder.includes(id)) return;
-  stackOrder = stackOrder.filter((item) => item !== id);
+  const hadMinimized = minimizedMap.delete(id);
+  const hadStack = stackOrder.includes(id);
+  if (!hadStack && !hadMinimized) return;
+  if (hadStack) {
+    stackOrder = stackOrder.filter((item) => item !== id);
+  }
   notifyStack();
+}
+
+export function setFloatingWindowMinimized(id: string, title: string, minimized: boolean): void {
+  if (minimized) {
+    if (minimizedMap.get(id) === title) return;
+    minimizedMap.set(id, title);
+    notifyStack();
+  } else if (minimizedMap.delete(id)) {
+    notifyStack();
+  }
+}
+
+export function getMinimizedFloatingWindows(): MinimizedWindowEntry[] {
+  return Array.from(minimizedMap.entries()).map(([id, title]) => ({ id, title }));
+}
+
+export function requestRestoreFloatingWindow(id: string): void {
+  minimizedMap.delete(id);
+  focusFloatingWindow(id);
+  notifyStack();
+  for (const listener of restoreListeners) {
+    listener(id);
+  }
 }
 
 export function focusFloatingWindow(id: string): void {
@@ -241,5 +282,6 @@ export function getOpenFloatingWindowCount(): number {
 
 export function resetWindowStackForTests(): void {
   stackOrder = [];
+  minimizedMap.clear();
   notifyStack();
 }

@@ -47,3 +47,38 @@ test('useWorkspaceTabsStore manages tabs, split pane, pinning, and cap eviction'
   assert.ok(s.getState().tabs.length <= 24, 'tab strip enforces 24-tab ceiling');
   s.getState().reset();
 });
+
+test('syncMapTab respects forceKind so switching from split_3d back to 2D table updates existing tab kind', () => {
+  const s = useWorkspaceTabsStore;
+  s.getState().reset();
+
+  const fuelMap = {
+    id: 'fuel_main',
+    name: 'Main Fuel',
+    category: 'Fuel',
+    address: 0x2000,
+    rows: 16,
+    cols: 16,
+    dtype: 'u16' as const,
+    endian: 'little' as const,
+    scaling: { equation: 'X', unit: 'ms', decimals: 2 },
+  };
+
+  s.getState().syncMapTab(fuelMap, 'map-split');
+  assert.strictEqual(s.getState().tabs.find((t) => t.id === 'map:fuel_main')?.kind, 'map-split');
+
+  // Default behavior preserves existing kind when simply re-selecting the map
+  s.getState().syncMapTab(fuelMap, 'map-table');
+  assert.strictEqual(s.getState().tabs.find((t) => t.id === 'map:fuel_main')?.kind, 'map-split');
+
+  // Explicit layout switch uses forceKind=true and returns to 2D table cleanly
+  s.getState().syncMapTab(fuelMap, 'map-table', true);
+  assert.strictEqual(s.getState().tabs.find((t) => t.id === 'map:fuel_main')?.kind, 'map-table');
+
+  s.getState().syncMapTab(fuelMap, 'map-3d', true);
+  assert.strictEqual(s.getState().tabs.find((t) => t.id === 'map:fuel_main')?.kind, 'map-3d');
+
+  s.getState().syncMapTab(fuelMap, 'map-table', true);
+  assert.strictEqual(s.getState().tabs.find((t) => t.id === 'map:fuel_main')?.kind, 'map-table');
+  s.getState().reset();
+});

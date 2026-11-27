@@ -9,6 +9,10 @@ import {
   getMatrixExtremes,
   calculateAutoYScaling,
   getPaletteColor,
+  getShadedPaletteColor,
+  computeQuadShade,
+  computeAxisTickIndices,
+  normalizeMatrixFor3D,
   findClosestCell,
   CAMERA_PRESETS,
   type Point3D,
@@ -227,4 +231,31 @@ test('findClosestCell: correctly pinpoints nearest grid point to screen coordina
   assert.equal(hit.r, 0);
   assert.equal(hit.c, 0);
   assert.ok(hit.distance < 5);
+});
+
+test('computeQuadShade, computeAxisTickIndices, and normalizeMatrixFor3D produce valid CAD plot geometry', () => {
+  const flatQuad = buildQuads([
+    [10, 10],
+    [10, 10],
+  ])[0];
+  const flatShade = computeQuadShade(flatQuad, 0.2);
+  assert.ok(flatShade >= 0.72 && flatShade <= 1.18);
+
+  const shadedColor = getShadedPaletteColor(50, 0, 100, 'spectrum', flatShade, 0.9);
+  assert.ok(shadedColor.startsWith('rgba('));
+
+  assert.deepEqual(computeAxisTickIndices(16, 5), [0, 4, 8, 11, 15]);
+  assert.deepEqual(computeAxisTickIndices(4, 6), [0, 1, 2, 3]);
+
+  const ribbon1d = normalizeMatrixFor3D([[10, 15, 20, 25]]);
+  assert.equal(ribbon1d.is1DRibbon, true);
+  assert.equal(ribbon1d.transpose1D, false);
+  assert.equal(ribbon1d.matrix.length, 2);
+  assert.equal(ribbon1d.matrix[0].length, 4);
+
+  const col1d = normalizeMatrixFor3D([[10], [20], [30]]);
+  assert.equal(col1d.is1DRibbon, true);
+  assert.equal(col1d.transpose1D, true);
+  assert.equal(col1d.matrix.length, 2);
+  assert.equal(col1d.matrix[0].length, 3);
 });

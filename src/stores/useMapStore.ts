@@ -81,6 +81,35 @@ interface DesktopDocMeta {
 
 const MAX_BROWSER_UNDO = 128;
 const MAX_RECENT_ROMS = 10;
+const MAX_MATRIX_CACHE = 32;
+
+const matrixCache = new Map<string, { active: number[][]; base: number[][] }>();
+
+function buildMatrixCacheKey(docId: string | null, revision: number, mapDef: MapDef): string {
+  return `${docId ?? 'none'}:${revision}:${mapDef.id}:${mapDef.address}:${mapDef.rows}x${mapDef.cols}:${mapDef.dtype}:${mapDef.endian}:${mapDef.scaling.equation}`;
+}
+
+function getCachedMatrix(key: string): { active: number[][]; base: number[][] } | undefined {
+  const hit = matrixCache.get(key);
+  if (!hit) return undefined;
+  matrixCache.delete(key);
+  matrixCache.set(key, hit);
+  return hit;
+}
+
+function putCachedMatrix(key: string, active: number[][], base: number[][]): void {
+  if (matrixCache.has(key)) {
+    matrixCache.delete(key);
+  } else if (matrixCache.size >= MAX_MATRIX_CACHE) {
+    const oldest = matrixCache.keys().next().value;
+    if (oldest !== undefined) matrixCache.delete(oldest);
+  }
+  matrixCache.set(key, { active, base });
+}
+
+function clearMatrixCache(): void {
+  matrixCache.clear();
+}
 
 const EMPTY_ROM_FIELDS = {
   maps: [] as MapDef[],
@@ -403,6 +432,7 @@ export const useMapStore = create<MapStoreState>((set, get) => ({
   },
 
   updateMapDef: async (mapDef) => {
+    clearMatrixCache();
     const state = get();
     const exists = state.maps.some((m) => m.id === mapDef.id);
     const nextMaps = exists
@@ -418,6 +448,7 @@ export const useMapStore = create<MapStoreState>((set, get) => ({
   },
 
   deleteMapDef: (mapId) => {
+    clearMatrixCache();
     const state = get();
     const nextMaps = state.maps.filter((m) => m.id !== mapId);
     const removingSelected = state.selectedMapId === mapId;
@@ -436,8 +467,23 @@ export const useMapStore = create<MapStoreState>((set, get) => ({
   },
 
   selectMap: (id) => {
-    const activeSlot = getActiveBrowserSlot(get().activeDocId);
+    const state = get();
+    const activeSlot = getActiveBrowserSlot(state.activeDocId);
     if (activeSlot) activeSlot.selectedMapId = id;
+    const targetMap = id ? state.maps.find((m) => m.id === id) : undefined;
+    if (targetMap && (state.romLoaded || state.romData)) {
+      const key = buildMatrixCacheKey(state.activeDocId, state.romRevision, targetMap);
+      const cached = getCachedMatrix(key);
+      if (cached) {
+        set({
+          selectedMapId: id,
+          activeMatrix: cached.active,
+          baseMatrix: cached.base,
+        });
+        if (isDesktopApp()) saveDesktopDocMeta(get());
+        return;
+      }
+    }
     set({ selectedMapId: id });
     if (isDesktopApp()) saveDesktopDocMeta(get());
   },
@@ -468,6 +514,7 @@ export const useMapStore = create<MapStoreState>((set, get) => ({
     }),
 
   loadRomBufferSync: (data) => {
+    clearMatrixCache();
     docOpSeq += 1;
     extractSeq += 1;
     checksumSeq += 1;
@@ -509,6 +556,7 @@ export const useMapStore = create<MapStoreState>((set, get) => ({
     }),
 
   loadRomBuffer: async (data, fallbackHashes, meta) => {
+    clearMatrixCache();
     const myDocSeq = ++docOpSeq;
     extractSeq += 1;
     checksumSeq += 1;
@@ -606,11 +654,24 @@ export const useMapStore = create<MapStoreState>((set, get) => ({
   },
 
   extractMatrix: async (mapDef) => {
+    const state = get();
+    const myDocId = state.activeDocId;
+    const rev = state.romRevision;
+    const cacheKey = buildMatrixCacheKey(myDocId, rev, mapDef);
+    const cached = getCachedMatrix(cacheKey);
+    if (cached) {
+      if (state.selectedMapId !== mapDef.id || state.activeMatrix !== cached.active || state.baseMatrix !== cached.base) {
+        set({
+          activeMatrix: cached.active,
+          baseMatrix: cached.base,
+        });
+      }
+      return cached.active;
+    }
+
     const seq = ++extractSeq;
     const myDocSeq = docOpSeq;
-    const myDocId = get().activeDocId;
     const desktop = isDesktopApp();
-    const state = get();
 
     if (desktop) {
       const [matrix, stock] = await Promise.all([
@@ -620,9 +681,11 @@ export const useMapStore = create<MapStoreState>((set, get) => ({
       if (seq !== extractSeq || myDocSeq !== docOpSeq || get().activeDocId !== myDocId) {
         return matrix;
       }
+      const base = stock ?? matrix.map((row) => [...row]);
+      putCachedMatrix(cacheKey, matrix, base);
       set({
         activeMatrix: matrix,
-        baseMatrix: stock ?? matrix.map((row) => [...row]),
+        baseMatrix: base,
       });
       return matrix;
     }
@@ -634,14 +697,17 @@ export const useMapStore = create<MapStoreState>((set, get) => ({
     if (seq !== extractSeq || myDocSeq !== docOpSeq || get().activeDocId !== myDocId) {
       return matrix;
     }
+    const base = stock ?? matrix.map((row) => [...row]);
+    putCachedMatrix(cacheKey, matrix, base);
     set({
       activeMatrix: matrix,
-      baseMatrix: stock ?? matrix.map((row) => [...row]),
+      baseMatrix: base,
     });
     return matrix;
   },
 
   updateMatrix: async (mapDef, matrix) => {
+    clearMatrixCache();
     const targetDocId = get().activeDocId;
     const targetDocSeq = docOpSeq;
     if (get().selectedMapId === mapDef.id) {
@@ -689,6 +755,7 @@ export const useMapStore = create<MapStoreState>((set, get) => ({
 
   patchActiveMapCells: async (mapDef, edits, label) => {
     if (edits.length === 0) return;
+    clearMatrixCache();
     const targetDocId = get().activeDocId;
     const targetDocSeq = docOpSeq;
 
@@ -765,6 +832,7 @@ export const useMapStore = create<MapStoreState>((set, get) => ({
 
   patchRomBytes: async (writes, label) => {
     if (writes.length === 0) return false;
+    clearMatrixCache();
     const targetDocId = get().activeDocId;
     const targetDocSeq = docOpSeq;
 
@@ -830,6 +898,7 @@ export const useMapStore = create<MapStoreState>((set, get) => ({
   },
 
   revertMapToOriginal: async (mapDef, selection) => {
+    clearMatrixCache();
     const targetDocId = get().activeDocId;
     const targetDocSeq = docOpSeq;
 
@@ -920,6 +989,7 @@ export const useMapStore = create<MapStoreState>((set, get) => ({
   },
 
   undoEdit: async () => {
+    clearMatrixCache();
     const targetDocId = get().activeDocId;
     const targetDocSeq = docOpSeq;
 
@@ -977,6 +1047,7 @@ export const useMapStore = create<MapStoreState>((set, get) => ({
   },
 
   redoEdit: async () => {
+    clearMatrixCache();
     const targetDocId = get().activeDocId;
     const targetDocSeq = docOpSeq;
 
@@ -1205,6 +1276,7 @@ export const useMapStore = create<MapStoreState>((set, get) => ({
   },
 
   openRomDocument: async (data, meta) => {
+    clearMatrixCache();
     const myDocSeq = ++docOpSeq;
     extractSeq += 1;
     checksumSeq += 1;
@@ -1273,6 +1345,7 @@ export const useMapStore = create<MapStoreState>((set, get) => ({
 
   openRomDocumentFile: async (path, meta) => {
     if (!isDesktopApp()) return;
+    clearMatrixCache();
     const myDocSeq = ++docOpSeq;
     extractSeq += 1;
     checksumSeq += 1;
@@ -1295,6 +1368,7 @@ export const useMapStore = create<MapStoreState>((set, get) => ({
   },
 
   switchRomDocument: async (docId) => {
+    clearMatrixCache();
     const myDocSeq = ++docOpSeq;
     extractSeq += 1;
     checksumSeq += 1;
@@ -1338,6 +1412,7 @@ export const useMapStore = create<MapStoreState>((set, get) => ({
   },
 
   closeRomDocument: async (docId) => {
+    clearMatrixCache();
     const myDocSeq = ++docOpSeq;
     extractSeq += 1;
     checksumSeq += 1;
@@ -1383,6 +1458,7 @@ export const useMapStore = create<MapStoreState>((set, get) => ({
   },
 
   closeActiveRom: async () => {
+    clearMatrixCache();
     const activeId = get().activeDocId;
     if (activeId) {
       await get().closeRomDocument(activeId);
@@ -1414,6 +1490,7 @@ export const useMapStore = create<MapStoreState>((set, get) => ({
 
   refreshRomSession: async () => {
     if (!isDesktopApp()) return;
+    clearMatrixCache();
     const myDocSeq = docOpSeq;
     const summary = await bridgeGetRomSessionSummary();
     if (myDocSeq !== docOpSeq || !summary) return;
@@ -1426,6 +1503,7 @@ export const useMapStore = create<MapStoreState>((set, get) => ({
   clearRecentRoms: () => set({ recentRoms: [] }),
 
   reset: () => {
+    clearMatrixCache();
     docOpSeq += 1;
     extractSeq += 1;
     checksumSeq += 1;

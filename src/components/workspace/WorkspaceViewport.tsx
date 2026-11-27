@@ -76,7 +76,7 @@ interface WorkspaceViewportProps {
   onCloseSplit?: () => void;
 }
 
-export const WorkspaceViewport: React.FC<WorkspaceViewportProps> = ({
+export const WorkspaceViewport: React.FC<WorkspaceViewportProps> = React.memo(({
   layoutPreset,
   setLayoutPreset,
   selectedMap,
@@ -159,7 +159,7 @@ export const WorkspaceViewport: React.FC<WorkspaceViewportProps> = ({
             </button>
           )}
         </div>
-        <div className="flex-1 overflow-auto p-3">
+        <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-auto p-3">
           {splitTab.kind === 'hex' ? (
             <HexdumpView
               data={romData}
@@ -189,24 +189,27 @@ export const WorkspaceViewport: React.FC<WorkspaceViewportProps> = ({
             />
           ) : selectedMap && activeMatrix ? (
             splitTab.kind === 'map-3d' ? (
-              <Surface3DView
-                title={`${selectedMap.name} (3D)`}
-                tableId={selectedMap.id}
-                matrix={activeMatrix}
-                baseMatrix={baseMatrix || undefined}
-                xLabels={xLabels}
-                yLabels={yLabels}
-                xAxisName={xAxisName}
-                yAxisName={yAxisName}
-                unit={selectedMap.scaling.unit || 'raw'}
-                decimals={selectedMap.scaling.decimals ?? 1}
-                selectedRange={tableSelection}
-                onSelectCell={(r, c) => setTableSelection({ minR: r, maxR: r, minC: c, maxC: c })}
-                onChangeMatrix={onChangeMatrix}
-                palette={palette}
-              />
+              <div className="flex min-h-[340px] min-w-0 flex-1 flex-col overflow-hidden">
+                <Surface3DView
+                  title={`${selectedMap.name} (3D)`}
+                  tableId={selectedMap.id}
+                  matrix={activeMatrix}
+                  baseMatrix={baseMatrix || undefined}
+                  xLabels={xLabels}
+                  yLabels={yLabels}
+                  xAxisName={xAxisName}
+                  yAxisName={yAxisName}
+                  unit={selectedMap.scaling.unit || 'raw'}
+                  decimals={selectedMap.scaling.decimals ?? 1}
+                  selectedRange={tableSelection}
+                  onSelectCell={(r, c) => setTableSelection({ minR: r, maxR: r, minC: c, maxC: c })}
+                  onChangeMatrix={onChangeMatrix}
+                  palette={palette}
+                />
+              </div>
             ) : (
               <HeatmapTable
+                fillHeight
                 title={selectedMap.name}
                 tableId={selectedMap.id}
                 matrix={activeMatrix}
@@ -354,7 +357,15 @@ export const WorkspaceViewport: React.FC<WorkspaceViewportProps> = ({
       </div>
 
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden lg:flex-row">
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-y-auto p-3 md:gap-4 md:p-4">
+        <div
+          className={`flex min-h-0 min-w-0 flex-1 flex-col gap-3 p-3 md:gap-4 md:p-4 ${
+            showHexPrimary || effectivePreset === 'full_3d'
+              ? 'overflow-hidden'
+              : effectivePreset === 'split_3d'
+                ? 'overflow-y-auto xl:overflow-hidden'
+                : 'overflow-y-auto'
+          }`}
+        >
           {showHexPrimary ? (
             <div className="flex flex-1 flex-col overflow-hidden rounded-lg border border-kiviBorder">
               <HexdumpView
@@ -403,28 +414,23 @@ export const WorkspaceViewport: React.FC<WorkspaceViewportProps> = ({
             </div>
           ) : effectivePreset === 'full_3d' ? (
             selectedMap && activeMatrix ? (
-              <div className="flex flex-1 flex-col">
-                <div className="mb-2">
-                  <h2 className="text-sm font-semibold text-kiviInk">{selectedMap.name} (3D)</h2>
-                </div>
-                <div className="min-h-[340px] flex-1 md:min-h-[500px]">
-                  <Surface3DView
-                    title={`${selectedMap.name} (3D Full)`}
-                    tableId={selectedMap.id}
-                    matrix={activeMatrix}
-                    baseMatrix={baseMatrix || undefined}
-                    xLabels={xLabels}
-                    yLabels={yLabels}
-                    xAxisName={xAxisName}
-                    yAxisName={yAxisName}
-                    unit={selectedMap.scaling.unit || 'raw'}
-                    decimals={selectedMap.scaling.decimals ?? 1}
-                    selectedRange={tableSelection}
-                    onSelectCell={(r, c) => setTableSelection({ minR: r, maxR: r, minC: c, maxC: c })}
-                    onChangeMatrix={onChangeMatrix}
-                    palette={palette}
-                  />
-                </div>
+              <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+                <Surface3DView
+                  title={`${selectedMap.name} (3D Full)`}
+                  tableId={selectedMap.id}
+                  matrix={activeMatrix}
+                  baseMatrix={baseMatrix || undefined}
+                  xLabels={xLabels}
+                  yLabels={yLabels}
+                  xAxisName={xAxisName}
+                  yAxisName={yAxisName}
+                  unit={selectedMap.scaling.unit || 'raw'}
+                  decimals={selectedMap.scaling.decimals ?? 1}
+                  selectedRange={tableSelection}
+                  onSelectCell={(r, c) => setTableSelection({ minR: r, maxR: r, minC: c, maxC: c })}
+                  onChangeMatrix={onChangeMatrix}
+                  palette={palette}
+                />
               </div>
             ) : (
               <div className="flex flex-1 flex-col items-center justify-center p-8 text-center text-kiviMuted">
@@ -434,9 +440,10 @@ export const WorkspaceViewport: React.FC<WorkspaceViewportProps> = ({
             )
           ) : effectivePreset === 'split_3d' ? (
             selectedMap && activeMatrix ? (
-              <div className="grid flex-1 grid-cols-1 gap-4 xl:grid-cols-2">
-                <div className="overflow-x-auto">
+              <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 xl:grid xl:grid-cols-[minmax(0,1.08fr)_minmax(0,1fr)] xl:overflow-hidden">
+                <div className="flex min-h-[320px] min-w-0 flex-col overflow-hidden xl:min-h-0">
                   <HeatmapTable
+                    fillHeight
                     title={`${selectedMap.name} (2D)`}
                     tableId={selectedMap.id}
                     matrix={activeMatrix}
@@ -463,7 +470,7 @@ export const WorkspaceViewport: React.FC<WorkspaceViewportProps> = ({
                     onEditMapProperties={onEditMapProperties}
                   />
                 </div>
-                <div className="h-[360px] xl:h-[520px]">
+                <div className="flex h-[380px] min-h-[320px] min-w-0 flex-col overflow-hidden xl:h-full xl:min-h-0">
                   <Surface3DView
                     title={`${selectedMap.name} (3D)`}
                     tableId={selectedMap.id}
@@ -491,9 +498,9 @@ export const WorkspaceViewport: React.FC<WorkspaceViewportProps> = ({
               </div>
             )
           ) : effectivePreset === 'split_waveform' ? (
-            <div className="flex flex-1 flex-col gap-4">
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-4">
               {selectedMap && activeMatrix && (
-                <div className="overflow-x-auto">
+                <div className="min-w-0 overflow-hidden">
                   <HeatmapTable
                     title={selectedMap.name}
                     tableId={selectedMap.id}
@@ -546,7 +553,7 @@ export const WorkspaceViewport: React.FC<WorkspaceViewportProps> = ({
               </div>
             </div>
           ) : (
-            <div className="flex flex-1 flex-col gap-4">
+            <div className="flex min-w-0 flex-1 flex-col gap-4">
               {selectedMap && activeMatrix ? (
                 showScalarFlagPrimary ? (
                   <ScalarFlagEditor
@@ -569,7 +576,7 @@ export const WorkspaceViewport: React.FC<WorkspaceViewportProps> = ({
                     onSwitchToGrid={() => setForceGridView(true)}
                   />
                 ) : (
-                  <div className="flex flex-1 flex-col gap-2">
+                  <div className="flex min-w-0 flex-1 flex-col gap-2">
                     {isScalarOrFlagMap(selectedMap) && (
                       <div className="flex items-center justify-end">
                         <button
@@ -651,4 +658,4 @@ export const WorkspaceViewport: React.FC<WorkspaceViewportProps> = ({
       </div>
     </main>
   );
-};
+});

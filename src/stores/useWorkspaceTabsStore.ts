@@ -37,7 +37,11 @@ export interface WorkspaceTabsState {
   toggleSplitView: (fallbackTab?: WorkspaceTab) => void;
   setSplitRatio: (ratio: number) => void;
   closeOtherTabs: (keepId: string) => void;
-  syncMapTab: (mapDef: MapDef, preferredKind?: 'map-table' | 'map-3d' | 'map-split') => string;
+  syncMapTab: (
+    mapDef: MapDef,
+    preferredKind?: 'map-table' | 'map-3d' | 'map-split',
+    forceKind?: boolean
+  ) => string;
   reset: () => void;
 }
 
@@ -180,17 +184,21 @@ export const useWorkspaceTabsStore = create<WorkspaceTabsState>((set, get) => ({
       return { tabs: nextTabs, activeTabId: nextActive, splitTabId: nextSplit };
     }),
 
-  syncMapTab: (mapDef, preferredKind = 'map-split') => {
+  syncMapTab: (mapDef, preferredKind = 'map-split', forceKind = false) => {
     const id = `map:${mapDef.id}`;
     const existing = get().tabs.find((t) => t.id === id);
+    const resolvedKind = forceKind ? preferredKind : existing?.kind ?? preferredKind;
     const nextTab: WorkspaceTab = {
       id,
-      kind: existing?.kind ?? preferredKind,
+      kind: resolvedKind,
       title: mapDef.name,
       mapId: mapDef.id,
       closable: true,
     };
     get().openTab(nextTab);
+    if (forceKind && existing && existing.kind !== resolvedKind) {
+      get().setTabKind(id, resolvedKind);
+    }
     return id;
   },
 

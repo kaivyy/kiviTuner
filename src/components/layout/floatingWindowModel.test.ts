@@ -6,10 +6,14 @@ import {
   clampWindowPosition,
   computeInitialRect,
   focusFloatingWindow,
+  getMinimizedFloatingWindows,
   getTopFloatingWindowId,
   getWindowZIndex,
   registerFloatingWindow,
+  requestRestoreFloatingWindow,
   resetWindowStackForTests,
+  setFloatingWindowMinimized,
+  subscribeWindowRestore,
   unregisterFloatingWindow,
 } from './floatingWindowModel.ts';
 
@@ -77,4 +81,21 @@ test('floating window focus stack updates top window and z-index cleanly', () =>
 
   unregisterFloatingWindow('telemetry');
   assert.equal(getTopFloatingWindowId(), 'flash');
+});
+
+test('minimized windows dock cleanly into StatusBar registry and restore on demand', () => {
+  resetWindowStackForTests();
+  registerFloatingWindow('diff');
+  setFloatingWindowMinimized('diff', 'Binary ROM Difference Analyzer', true);
+  assert.deepEqual(getMinimizedFloatingWindows(), [
+    { id: 'diff', title: 'Binary ROM Difference Analyzer' },
+  ]);
+
+  const restoredIds: string[] = [];
+  const unsub = subscribeWindowRestore((id) => restoredIds.push(id));
+  requestRestoreFloatingWindow('diff');
+  unsub();
+
+  assert.deepEqual(restoredIds, ['diff']);
+  assert.deepEqual(getMinimizedFloatingWindows(), []);
 });

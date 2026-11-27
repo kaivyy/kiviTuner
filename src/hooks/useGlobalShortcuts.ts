@@ -6,6 +6,7 @@ interface GlobalShortcutsOptions {
   binFileInputRef: RefObject<HTMLInputElement | null>;
   xdfFileInputRef: RefObject<HTMLInputElement | null>;
   setLayoutPreset: React.Dispatch<React.SetStateAction<LayoutPreset>>;
+  onToggleSplit3D?: () => void;
   setIsWorkbenchOpen: (open: boolean) => void;
   setIsDiffModalOpen: (open: boolean) => void;
   setIsShortcutsOpen: (open: boolean) => void;
@@ -22,6 +23,7 @@ export function useGlobalShortcuts({
   binFileInputRef,
   xdfFileInputRef,
   setLayoutPreset,
+  onToggleSplit3D,
   setIsWorkbenchOpen,
   setIsDiffModalOpen,
   setIsShortcutsOpen,
@@ -71,7 +73,11 @@ export function useGlobalShortcuts({
 
       if ((e.ctrlKey || e.metaKey) && e.key === '\\') {
         e.preventDefault();
-        setLayoutPreset((prev) => (prev === 'split_3d' ? 'standard' : 'split_3d'));
+        if (onToggleSplit3D) {
+          onToggleSplit3D();
+        } else {
+          setLayoutPreset((prev) => (prev === 'split_3d' ? 'standard' : 'split_3d'));
+        }
         return;
       }
 
@@ -141,6 +147,7 @@ export function useGlobalShortcuts({
     binFileInputRef,
     xdfFileInputRef,
     setLayoutPreset,
+    onToggleSplit3D,
     setIsWorkbenchOpen,
     setIsDiffModalOpen,
     setIsShortcutsOpen,

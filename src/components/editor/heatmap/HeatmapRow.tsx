@@ -74,7 +74,7 @@ const HeatmapRowComponent: React.FC<HeatmapRowProps> = ({
       <th
         onClick={() => onRowHeaderClick(rIdx)}
         title={`Row ${rIdx} (${yAxisName}): Click to select row`}
-        className={`sticky left-0 z-20 p-1 px-2.5 border border-kiviBorder cursor-pointer text-right tabular-nums transition-colors ${
+        className={`sticky left-0 z-20 min-w-[68px] whitespace-nowrap border border-kiviBorder px-2.5 py-1 cursor-pointer text-right tabular-nums transition-colors ${
           isRowInSelection
             ? 'bg-kiviAccent/20 text-kiviAccent font-semibold'
             : 'bg-kiviSurface text-kiviSecondary hover:bg-kiviElevated hover:text-kiviInk'
@@ -130,7 +130,7 @@ const HeatmapRowComponent: React.FC<HeatmapRowProps> = ({
                 ? `${crosshairState.tooltip ? `${crosshairState.tooltip} | ` : ''}Hits: ${hitVisual.count}`
                 : crosshairState.tooltip
             }
-            className={`relative p-1.5 border border-kiviBorder/60 font-semibold cursor-pointer select-none tabular-nums ${
+            className={`relative min-w-[56px] whitespace-nowrap border border-kiviBorder/60 px-1.5 py-1 font-semibold cursor-pointer select-none tabular-nums ${
               crosshairState.isCorrelated
                 ? `${crosshairState.reticleClass} ${isAnchor ? 'ring-offset-2' : ''}`
                 : isAnchor

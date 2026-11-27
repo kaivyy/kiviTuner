@@ -1,7 +1,9 @@
 import React from 'react';
-import { Cpu, ShieldCheck, Layers } from 'lucide-react';
+import { Cpu, Download, Layers, ShieldCheck } from 'lucide-react';
 import { FloatingWindow } from '../layout/FloatingWindow';
 import { TOOL_WINDOW_SPECS } from '../layout/toolWindowRegistry';
+import { APP_VERSION } from '../../lib/updaterBridge';
+import { useUpdateStore } from '../../stores/useUpdateStore';
 
 interface AboutModalProps {
   isOpen: boolean;
@@ -45,7 +47,15 @@ export const AboutModal: React.FC<AboutModalProps> = ({
       popoutToolId="about"
       closeLabel="Close About dialog"
       footer={
-        <div className="flex shrink-0 justify-end border-t border-kiviBorder bg-kiviElevated px-5 py-2.5">
+        <div className="flex shrink-0 items-center justify-between gap-2 border-t border-kiviBorder bg-kiviElevated px-5 py-2.5">
+          <button
+            type="button"
+            onClick={() => void useUpdateStore.getState().checkForUpdates(false)}
+            className="inline-flex items-center gap-1.5 rounded border border-kiviBorderStrong bg-kiviSurface px-3 py-1.5 text-xs font-medium text-kiviInk hover:bg-kiviBg"
+          >
+            <Download className="h-3.5 w-3.5 text-kiviAccent" />
+            <span>Check for Updates</span>
+          </button>
           <button
             type="button"
             onClick={onClose}
@@ -66,6 +76,10 @@ export const AboutModal: React.FC<AboutModalProps> = ({
         </p>
 
         <div className="space-y-2 rounded-md border border-kiviBorder bg-kiviBg p-3 font-mono text-[11px] tabular-nums">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-kiviMuted">Version</span>
+            <span className="text-kiviAccent font-semibold">v{APP_VERSION}</span>
+          </div>
           <div className="flex items-center justify-between gap-2">
             <span className="text-kiviMuted">Runtime Mode</span>
             <span className="text-kiviInk">{isDesktop ? 'Desktop (Rust Tauri)' : 'Web Preview'}</span>

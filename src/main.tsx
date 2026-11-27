@@ -1,9 +1,14 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import ReactDOM from 'react-dom/client';
-import App from './App';
 import { getStandaloneWindowId } from './lib/windowControlsBridge';
-import { StandaloneWindowHost } from './components/layout/StandaloneWindowHost';
 import './styles/globals.css';
+
+const App = lazy(() => import('./App'));
+const StandaloneWindowHost = lazy(() =>
+  import('./components/layout/StandaloneWindowHost').then((m) => ({
+    default: m.StandaloneWindowHost,
+  }))
+);
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
@@ -14,6 +19,14 @@ const standaloneTool = getStandaloneWindowId();
 
 ReactDOM.createRoot(rootElement).render(
   <React.StrictMode>
-    {standaloneTool ? <StandaloneWindowHost toolId={standaloneTool} /> : <App />}
+    <Suspense
+      fallback={
+        <div className="flex h-screen w-screen items-center justify-center bg-kiviBg font-mono text-xs text-kiviMuted">
+          Loading kiviTuner...
+        </div>
+      }
+    >
+      {standaloneTool ? <StandaloneWindowHost toolId={standaloneTool} /> : <App />}
+    </Suspense>
   </React.StrictMode>
 );

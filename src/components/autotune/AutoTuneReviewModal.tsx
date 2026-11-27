@@ -29,6 +29,7 @@ import {
 export interface AutoTuneReviewModalProps {
   isOpen: boolean;
   onClose: () => void;
+  standalone?: boolean;
 }
 
 export type TableFilterMode = 'all' | 'eligible' | 'clamped' | 'insufficient' | 'no_change';
@@ -36,6 +37,7 @@ export type TableFilterMode = 'all' | 'eligible' | 'clamped' | 'insufficient' | 
 export const AutoTuneReviewModal: React.FC<AutoTuneReviewModalProps> = ({
   isOpen,
   onClose,
+  standalone = false,
 }) => {
   // Store subscriptions
   const activeReport = useCorrelationStore((s) => s.activeReport);
@@ -196,6 +198,8 @@ export const AutoTuneReviewModal: React.FC<AutoTuneReviewModalProps> = ({
       minWidth={spec.minWidth}
       minHeight={spec.minHeight}
       dock={spec.dock}
+      standalone={standalone}
+      popoutToolId="autotune"
       closeLabel="Close dialog"
       headerActions={
         <button

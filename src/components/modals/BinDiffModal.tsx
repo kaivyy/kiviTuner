@@ -44,6 +44,7 @@ export interface BinDiffModalProps {
   onExtractAllTables: (regions: DiffRegion[]) => void;
   /** Loads a single-segment VBF payload into the ROM workspace. */
   onVbfLoadRom?: (bytes: Uint8Array, baseAddress: number) => void;
+  standalone?: boolean;
 }
 
 export type DiffCategoryFilter = 'all' | 'table_2d' | 'axis_1d' | 'scalar';
@@ -58,6 +59,7 @@ export const BinDiffModal: React.FC<BinDiffModalProps> = ({
   onExtractMap,
   onExtractAllTables,
   onVbfLoadRom,
+  standalone = false,
 }) => {
   const [diffs, setDiffs] = useState<DiffRegion[]>(currentDiffs);
   const [filter, setFilter] = useState<DiffCategoryFilter>('all');
@@ -418,6 +420,8 @@ export const BinDiffModal: React.FC<BinDiffModalProps> = ({
       minWidth={spec.minWidth}
       minHeight={spec.minHeight}
       dock={spec.dock}
+      standalone={standalone}
+      popoutToolId="diff"
       titlebarTone="sidebar"
       closeLabel="Close binary difference analyzer"
       footer={

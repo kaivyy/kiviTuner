@@ -268,7 +268,8 @@ test('blindTableToMapDef maps signed, float32, and 1D curves cleanly', () => {
     0
   );
   assert.equal(f32Curve.dtype, 'f32');
-  assert.equal(f32Curve.category, 'Blind 1D Curves');
+  assert.equal(f32Curve.category, 'Auto-Detected / 1D Curves (32-bit Float)');
+  assert.equal(f32Curve.name, '8-pt F32 Curve (0x4200)');
 
   const signed16 = blindTableToMapDef(
     {
@@ -283,7 +284,8 @@ test('blindTableToMapDef maps signed, float32, and 1D curves cleanly', () => {
     1
   );
   assert.equal(signed16.dtype, 'i16');
-  assert.equal(signed16.category, 'Blind 2D Maps');
+  assert.equal(signed16.category, 'Auto-Detected / 2D Tables (16-bit Signed)');
+  assert.equal(signed16.name, '8x12 I16 Map (0x4200)');
 
   const unsigned32 = blindTableToMapDef(
     {

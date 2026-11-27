@@ -78,7 +78,7 @@ export const BlindScanTab: React.FC<BlindScanTabProps> = ({
         onClick={onRunScan}
         className="rounded bg-kiviAccent/20 px-3 py-1 font-medium text-kiviAccent hover:bg-kiviAccent/30 disabled:opacity-50"
       >
-        {busy ? 'Scanning...' : 'Run Blind V2 + Classifier'}
+        {busy ? 'Scanning...' : 'Run Auto-Scan + Classifier'}
       </button>
       {blindResults.length > 0 && (
         <button
@@ -88,7 +88,7 @@ export const BlindScanTab: React.FC<BlindScanTabProps> = ({
               blindResults.map((entry, i) => blindTableToMapDef(entry, i)),
               true
             );
-            onInfo(`Added ${blindResults.length} blind tables to workspace sidebar.`);
+            onInfo(`Added ${blindResults.length} auto-detected map(s) to Map Explorer folders.`);
           }}
           className="rounded border border-kiviAccent/40 bg-kiviAccent/15 px-2.5 py-1 text-kiviAccent hover:bg-kiviAccent/15"
         >
@@ -99,8 +99,8 @@ export const BlindScanTab: React.FC<BlindScanTabProps> = ({
 
     {blindResults.length === 0 ? (
       <p className="text-kiviMuted">
-        Run Blind V2 + Classifier on a loaded ROM to detect non-overlapping 2D/1D tables and attach
-        transparent rule proposals.
+        Run Auto-Scan + Classifier on a loaded ROM to detect non-overlapping 2D/1D tables and group
+        them into structured Map Explorer folders.
       </p>
     ) : (
       <div className="overflow-x-auto rounded border border-kiviBorder">

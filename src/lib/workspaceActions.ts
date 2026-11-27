@@ -29,6 +29,7 @@ export interface BuildCommandPaletteParams {
   onExportDef: (format: 'xdf' | 'ini' | 'kp') => void;
   onToggleTheme: () => void;
   onOpenHowToUse?: () => void;
+  onCheckForUpdates?: () => void;
 }
 
 export function buildCommandPaletteActions(
@@ -194,6 +195,16 @@ export function buildCommandPaletteActions(
             label: 'How to Use kiviTuner (Tutorial)',
             category: 'Help',
             onExecute: p.onOpenHowToUse,
+          },
+        ]
+      : []),
+    ...(p.onCheckForUpdates
+      ? [
+          {
+            id: 'check-updates',
+            label: 'Check for Application Updates...',
+            category: 'Help',
+            onExecute: p.onCheckForUpdates,
           },
         ]
       : []),

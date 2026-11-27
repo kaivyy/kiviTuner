@@ -67,7 +67,7 @@ function formatRomBytes(bytes: number): string {
   return `${bytes} B`;
 }
 
-export const WorkspaceTabBar: React.FC<WorkspaceTabBarProps> = ({
+export const WorkspaceTabBar: React.FC<WorkspaceTabBarProps> = React.memo(({
   romDocuments,
   activeDocId,
   onSwitchRomDocument,
@@ -242,4 +242,4 @@ export const WorkspaceTabBar: React.FC<WorkspaceTabBarProps> = ({
       </div>
     </div>
   );
-};
+});

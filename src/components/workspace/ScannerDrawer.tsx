@@ -161,7 +161,7 @@ export const ScannerDrawer: React.FC<ScannerDrawerProps> = ({
                 : 'text-kiviSecondary hover:text-kiviInk'
             }`}
           >
-            Blind V2
+            Auto-Scan
           </button>
           <button
             type="button"
@@ -214,7 +214,7 @@ export const ScannerDrawer: React.FC<ScannerDrawerProps> = ({
               className="flex w-full items-center justify-center gap-1.5 rounded bg-kiviAccent py-1.5 text-xs font-semibold text-kiviAccentFg transition-opacity hover:opacity-90 disabled:opacity-50"
             >
               <Layers className="h-3.5 w-3.5" />
-              <span>{isBlindRunning ? 'Running Blind V2...' : 'Run Multi-Brand Blind V2'}</span>
+              <span>{isBlindRunning ? 'Scanning ROM...' : 'Run Multi-Brand Auto-Scan'}</span>
             </button>
             {blindProgress && (
               <div className="space-y-1 text-[10px]">
@@ -300,18 +300,20 @@ export const ScannerDrawer: React.FC<ScannerDrawerProps> = ({
           blindResults.length === 0 ? (
             <div className="flex flex-col items-center justify-center p-6 text-center text-xs text-kiviMuted">
               <Layers className="mb-2 h-8 w-8 opacity-40" />
-              <p>Run Multi-Brand Blind V2 to discover 2D tables and 1D curves without an XDF.</p>
+              <p>Run Multi-Brand Auto-Scan to discover 2D maps and 1D curves without an XDF.</p>
             </div>
           ) : (
             blindResults.map((entry, idx) => {
               const t = entry.table;
-              const label =
-                entry.classification?.role_name ??
-                t.label ??
-                `Table 0x${t.address.toString(16).toUpperCase()}`;
               const dtypeBadge = t.is_float
                 ? 'f32'
                 : `${t.is_signed ? 'i' : 'u'}${t.cell_bits}`;
+              const addrHex = t.address.toString(16).toUpperCase();
+              const label =
+                entry.classification?.role_name ??
+                (t.is_curve || t.rows <= 1
+                  ? `${t.cols}-pt ${dtypeBadge.toUpperCase()} Curve (0x${addrHex})`
+                  : `${t.rows}x${t.cols} ${dtypeBadge.toUpperCase()} Map (0x${addrHex})`);
               return (
                 <div
                   key={`blind-${t.address}-${idx}`}

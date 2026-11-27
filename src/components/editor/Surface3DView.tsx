@@ -15,16 +15,19 @@ import {
 import type { SelectionRange } from './HeatmapTable';
 import {
   CAMERA_PRESETS,
+  buildQuads,
   calculateAutoYScaling,
   calculateMatrixCenter,
+  computeAxisTickIndices,
+  computeQuadShade,
   findClosestCell,
   getMatrixExtremes,
   getPaletteColor,
+  getShadedPaletteColor,
+  normalizeMatrixFor3D,
   projectPoint,
-  buildQuads,
   sortQuadsByDepth,
   type CameraState,
-  type Point3D,
   type SurfacePalette,
 } from '../../lib/surface3d';
 import { adjustSelection, scaleSelection } from '../../lib/interpolation';
@@ -55,7 +58,27 @@ export interface Surface3DViewProps {
   readOnly?: boolean;
 }
 
-export const Surface3DView: React.FC<Surface3DViewProps> = ({
+type SurfaceRenderMode = 'shaded' | 'smooth' | 'wireframe';
+type CameraPresetKey = keyof typeof CAMERA_PRESETS;
+
+function formatCompactTick(val: number, decimals: number): string {
+  if (!Number.isFinite(val)) return '0';
+  if (Math.abs(val) >= 1000 && decimals === 0) return Math.round(val).toString();
+  const fixed = val.toFixed(Math.min(decimals, 2));
+  return fixed.replace(/\.00$/, '');
+}
+
+function drawPolygon(ctx: CanvasRenderingContext2D, pts: Array<{ x: number; y: number }>): void {
+  if (pts.length === 0) return;
+  ctx.beginPath();
+  ctx.moveTo(pts[0].x, pts[0].y);
+  for (let i = 1; i < pts.length; i++) {
+    ctx.lineTo(pts[i].x, pts[i].y);
+  }
+  ctx.closePath();
+}
+
+export const Surface3DView: React.FC<Surface3DViewProps> = React.memo(({
   title,
   tableId,
   correlatedCell: propCorrelatedCell,
@@ -73,17 +96,44 @@ export const Surface3DView: React.FC<Surface3DViewProps> = ({
   palette: initialPalette = 'classic',
   readOnly = false,
 }) => {
-  const containerRef = useRef<HTMLDivElement>(null);
+  const canvasHostRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const canvasRectRef = useRef<{ left: number; top: number; width: number; height: number } | null>(
     null
   );
+  const hoverRafRef = useRef<number | null>(null);
+  const pendingPointerRef = useRef<{ x: number; y: number } | null>(null);
   const theme = useThemeStore((s) => s.theme);
 
-  const numRows = matrix?.length ?? 0;
-  const numCols = matrix?.[0]?.length ?? 0;
+  const normalized = useMemo(() => normalizeMatrixFor3D(matrix), [matrix]);
+  const normalizedBase = useMemo(
+    () => (baseMatrix ? normalizeMatrixFor3D(baseMatrix) : null),
+    [baseMatrix]
+  );
 
-  // Correlation Crosshair Resolution
+  const renderMatrix = normalized.matrix;
+  const renderBaseMatrix =
+    normalizedBase && normalizedBase.matrix.length >= 2 ? normalizedBase.matrix : undefined;
+
+  const origRows = matrix?.length ?? 0;
+  const origCols = matrix?.[0]?.length ?? 0;
+  const numRows = renderMatrix.length;
+  const numCols = renderMatrix[0]?.length ?? 0;
+
+  // Map axis labels cleanly when 1D column curves are transposed into 2xN ribbons.
+  const effectiveXLabels = useMemo(() => {
+    if (normalized.transpose1D) return yLabels;
+    return xLabels;
+  }, [normalized.transpose1D, xLabels, yLabels]);
+
+  const effectiveYLabels = useMemo(() => {
+    if (normalized.is1DRibbon) return ['0', '1'];
+    return yLabels;
+  }, [normalized.is1DRibbon, yLabels]);
+
+  const effectiveXAxisName = normalized.transpose1D ? yAxisName : xAxisName;
+  const effectiveYAxisName = normalized.is1DRibbon ? '' : yAxisName;
+
   const activeCorrelation = useCorrelationStore((s) => s.activeCorrelation);
   const targetTableId = useCorrelationStore((s) => s.targetTableId);
 
@@ -92,48 +142,51 @@ export const Surface3DView: React.FC<Surface3DViewProps> = ({
       if (
         propCorrelatedCell &&
         propCorrelatedCell.r >= 0 &&
-        propCorrelatedCell.r < numRows &&
+        propCorrelatedCell.r < origRows &&
         propCorrelatedCell.c >= 0 &&
-        propCorrelatedCell.c < numCols
+        propCorrelatedCell.c < origCols
       ) {
         return propCorrelatedCell;
       }
       return null;
     }
     return resolveCorrelatedCell({
-      matrixDimensions: { numRows, numCols },
+      matrixDimensions: { numRows: origRows, numCols: origCols },
       activeCorrelation,
       targetTableId,
       currentTableId: tableId,
     });
-  }, [propCorrelatedCell, numRows, numCols, activeCorrelation, targetTableId, tableId]);
+  }, [propCorrelatedCell, origRows, origCols, activeCorrelation, targetTableId, tableId]);
 
-  // Viewport & rendering states
   const [dimensions, setDimensions] = useState<{ width: number; height: number }>({
-    width: 640,
-    height: 480,
+    width: 600,
+    height: 360,
   });
 
   const [activePalette, setActivePalette] = useState<SurfacePalette>(initialPalette);
-  const [renderMode, setRenderMode] = useState<'shaded' | 'wireframe'>('shaded');
+  const [renderMode, setRenderMode] = useState<SurfaceRenderMode>('shaded');
+  const [showCage, setShowCage] = useState<boolean>(true);
   const [showGhost, setShowGhost] = useState<boolean>(true);
   const [elevationMultiplier, setElevationMultiplier] = useState<number>(1.0);
+  const [activePreset, setActivePreset] = useState<CameraPresetKey | null>('ISOMETRIC');
   const [hoveredCell, setHoveredCell] = useState<{ r: number; c: number } | null>(null);
 
-  // Camera state
+  useEffect(() => {
+    setActivePalette(initialPalette);
+  }, [initialPalette]);
+
   const [camera, setCamera] = useState<CameraState>(() => ({
     ...CAMERA_PRESETS.ISOMETRIC,
-    scale: 25,
+    scale: 24,
     panX: 0,
     panY: 0,
   }));
 
-  // Matrix geometry bounds
-  const center = useMemo(() => calculateMatrixCenter(matrix), [matrix]);
-  const extremes = useMemo(() => getMatrixExtremes(matrix), [matrix]);
+  const center = useMemo(() => calculateMatrixCenter(renderMatrix), [renderMatrix]);
+  const extremes = useMemo(() => getMatrixExtremes(renderMatrix), [renderMatrix]);
   const baseExtremes = useMemo(
-    () => (baseMatrix ? getMatrixExtremes(baseMatrix) : null),
-    [baseMatrix]
+    () => (renderBaseMatrix ? getMatrixExtremes(renderBaseMatrix) : null),
+    [renderBaseMatrix]
   );
 
   const minVal = useMemo(
@@ -145,23 +198,27 @@ export const Surface3DView: React.FC<Surface3DViewProps> = ({
     [extremes.max, baseExtremes]
   );
 
-  // Auto-calculated Y elevation scaling
-  const baseYScaling = useMemo(() => calculateAutoYScaling(matrix), [matrix]);
+  const quads = useMemo(() => buildQuads(renderMatrix), [renderMatrix]);
+  const baseYScaling = useMemo(() => calculateAutoYScaling(renderMatrix), [renderMatrix]);
   const effectiveYScaling = baseYScaling * elevationMultiplier;
 
-  // Compute initial auto-fit scale
   const computeAutoFitScale = useCallback(
     (w: number, h: number): number => {
-      const maxDim = Math.max(numRows, numCols, 6);
-      return Math.max(10, Math.min(w, h) / (maxDim * 1.55));
+      const spanX = Math.max(numCols - 1, 2);
+      const spanZ = Math.max(numRows - 1, 2);
+      const span = Math.max(spanX, spanZ, 5);
+      const reserveRight = w >= 360 ? 78 : 20;
+      const usableW = Math.max(140, w - reserveRight - 64);
+      const usableH = Math.max(150, h - 56);
+      return Math.max(8, Math.min(260, Math.min(usableW, usableH) / (span * 1.64)));
     },
     [numRows, numCols]
   );
 
-  // Auto-resize canvas according to container and cache bounding rect for zero-reflow pointer math
+  // Measure only the dedicated canvas host element so the canvas NEVER inflates container height.
   useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
+    const host = canvasHostRef.current;
+    if (!host) return;
 
     const refreshRect = () => {
       if (canvasRef.current) {
@@ -176,20 +233,15 @@ export const Surface3DView: React.FC<Surface3DViewProps> = ({
     };
 
     const updateSize = () => {
-      const rect = container.getBoundingClientRect();
-      const w = Math.max(300, Math.floor(rect.width));
-      const h = Math.max(300, Math.floor(rect.height));
-
-      setDimensions((prev) => {
-        if (prev.width === w && prev.height === h) return prev;
-        return { width: w, height: h };
-      });
+      const w = Math.max(240, Math.min(4096, Math.floor(host.clientWidth)));
+      const h = Math.max(220, Math.min(4096, Math.floor(host.clientHeight)));
+      setDimensions((prev) => (prev.width === w && prev.height === h ? prev : { width: w, height: h }));
       refreshRect();
     };
 
     updateSize();
     const observer = new ResizeObserver(updateSize);
-    observer.observe(container);
+    observer.observe(host);
     window.addEventListener('resize', refreshRect, { passive: true });
     window.addEventListener('scroll', refreshRect, { capture: true, passive: true });
 
@@ -197,50 +249,53 @@ export const Surface3DView: React.FC<Surface3DViewProps> = ({
       observer.disconnect();
       window.removeEventListener('resize', refreshRect);
       window.removeEventListener('scroll', refreshRect, { capture: true });
+      if (hoverRafRef.current !== null) cancelAnimationFrame(hoverRafRef.current);
     };
   }, []);
 
-  // Set initial scale on first load or matrix size change
-  const initialFitDone = useRef(false);
+  // Re-fit scale on table dimension change or initial mount.
+  const fitSignatureRef = useRef<string>('');
   useEffect(() => {
-    if (dimensions.width > 0 && dimensions.height > 0 && !initialFitDone.current) {
+    const sig = `${tableId ?? 'none'}:${numRows}x${numCols}`;
+    if (dimensions.width > 0 && dimensions.height > 0 && fitSignatureRef.current !== sig) {
       const initialScale = computeAutoFitScale(dimensions.width, dimensions.height);
       setCamera((prev) => ({
         ...prev,
         scale: initialScale,
+        panX: dimensions.width >= 360 ? -30 : 0,
+        panY: 8,
       }));
-      initialFitDone.current = true;
+      fitSignatureRef.current = sig;
     }
-  }, [dimensions, computeAutoFitScale]);
+  }, [tableId, numRows, numCols, dimensions, computeAutoFitScale]);
 
-  // Reset Camera View
   const handleResetCamera = useCallback(() => {
     const scale = computeAutoFitScale(dimensions.width, dimensions.height);
     setCamera({
       ...CAMERA_PRESETS.ISOMETRIC,
       scale,
-      panX: 0,
-      panY: 0,
+      panX: dimensions.width >= 360 ? -30 : 0,
+      panY: 8,
     });
+    setActivePreset('ISOMETRIC');
     setElevationMultiplier(1.0);
   }, [computeAutoFitScale, dimensions.width, dimensions.height]);
 
-  // Apply Camera Presets
   const applyPreset = useCallback(
-    (presetKey: keyof typeof CAMERA_PRESETS) => {
+    (presetKey: CameraPresetKey) => {
       const preset = CAMERA_PRESETS[presetKey];
+      setActivePreset(presetKey);
       setCamera((prev) => ({
         ...prev,
         yaw: preset.yaw,
         pitch: preset.pitch,
-        panX: 0,
-        panY: 0,
+        panX: dimensions.width >= 360 ? -30 : 0,
+        panY: 8,
       }));
     },
-    []
+    [dimensions.width]
   );
 
-  // Zoom Controls
   const handleZoom = useCallback((factor: number) => {
     setCamera((prev) => ({
       ...prev,
@@ -248,10 +303,44 @@ export const Surface3DView: React.FC<Surface3DViewProps> = ({
     }));
   }, []);
 
+  // Native non-passive wheel handler prevents parent scroll hijacking while zooming 3D surface.
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const factor = e.deltaY < 0 ? 1.09 : 0.91;
+      handleZoom(factor);
+    };
+    canvas.addEventListener('wheel', onWheel, { passive: false });
+    return () => canvas.removeEventListener('wheel', onWheel);
+  }, [handleZoom]);
+
+  const mapRenderToOrigCoord = useCallback(
+    (r: number, c: number): { r: number; c: number } => {
+      if (normalized.is1DRibbon) {
+        return normalized.transpose1D ? { r: c, c: 0 } : { r: 0, c };
+      }
+      return { r, c };
+    },
+    [normalized.is1DRibbon, normalized.transpose1D]
+  );
+
+  const mapOrigToRenderCoord = useCallback(
+    (r: number, c: number): { r: number; c: number } => {
+      if (normalized.is1DRibbon) {
+        return normalized.transpose1D ? { r: 0, c: r } : { r: 0, c };
+      }
+      return { r, c };
+    },
+    [normalized.is1DRibbon, normalized.transpose1D]
+  );
+
   // Main Canvas Render
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas || !numRows || !numCols) return;
+    if (!canvas || numRows < 2 || numCols < 2) return;
 
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
@@ -259,194 +348,363 @@ export const Surface3DView: React.FC<Surface3DViewProps> = ({
     const dpr = window.devicePixelRatio || 1;
     const { width, height } = dimensions;
 
-    canvas.width = Math.floor(width * dpr);
-    canvas.height = Math.floor(height * dpr);
+    const pixelW = Math.floor(width * dpr);
+    const pixelH = Math.floor(height * dpr);
+    if (canvas.width !== pixelW || canvas.height !== pixelH) {
+      canvas.width = pixelW;
+      canvas.height = pixelH;
+    }
 
     ctx.save();
     ctx.scale(dpr, dpr);
 
     const isLight = theme === 'light';
-    ctx.fillStyle = isLight ? '#F4F6F9' : '#0A0D12';
+    const bgColor = isLight ? '#F4F6F9' : '#0A0D12';
+    const plateFill = isLight ? 'rgba(226, 232, 240, 0.55)' : 'rgba(17, 22, 31, 0.72)';
+    const wallFill = isLight ? 'rgba(241, 245, 249, 0.72)' : 'rgba(15, 20, 29, 0.72)';
+    const cageBorder = isLight ? 'rgba(100, 116, 139, 0.55)' : 'rgba(71, 85, 105, 0.65)';
+    const gridMajor = isLight ? 'rgba(148, 163, 184, 0.45)' : 'rgba(51, 65, 85, 0.55)';
+    const labelColor = isLight ? '#334155' : '#94A3B8';
+    const titleInk = isLight ? '#0F172A' : '#E2E8F0';
+    const accentColor = isLight ? '#0369A1' : '#38BDF8';
+    const warnColor = isLight ? '#B45309' : '#FBBF24';
+
+    ctx.fillStyle = bgColor;
     ctx.fillRect(0, 0, width, height);
 
-    // Subtle background radial depth tone
-    const bgGrad = ctx.createRadialGradient(
-      width / 2,
-      height / 2,
-      20,
-      width / 2,
-      height / 2,
-      Math.max(width, height) * 0.7
-    );
-    bgGrad.addColorStop(0, isLight ? '#FFFFFF' : '#11161F');
-    bgGrad.addColorStop(1, isLight ? '#E9EEF5' : '#070A0F');
-    ctx.fillStyle = bgGrad;
-    ctx.fillRect(0, 0, width, height);
+    const maxC = numCols - 1;
+    const maxR = numRows - 1;
+    const midX = maxC / 2;
+    const midZ = maxR / 2;
+    const spanY = Math.max(maxVal - minVal, 1e-6);
+    const topBoxVal = minVal + spanY * 1.05;
 
-    // 2. Base ROM Ghost Wireframe (if enabled)
-    if (showGhost && baseMatrix && baseMatrix.length >= 2 && baseMatrix[0]?.length >= 2) {
-      const bRows = baseMatrix.length;
-      const bCols = baseMatrix[0].length;
+    const proj = (x: number, y: number, z: number) =>
+      projectPoint({ x, y, z }, center, camera, width, height, effectiveYScaling);
+
+    const maxTicks = width < 480 ? 5 : 7;
+    const xTicks = computeAxisTickIndices(numCols, Math.min(maxTicks, numCols));
+    const zTicks = computeAxisTickIndices(numRows, Math.min(maxTicks, numRows));
+
+    // Determine back vs front walls cleanly from projected zDepth so walls never occlude mesh.
+    const x0Depth = proj(0, minVal, midZ).zDepth;
+    const x1Depth = proj(maxC, minVal, midZ).zDepth;
+    const backX = x0Depth <= x1Depth ? 0 : maxC;
+    const frontX = backX === 0 ? maxC : 0;
+
+    const z0Depth = proj(midX, minVal, 0).zDepth;
+    const z1Depth = proj(midX, minVal, maxR).zDepth;
+    const backZ = z0Depth <= z1Depth ? 0 : maxR;
+    const frontZ = backZ === 0 ? maxR : 0;
+
+    // 1. 3D Calibration Cage (Floor + Camera-Aware Back Walls + Ticks)
+    if (showCage) {
+      const f00 = proj(0, minVal, 0);
+      const f10 = proj(maxC, minVal, 0);
+      const f11 = proj(maxC, minVal, maxR);
+      const f01 = proj(0, minVal, maxR);
 
       ctx.save();
-      ctx.setLineDash([3, 4]);
-      ctx.strokeStyle = isLight ? 'rgba(71, 85, 105, 0.4)' : 'rgba(148, 163, 184, 0.45)';
-      ctx.lineWidth = 1;
+      drawPolygon(ctx, [f00, f10, f11, f01]);
+      ctx.fillStyle = plateFill;
+      ctx.fill();
 
-      // Draw rows
-      for (let r = 0; r < bRows; r++) {
-        ctx.beginPath();
-        for (let c = 0; c < bCols; c++) {
-          const pt: Point3D = { x: c, y: baseMatrix[r][c], z: r };
-          const proj = projectPoint(pt, center, camera, width, height, effectiveYScaling);
-          if (c === 0) ctx.moveTo(proj.x, proj.y);
-          else ctx.lineTo(proj.x, proj.y);
-        }
+      // Back wall perpendicular to X (`x = backX`)
+      if (Math.abs(camera.pitch) < Math.PI / 2 - 0.14) {
+        const wA = proj(backX, minVal, 0);
+        const wB = proj(backX, minVal, maxR);
+        const wC = proj(backX, topBoxVal, maxR);
+        const wD = proj(backX, topBoxVal, 0);
+        drawPolygon(ctx, [wA, wB, wC, wD]);
+        ctx.fillStyle = wallFill;
+        ctx.fill();
+        ctx.strokeStyle = cageBorder;
+        ctx.lineWidth = 1;
         ctx.stroke();
+
+        // Back wall perpendicular to Z (`z = backZ`)
+        const zA = proj(0, minVal, backZ);
+        const zB = proj(maxC, minVal, backZ);
+        const zC = proj(maxC, topBoxVal, backZ);
+        const zD = proj(0, topBoxVal, backZ);
+        drawPolygon(ctx, [zA, zB, zC, zD]);
+        ctx.fillStyle = wallFill;
+        ctx.fill();
+        ctx.strokeStyle = cageBorder;
+        ctx.stroke();
+
+        // Z elevation gridlines + numeric labels on the leftmost outer cage vertical edge
+        ctx.font = '10px "JetBrains Mono", ui-monospace, monospace';
+        const edgeA = proj(frontX, minVal, backZ);
+        const edgeB = proj(backX, minVal, frontZ);
+        const useEdgeA = edgeA.x <= edgeB.x;
+        const zRailX = useEdgeA ? frontX : backX;
+        const zRailZ = useEdgeA ? backZ : frontZ;
+        const steps = 4;
+        for (let s = 0; s <= steps; s++) {
+          const v = minVal + (spanY * s) / steps;
+          ctx.beginPath();
+          const a = proj(backX, v, 0);
+          const b = proj(backX, v, maxR);
+          const c = proj(0, v, backZ);
+          const d = proj(maxC, v, backZ);
+          ctx.moveTo(a.x, a.y);
+          ctx.lineTo(b.x, b.y);
+          ctx.moveTo(c.x, c.y);
+          ctx.lineTo(d.x, d.y);
+          ctx.strokeStyle = gridMajor;
+          ctx.lineWidth = s === 0 ? 1.1 : 0.75;
+          ctx.stroke();
+
+          if (width >= 300) {
+            const lp = proj(zRailX, v, zRailZ);
+            if (lp.x >= 36) {
+              ctx.fillStyle = labelColor;
+              ctx.textAlign = 'right';
+              ctx.textBaseline = 'middle';
+              ctx.fillText(formatCompactTick(v, decimals), lp.x - 6, lp.y);
+            }
+          }
+        }
       }
 
-      // Draw columns
-      for (let c = 0; c < bCols; c++) {
-        ctx.beginPath();
-        for (let r = 0; r < bRows; r++) {
-          const pt: Point3D = { x: c, y: baseMatrix[r][c], z: r };
-          const proj = projectPoint(pt, center, camera, width, height, effectiveYScaling);
-          if (r === 0) ctx.moveTo(proj.x, proj.y);
-          else ctx.lineTo(proj.x, proj.y);
-        }
-        ctx.stroke();
+      // Floor grid lines aligned with X & Z ticks
+      ctx.beginPath();
+      for (const cIdx of xTicks) {
+        const a = proj(cIdx, minVal, 0);
+        const b = proj(cIdx, minVal, maxR);
+        ctx.moveTo(a.x, a.y);
+        ctx.lineTo(b.x, b.y);
+      }
+      for (const rIdx of zTicks) {
+        const a = proj(0, minVal, rIdx);
+        const b = proj(maxC, minVal, rIdx);
+        ctx.moveTo(a.x, a.y);
+        ctx.lineTo(b.x, b.y);
+      }
+      ctx.strokeStyle = gridMajor;
+      ctx.lineWidth = 0.75;
+      ctx.stroke();
+
+      // Floor outer outline
+      drawPolygon(ctx, [f00, f10, f11, f01]);
+      ctx.strokeStyle = cageBorder;
+      ctx.lineWidth = 1.1;
+      ctx.stroke();
+
+      // X-axis tick labels along frontZ
+      const xSlopeDownRight = proj(maxC, minVal, frontZ).y >= proj(0, minVal, frontZ).y;
+      const xAlign: CanvasTextAlign = xSlopeDownRight ? 'right' : 'left';
+      const xTickDx = xSlopeDownRight ? -6 : 6;
+      ctx.font = '10px "JetBrains Mono", ui-monospace, monospace';
+      ctx.fillStyle = labelColor;
+      ctx.textAlign = xAlign;
+      ctx.textBaseline = 'top';
+      for (const cIdx of xTicks) {
+        const pTick = proj(cIdx, minVal, frontZ);
+        const rawLbl = effectiveXLabels?.[cIdx] ?? cIdx;
+        ctx.fillText(String(rawLbl), pTick.x + xTickDx, pTick.y + 4);
+      }
+      if (effectiveXAxisName) {
+        const xTitlePos = proj(midX, minVal, frontZ);
+        ctx.fillStyle = accentColor;
+        ctx.font = '600 10px "JetBrains Mono", ui-monospace, monospace';
+        ctx.textAlign = xAlign;
+        ctx.fillText(
+          effectiveXAxisName,
+          xTitlePos.x + (xSlopeDownRight ? -26 : 26),
+          xTitlePos.y + 24
+        );
       }
 
+      // Y/Row-axis tick labels along frontX (only for genuine 2D maps)
+      if (!normalized.is1DRibbon) {
+        const labelOnLeft = proj(frontX, minVal, midZ).x < width / 2;
+        const yAlign: CanvasTextAlign = labelOnLeft ? 'right' : 'left';
+        ctx.font = '10px "JetBrains Mono", ui-monospace, monospace';
+        ctx.fillStyle = labelColor;
+        ctx.textAlign = yAlign;
+        ctx.textBaseline = 'top';
+        for (const rIdx of zTicks) {
+          const pTick = proj(frontX, minVal, rIdx);
+          const rawLbl = effectiveYLabels?.[rIdx] ?? rIdx;
+          ctx.fillText(String(rawLbl), pTick.x + (labelOnLeft ? -8 : 8), pTick.y + 4);
+        }
+        if (effectiveYAxisName) {
+          const yTitlePos = proj(frontX, minVal, midZ);
+          ctx.fillStyle = accentColor;
+          ctx.font = '600 10px "JetBrains Mono", ui-monospace, monospace';
+          ctx.textAlign = yAlign;
+          ctx.fillText(
+            effectiveYAxisName,
+            yTitlePos.x + (labelOnLeft ? -26 : 26),
+            yTitlePos.y + 24
+          );
+        }
+      }
       ctx.restore();
     }
 
-    // 3. Build & Depth-Sort Surface Quads (Painter's Algorithm)
-    const quads = buildQuads(matrix);
-    const sortedQuads = sortQuadsByDepth(quads, center, camera, effectiveYScaling);
+    // 2. Base ROM Ghost Wireframe (if enabled)
+    if (showGhost && renderBaseMatrix) {
+      const bRows = renderBaseMatrix.length;
+      const bCols = renderBaseMatrix[0].length;
+      ctx.save();
+      ctx.setLineDash([3, 3]);
+      ctx.strokeStyle = isLight ? 'rgba(71, 85, 105, 0.42)' : 'rgba(148, 163, 184, 0.42)';
+      ctx.lineWidth = 1;
+      for (let r = 0; r < bRows; r++) {
+        ctx.beginPath();
+        for (let c = 0; c < bCols; c++) {
+          const p = proj(c, renderBaseMatrix[r][c], r);
+          if (c === 0) ctx.moveTo(p.x, p.y);
+          else ctx.lineTo(p.x, p.y);
+        }
+        ctx.stroke();
+      }
+      for (let c = 0; c < bCols; c++) {
+        ctx.beginPath();
+        for (let r = 0; r < bRows; r++) {
+          const p = proj(c, renderBaseMatrix[r][c], r);
+          if (r === 0) ctx.moveTo(p.x, p.y);
+          else ctx.lineTo(p.x, p.y);
+        }
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
 
-    // Render Quads Back-to-Front
+    // 3. Subtle Base Skirt Walls along Front Perimeter (solid CAD volume anchor)
+    if (renderMode !== 'wireframe' && showCage) {
+      ctx.save();
+      const skirtFill = isLight ? 'rgba(100, 116, 139, 0.14)' : 'rgba(56, 189, 248, 0.10)';
+      const skirtEdge = isLight ? 'rgba(71, 85, 105, 0.28)' : 'rgba(56, 189, 248, 0.22)';
+      ctx.fillStyle = skirtFill;
+      ctx.strokeStyle = skirtEdge;
+      ctx.lineWidth = 0.8;
+
+      for (let c = 0; c < maxC; c++) {
+        const b0 = proj(c, minVal, frontZ);
+        const b1 = proj(c + 1, minVal, frontZ);
+        const t1 = proj(c + 1, renderMatrix[frontZ][c + 1], frontZ);
+        const t0 = proj(c, renderMatrix[frontZ][c], frontZ);
+        drawPolygon(ctx, [b0, b1, t1, t0]);
+        ctx.fill();
+        ctx.stroke();
+      }
+      for (let r = 0; r < maxR; r++) {
+        const b0 = proj(frontX, minVal, r);
+        const b1 = proj(frontX, minVal, r + 1);
+        const t1 = proj(frontX, renderMatrix[r + 1][frontX], r + 1);
+        const t0 = proj(frontX, renderMatrix[r][frontX], r);
+        drawPolygon(ctx, [b0, b1, t1, t0]);
+        ctx.fill();
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    // 4. Depth-Sorted Sculpted Surface Quads (Painter's Algorithm + Directional Lighting)
+    const sortedQuads = sortQuadsByDepth(quads, center, camera, effectiveYScaling);
     for (const quad of sortedQuads) {
       const p0 = projectPoint(quad.p0, center, camera, width, height, effectiveYScaling);
       const p1 = projectPoint(quad.p1, center, camera, width, height, effectiveYScaling);
       const p2 = projectPoint(quad.p2, center, camera, width, height, effectiveYScaling);
       const p3 = projectPoint(quad.p3, center, camera, width, height, effectiveYScaling);
 
-      ctx.beginPath();
-      ctx.moveTo(p0.x, p0.y);
-      ctx.lineTo(p1.x, p1.y);
-      ctx.lineTo(p2.x, p2.y);
-      ctx.lineTo(p3.x, p3.y);
-      ctx.closePath();
+      drawPolygon(ctx, [p0, p1, p2, p3]);
 
-      // Check if this quad is within selected range
-      const isSelected =
+      const origCorner = mapRenderToOrigCoord(quad.r, quad.c);
+      const isSelected = Boolean(
         selectedRange &&
-        quad.r >= selectedRange.minR &&
-        quad.r <= selectedRange.maxR &&
-        quad.c >= selectedRange.minC &&
-        quad.c <= selectedRange.maxC;
+          origCorner.r >= selectedRange.minR &&
+          origCorner.r <= selectedRange.maxR &&
+          origCorner.c >= selectedRange.minC &&
+          origCorner.c <= selectedRange.maxC
+      );
 
-      if (renderMode === 'shaded') {
-        // Shaded polygon
-        const fillColor = getPaletteColor(
-          quad.avgValue,
-          minVal,
-          maxVal,
-          activePalette,
-          isSelected ? 0.95 : 0.82
-        );
-        ctx.fillStyle = fillColor;
-        ctx.fill();
-
-        // Wireframe grid edge lines
-        ctx.strokeStyle = isSelected ? '#38bdf8' : 'rgba(15, 23, 42, 0.45)';
-        ctx.lineWidth = isSelected ? 1.8 : 0.85;
-        ctx.stroke();
-      } else {
-        // Wireframe only mode
+      if (renderMode === 'wireframe') {
         const strokeColor = getPaletteColor(
           quad.avgValue,
           minVal,
           maxVal,
           activePalette,
-          isSelected ? 1.0 : 0.88
+          isSelected ? 1.0 : 0.9
         );
-        ctx.strokeStyle = isSelected ? '#38bdf8' : strokeColor;
-        ctx.lineWidth = isSelected ? 2.2 : 1.2;
+        ctx.strokeStyle = isSelected ? accentColor : strokeColor;
+        ctx.lineWidth = isSelected ? 1.8 : 1.15;
+        ctx.stroke();
+      } else {
+        const shade = computeQuadShade(quad, effectiveYScaling);
+        ctx.fillStyle = getShadedPaletteColor(
+          quad.avgValue,
+          minVal,
+          maxVal,
+          activePalette,
+          shade,
+          isSelected ? 0.98 : 0.92
+        );
+        ctx.fill();
+
+        if (isSelected) {
+          ctx.strokeStyle = accentColor;
+          ctx.lineWidth = 1.6;
+        } else if (renderMode === 'shaded') {
+          ctx.strokeStyle = isLight ? 'rgba(15, 23, 42, 0.32)' : 'rgba(10, 13, 18, 0.55)';
+          ctx.lineWidth = 0.8;
+        } else {
+          ctx.strokeStyle = isLight ? 'rgba(15, 23, 42, 0.12)' : 'rgba(255, 255, 255, 0.08)';
+          ctx.lineWidth = 0.45;
+        }
         ctx.stroke();
       }
     }
 
-    // 4. Highlighted Pillars & Markers for Selected Range
+    // 5. Selected Range Vertex Markers
     if (selectedRange) {
       const rMin = Math.max(0, Math.min(selectedRange.minR, selectedRange.maxR));
-      const rMax = Math.min(numRows - 1, Math.max(selectedRange.minR, selectedRange.maxR));
+      const rMax = Math.min(origRows - 1, Math.max(selectedRange.minR, selectedRange.maxR));
       const cMin = Math.max(0, Math.min(selectedRange.minC, selectedRange.maxC));
-      const cMax = Math.min(numCols - 1, Math.max(selectedRange.minC, selectedRange.maxC));
+      const cMax = Math.min(origCols - 1, Math.max(selectedRange.minC, selectedRange.maxC));
+      const selCount = (rMax - rMin + 1) * (cMax - cMin + 1);
 
       for (let r = rMin; r <= rMax; r++) {
         for (let c = cMin; c <= cMax; c++) {
-          const val = matrix[r][c];
-          const topPoint: Point3D = { x: c, y: val, z: r };
-          const basePoint: Point3D = { x: c, y: minVal, z: r };
+          const val = matrix[r]?.[c];
+          if (val === undefined) continue;
+          const mapped = mapOrigToRenderCoord(r, c);
+          const projTop = proj(mapped.c, val, mapped.r);
+          const projBase = proj(mapped.c, minVal, mapped.r);
 
-          const projTop = projectPoint(
-            topPoint,
-            center,
-            camera,
-            width,
-            height,
-            effectiveYScaling
-          );
-          const projBase = projectPoint(
-            basePoint,
-            center,
-            camera,
-            width,
-            height,
-            effectiveYScaling
-          );
+          if (selCount <= 16) {
+            ctx.beginPath();
+            ctx.setLineDash([2, 3]);
+            ctx.strokeStyle = accentColor;
+            ctx.lineWidth = 1.1;
+            ctx.moveTo(projBase.x, projBase.y);
+            ctx.lineTo(projTop.x, projTop.y);
+            ctx.stroke();
+            ctx.setLineDash([]);
+          }
 
-          // Draw vertical neon pillar
           ctx.beginPath();
-          ctx.setLineDash([2, 3]);
-          ctx.strokeStyle = 'rgba(56, 189, 248, 0.6)';
-          ctx.lineWidth = 1.4;
-          ctx.moveTo(projBase.x, projBase.y);
-          ctx.lineTo(projTop.x, projTop.y);
+          ctx.arc(projTop.x, projTop.y, selCount <= 4 ? 4.5 : 3.0, 0, Math.PI * 2);
+          ctx.fillStyle = isLight ? '#FFFFFF' : '#0A0D12';
+          ctx.fill();
+          ctx.strokeStyle = accentColor;
+          ctx.lineWidth = 1.8;
           ctx.stroke();
-          ctx.setLineDash([]);
-
-          // Base footprint dot
-          ctx.beginPath();
-          ctx.arc(projBase.x, projBase.y, 2.5, 0, Math.PI * 2);
-          ctx.fillStyle = 'rgba(56, 189, 248, 0.4)';
-          ctx.fill();
-
-          // Surface vertex glow ring
-          ctx.beginPath();
-          ctx.arc(projTop.x, projTop.y, 6, 0, Math.PI * 2);
-          ctx.fillStyle = 'rgba(56, 189, 248, 0.35)';
-          ctx.fill();
-          ctx.strokeStyle = '#38bdf8';
-          ctx.lineWidth = 1.5;
-          ctx.stroke();
-
-          // Center solid pip
-          ctx.beginPath();
-          ctx.arc(projTop.x, projTop.y, 2.5, 0, Math.PI * 2);
-          ctx.fillStyle = '#ffffff';
-          ctx.fill();
         }
       }
     }
 
-    // 4.5. Telemetry Crosshair Indicator (Amber Neon Reticle)
+    // 6. Live Telemetry Crosshair Needle
     if (activeCorrelatedCell) {
+      const mapped = mapOrigToRenderCoord(activeCorrelatedCell.r, activeCorrelatedCell.c);
       const crosshairGeom = get3DSurfaceCrosshairGeometry({
-        r: activeCorrelatedCell.r,
-        c: activeCorrelatedCell.c,
-        matrix,
+        r: mapped.r,
+        c: mapped.c,
+        matrix: renderMatrix,
         minVal,
         center,
         camera,
@@ -457,148 +715,91 @@ export const Surface3DView: React.FC<Surface3DViewProps> = ({
 
       if (crosshairGeom && crosshairGeom.isValid) {
         const { topProj, baseProj } = crosshairGeom;
-
         ctx.save();
-
-        // Vertical amber neon dashed pillar
         ctx.beginPath();
         ctx.setLineDash([3, 3]);
-        ctx.strokeStyle = '#f59e0b'; // amber-500
-        ctx.lineWidth = 2.0;
+        ctx.strokeStyle = warnColor;
+        ctx.lineWidth = 1.6;
         ctx.moveTo(baseProj.x, baseProj.y);
         ctx.lineTo(topProj.x, topProj.y);
         ctx.stroke();
         ctx.setLineDash([]);
 
-        // Base footprint dot & ring
         ctx.beginPath();
-        ctx.arc(baseProj.x, baseProj.y, 3.5, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(245, 158, 11, 0.5)';
+        ctx.arc(topProj.x, topProj.y, 6, 0, Math.PI * 2);
+        ctx.strokeStyle = warnColor;
+        ctx.lineWidth = 1.8;
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.arc(topProj.x, topProj.y, 2.2, 0, Math.PI * 2);
+        ctx.fillStyle = warnColor;
         ctx.fill();
-        ctx.strokeStyle = '#d97706';
-        ctx.lineWidth = 1.0;
-        ctx.stroke();
-
-        // Surface vertex outer target ring
-        ctx.beginPath();
-        ctx.arc(topProj.x, topProj.y, 9, 0, Math.PI * 2);
-        ctx.strokeStyle = 'rgba(245, 158, 11, 0.45)';
-        ctx.lineWidth = 1.5;
-        ctx.stroke();
-
-        // Surface vertex inner target ring
-        ctx.beginPath();
-        ctx.arc(topProj.x, topProj.y, 5, 0, Math.PI * 2);
-        ctx.strokeStyle = '#f59e0b';
-        ctx.lineWidth = 2.0;
-        ctx.stroke();
-
-        // Center solid amber pip
-        ctx.beginPath();
-        ctx.arc(topProj.x, topProj.y, 2.5, 0, Math.PI * 2);
-        ctx.fillStyle = '#fbbf24'; // amber-400
-        ctx.fill();
-
-        // Crosshair reticle ticks
-        ctx.strokeStyle = '#f59e0b';
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        // North tick
-        ctx.moveTo(topProj.x, topProj.y - 13);
-        ctx.lineTo(topProj.x, topProj.y - 7);
-        // South tick
-        ctx.moveTo(topProj.x, topProj.y + 7);
-        ctx.lineTo(topProj.x, topProj.y + 13);
-        // West tick
-        ctx.moveTo(topProj.x - 13, topProj.y);
-        ctx.lineTo(topProj.x - 7, topProj.y);
-        // East tick
-        ctx.moveTo(topProj.x + 7, topProj.y);
-        ctx.lineTo(topProj.x + 13, topProj.y);
-        ctx.stroke();
-
         ctx.restore();
       }
     }
 
-    // 5. Hover indicator marker
+    // 7. Hover Target Pin
     if (hoveredCell) {
       const hVal = matrix[hoveredCell.r]?.[hoveredCell.c];
       if (hVal !== undefined) {
-        const hPt: Point3D = { x: hoveredCell.c, y: hVal, z: hoveredCell.r };
-        const hProj = projectPoint(
-          hPt,
-          center,
-          camera,
-          width,
-          height,
-          effectiveYScaling
-        );
-
+        const mapped = mapOrigToRenderCoord(hoveredCell.r, hoveredCell.c);
+        const hProj = proj(mapped.c, hVal, mapped.r);
         ctx.beginPath();
-        ctx.arc(hProj.x, hProj.y, 7, 0, Math.PI * 2);
-        ctx.strokeStyle = '#facc15';
-        ctx.lineWidth = 2;
+        ctx.arc(hProj.x, hProj.y, 5.5, 0, Math.PI * 2);
+        ctx.strokeStyle = accentColor;
+        ctx.lineWidth = 1.8;
         ctx.stroke();
       }
     }
 
-    // 6. Draw 3D Coordinate Axis Guides
-    const originPoint = projectPoint(
-      { x: 0, y: minVal, z: 0 },
-      center,
-      camera,
-      width,
-      height,
-      effectiveYScaling
-    );
-    const xEnd = projectPoint(
-      { x: Math.min(3, numCols - 1), y: minVal, z: 0 },
-      center,
-      camera,
-      width,
-      height,
-      effectiveYScaling
-    );
-    const zEnd = projectPoint(
-      { x: 0, y: minVal, z: Math.min(3, numRows - 1) },
-      center,
-      camera,
-      width,
-      height,
-      effectiveYScaling
-    );
+    // 8. Calibrated Vertical Color Scale Legend
+    if (width >= 360 && height >= 200) {
+      ctx.save();
+      const barW = 10;
+      const barH = Math.min(180, Math.max(88, Math.floor(height * 0.48)));
+      const barX = width - 58;
+      const barY = Math.round((height - barH) / 2);
 
-    ctx.save();
-    ctx.lineWidth = 1.8;
+      for (let py = 0; py < barH; py++) {
+        const frac = 1 - py / Math.max(1, barH - 1);
+        const val = minVal + frac * (maxVal - minVal);
+        ctx.fillStyle = getPaletteColor(val, minVal, maxVal, activePalette, 1.0);
+        ctx.fillRect(barX, barY + py, barW, 1.5);
+      }
 
-    // TPS axis guide (X axis - Cyan)
-    ctx.strokeStyle = '#06b6d4';
-    ctx.beginPath();
-    ctx.moveTo(originPoint.x, originPoint.y);
-    ctx.lineTo(xEnd.x, xEnd.y);
-    ctx.stroke();
+      ctx.strokeStyle = cageBorder;
+      ctx.lineWidth = 1;
+      ctx.strokeRect(barX, barY, barW, barH);
 
-    // RPM axis guide (Z axis - Emerald)
-    ctx.strokeStyle = '#10b981';
-    ctx.beginPath();
-    ctx.moveTo(originPoint.x, originPoint.y);
-    ctx.lineTo(zEnd.x, zEnd.y);
-    ctx.stroke();
+      ctx.font = '10px "JetBrains Mono", ui-monospace, monospace';
+      ctx.fillStyle = labelColor;
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'middle';
+      const legSteps = 4;
+      for (let i = 0; i <= legSteps; i++) {
+        const frac = i / legSteps;
+        const val = maxVal - frac * (maxVal - minVal);
+        const yPos = barY + frac * barH;
+        ctx.fillText(formatCompactTick(val, decimals), barX + barW + 5, yPos);
+      }
 
-    ctx.font = '10px monospace';
-    ctx.fillStyle = '#06b6d4';
-    ctx.fillText('TPS →', xEnd.x + 4, xEnd.y + 4);
-
-    ctx.fillStyle = '#10b981';
-    ctx.fillText('RPM ↓', zEnd.x + 4, zEnd.y + 4);
-    ctx.restore();
+      if (unit) {
+        ctx.fillStyle = titleInk;
+        ctx.font = '600 10px "JetBrains Mono", ui-monospace, monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText(unit, barX + barW / 2, barY - 12);
+      }
+      ctx.restore();
+    }
 
     ctx.restore();
   }, [
     dimensions,
     matrix,
-    baseMatrix,
+    renderMatrix,
+    renderBaseMatrix,
+    quads,
     camera,
     center,
     minVal,
@@ -606,16 +807,27 @@ export const Surface3DView: React.FC<Surface3DViewProps> = ({
     effectiveYScaling,
     activePalette,
     renderMode,
+    showCage,
     showGhost,
     selectedRange,
     hoveredCell,
     activeCorrelatedCell,
     numRows,
     numCols,
+    origRows,
+    origCols,
+    effectiveXLabels,
+    effectiveYLabels,
+    effectiveXAxisName,
+    effectiveYAxisName,
+    normalized.is1DRibbon,
+    unit,
+    decimals,
     theme,
+    mapRenderToOrigCoord,
+    mapOrigToRenderCoord,
   ]);
 
-  // Mouse Interaction: Rotate (Left Drag), Pan (Shift+Drag / Right Drag), Zoom (Wheel)
   const isDraggingRef = useRef(false);
   const dragStartRef = useRef<{ x: number; y: number; isPan: boolean }>({
     x: 0,
@@ -657,16 +869,14 @@ export const Surface3DView: React.FC<Surface3DViewProps> = ({
   const handlePointerMove = (e: React.PointerEvent<HTMLCanvasElement>) => {
     const pt = readCachedCanvasCoords(e.clientX, e.clientY);
     if (!pt) return;
-    const { mouseX, mouseY } = pt;
 
     if (isDraggingRef.current) {
       const dx = e.clientX - dragStartRef.current.x;
       const dy = e.clientY - dragStartRef.current.y;
-
       if (Math.hypot(dx, dy) > 2) {
         hasMovedRef.current = true;
+        setActivePreset(null);
       }
-
       dragStartRef.current = {
         x: e.clientX,
         y: e.clientY,
@@ -683,31 +893,37 @@ export const Surface3DView: React.FC<Surface3DViewProps> = ({
         setCamera((prev) => ({
           ...prev,
           yaw: prev.yaw + dx * 0.007,
-          pitch: Math.max(
-            -Math.PI / 2 + 0.05,
-            Math.min(Math.PI / 2 - 0.05, prev.pitch + dy * 0.007)
-          ),
+          pitch: Math.max(-Math.PI / 2 + 0.05, Math.min(Math.PI / 2 - 0.05, prev.pitch + dy * 0.007)),
         }));
       }
-    } else {
-      // Find closest cell under mouse for hover HUD
+      return;
+    }
+
+    pendingPointerRef.current = { x: pt.mouseX, y: pt.mouseY };
+    if (hoverRafRef.current !== null) return;
+    hoverRafRef.current = requestAnimationFrame(() => {
+      hoverRafRef.current = null;
+      const coords = pendingPointerRef.current;
+      if (!coords) return;
       const closest = findClosestCell(
-        mouseX,
-        mouseY,
-        matrix,
+        coords.x,
+        coords.y,
+        renderMatrix,
         center,
         camera,
         dimensions.width,
         dimensions.height,
         effectiveYScaling
       );
-
-      if (closest && closest.distance < 28) {
-        setHoveredCell({ r: closest.r, c: closest.c });
+      if (closest && closest.distance < 26) {
+        const mapped = mapRenderToOrigCoord(closest.r, closest.c);
+        setHoveredCell((prev) =>
+          prev && prev.r === mapped.r && prev.c === mapped.c ? prev : mapped
+        );
       } else {
-        setHoveredCell(null);
+        setHoveredCell((prev) => (prev === null ? null : null));
       }
-    }
+    });
   };
 
   const handlePointerUp = (e: React.PointerEvent<HTMLCanvasElement>) => {
@@ -716,113 +932,68 @@ export const Surface3DView: React.FC<Surface3DViewProps> = ({
     try {
       (e.target as HTMLElement).releasePointerCapture(e.pointerId);
     } catch {
-      // Ignore if pointer capture was already released
+      // Ignore if pointer capture already released.
     }
 
-    // If it was a clean click without dragging, select the clicked cell
     if (!hasMovedRef.current && onSelectCell) {
       const pt = readCachedCanvasCoords(e.clientX, e.clientY);
       if (!pt) return;
-      const { mouseX, mouseY } = pt;
-
       const closest = findClosestCell(
-        mouseX,
-        mouseY,
-        matrix,
+        pt.mouseX,
+        pt.mouseY,
+        renderMatrix,
         center,
         camera,
         dimensions.width,
         dimensions.height,
         effectiveYScaling
       );
-
-      if (closest && closest.distance < 35) {
-        onSelectCell(closest.r, closest.c);
+      if (closest && closest.distance < 32) {
+        const mapped = mapRenderToOrigCoord(closest.r, closest.c);
+        onSelectCell(mapped.r, mapped.c);
       }
     }
   };
 
-  // Wheel Zoom
-  const handleWheel = (e: React.WheelEvent<HTMLCanvasElement>) => {
-    e.preventDefault();
-    const factor = e.deltaY < 0 ? 1.08 : 0.92;
-    handleZoom(factor);
-  };
-
-  // Keyboard live editing when focused
   const handleKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
     if (readOnly || !onChangeMatrix || !selectedRange) return;
-
-    const rMin = selectedRange.minR;
-    const rMax = selectedRange.maxR;
-    const cMin = selectedRange.minC;
-    const cMax = selectedRange.maxC;
-
+    const { minR, maxR, minC, maxC } = selectedRange;
     const step = decimals > 0 ? 0.1 : 1;
 
     switch (e.key) {
       case '+':
-      case '=': {
+      case '=':
         e.preventDefault();
-        const adjusted = adjustSelection(matrix, rMin, rMax, cMin, cMax, step, decimals);
-        onChangeMatrix(adjusted);
+        onChangeMatrix(adjustSelection(matrix, minR, maxR, minC, maxC, step, decimals));
         break;
-      }
-
       case '-':
-      case '_': {
+      case '_':
         e.preventDefault();
-        const adjusted = adjustSelection(matrix, rMin, rMax, cMin, cMax, -step, decimals);
-        onChangeMatrix(adjusted);
+        onChangeMatrix(adjustSelection(matrix, minR, maxR, minC, maxC, -step, decimals));
         break;
-      }
-
-      case '%': {
+      case '%':
         e.preventDefault();
-        const scaled = scaleSelection(matrix, rMin, rMax, cMin, cMax, 5, decimals);
-        onChangeMatrix(scaled);
+        onChangeMatrix(scaleSelection(matrix, minR, maxR, minC, maxC, 5, decimals));
         break;
-      }
-
-      case 'ArrowUp': {
+      case 'ArrowUp':
         e.preventDefault();
-        if (onSelectCell && selectedRange) {
-          const nextR = Math.max(0, selectedRange.minR - 1);
-          onSelectCell(nextR, selectedRange.minC);
-        }
+        onSelectCell?.(Math.max(0, minR - 1), minC);
         break;
-      }
-
-      case 'ArrowDown': {
+      case 'ArrowDown':
         e.preventDefault();
-        if (onSelectCell && selectedRange) {
-          const nextR = Math.min(numRows - 1, selectedRange.minR + 1);
-          onSelectCell(nextR, selectedRange.minC);
-        }
+        onSelectCell?.(Math.min(origRows - 1, minR + 1), minC);
         break;
-      }
-
-      case 'ArrowLeft': {
+      case 'ArrowLeft':
         e.preventDefault();
-        if (onSelectCell && selectedRange) {
-          const nextC = Math.max(0, selectedRange.minC - 1);
-          onSelectCell(selectedRange.minR, nextC);
-        }
+        onSelectCell?.(minR, Math.max(0, minC - 1));
         break;
-      }
-
-      case 'ArrowRight': {
+      case 'ArrowRight':
         e.preventDefault();
-        if (onSelectCell && selectedRange) {
-          const nextC = Math.min(numCols - 1, selectedRange.minC + 1);
-          onSelectCell(selectedRange.minR, nextC);
-        }
+        onSelectCell?.(minR, Math.min(origCols - 1, minC + 1));
         break;
-      }
     }
   };
 
-  // Determine active inspected cell (hovered or selected anchor)
   const activeCellCoord = useMemo(() => {
     if (hoveredCell) return hoveredCell;
     if (selectedRange) return { r: selectedRange.minR, c: selectedRange.minC };
@@ -832,12 +1003,8 @@ export const Surface3DView: React.FC<Surface3DViewProps> = ({
   const activeCellValue = activeCellCoord
     ? matrix[activeCellCoord.r]?.[activeCellCoord.c]
     : null;
-
   const activeBaseValue =
-    activeCellCoord && baseMatrix
-      ? baseMatrix[activeCellCoord.r]?.[activeCellCoord.c]
-      : null;
-
+    activeCellCoord && baseMatrix ? baseMatrix[activeCellCoord.r]?.[activeCellCoord.c] : null;
   const activeDelta =
     activeCellValue !== null &&
     activeCellValue !== undefined &&
@@ -848,106 +1015,117 @@ export const Surface3DView: React.FC<Surface3DViewProps> = ({
 
   return (
     <div
-      ref={containerRef}
       tabIndex={0}
       onKeyDown={handleKeyDown}
-      className="relative flex flex-col w-full h-full min-h-[460px] bg-kiviBg rounded-lg border border-kiviBorder select-none focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-kiviAccent focus:ring-1 focus:ring-kiviAccent/50"
+      className="relative flex h-full w-full min-h-0 min-w-0 flex-col overflow-hidden rounded-lg border border-kiviBorder bg-kiviBg select-none focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-kiviAccent"
     >
-      {/* 3D Top Header & Camera Toolbar */}
-      <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 border-b border-kiviBorder bg-kiviSurface z-10">
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-semibold text-kiviInk tracking-wide flex items-center gap-1.5">
-            <Box className="h-4 w-4 text-kiviAccent" />
-            <span>{title || '3D Surface Mesh Viewer'}</span>
+      {/* Responsive Wrapping 3D Calibration Toolbar */}
+      <div className="z-10 flex min-w-0 shrink-0 flex-wrap items-center justify-between gap-x-2 gap-y-1.5 border-b border-kiviBorder bg-kiviSurface px-2.5 py-1.5">
+        <div className="flex min-w-0 items-center gap-1.5">
+          <Box className="h-3.5 w-3.5 shrink-0 text-kiviAccent" />
+          <span className="truncate text-xs font-semibold text-kiviInk">
+            {title || '3D Surface Mesh'}
           </span>
-          <span className="text-[11px] font-mono text-kiviMuted px-1.5 py-0.5 rounded bg-kiviElevated border border-kiviBorderStrong">
-            {numRows} &times; {numCols}
+          <span className="shrink-0 whitespace-nowrap rounded border border-kiviBorderStrong bg-kiviElevated px-1.5 py-0.5 font-mono text-[10px] text-kiviMuted tabular-nums">
+            {origRows} &times; {origCols}
           </span>
+          {normalized.is1DRibbon && (
+            <span className="shrink-0 whitespace-nowrap rounded border border-kiviAccent/40 bg-kiviAccent/10 px-1.5 py-0.5 font-mono text-[10px] text-kiviAccent">
+              1D Ribbon
+            </span>
+          )}
         </div>
 
-        {/* Toolbar Controls */}
-        <div className="flex items-center gap-1.5">
-          {/* Preset Camera Angles */}
-          <div className="flex items-center bg-kiviBg p-0.5 rounded border border-kiviBorder">
-            <button
-              type="button"
-              title="Isometric Perspective"
-              onClick={() => applyPreset('ISOMETRIC')}
-              className="px-2 py-1 text-[11px] font-medium rounded text-kiviSecondary hover:text-kiviInk hover:bg-kiviElevated transition-colors flex items-center gap-1"
-            >
-              <Box className="h-3 w-3 text-kiviAccent" />
-              <span>Iso</span>
-            </button>
-            <button
-              type="button"
-              title="Top-Down View"
-              onClick={() => applyPreset('TOP_DOWN')}
-              className="px-2 py-1 text-[11px] font-medium rounded text-kiviSecondary hover:text-kiviInk hover:bg-kiviElevated transition-colors flex items-center gap-1"
-            >
-              <Grid className="h-3 w-3 text-kiviAccent" />
-              <span>Top</span>
-            </button>
-            <button
-              type="button"
-              title="Front View (RPM Elevation)"
-              onClick={() => applyPreset('FRONT_RPM')}
-              className="px-2 py-1 text-[11px] font-medium rounded text-kiviSecondary hover:text-kiviInk hover:bg-kiviElevated transition-colors flex items-center gap-1"
-            >
-              <MoveHorizontal className="h-3 w-3 text-kiviGreen" />
-              <span>RPM</span>
-            </button>
-            <button
-              type="button"
-              title="Side View (TPS Elevation)"
-              onClick={() => applyPreset('SIDE_TPS')}
-              className="px-2 py-1 text-[11px] font-medium rounded text-kiviSecondary hover:text-kiviInk hover:bg-kiviElevated transition-colors flex items-center gap-1"
-            >
-              <MoveVertical className="h-3 w-3 text-kiviWarn" />
-              <span>TPS</span>
-            </button>
+        <div className="flex min-w-0 flex-wrap items-center gap-1">
+          <div className="flex shrink-0 items-center rounded border border-kiviBorder bg-kiviBg p-0.5">
+            {(
+              [
+                { key: 'ISOMETRIC', label: 'Iso', title: 'Isometric Angle', Icon: Box },
+                { key: 'TOP_DOWN', label: 'Top', title: 'Top Plan View', Icon: Grid },
+                { key: 'FRONT_RPM', label: 'Front', title: 'Front Profile', Icon: MoveHorizontal },
+                { key: 'SIDE_TPS', label: 'Side', title: 'Side Profile', Icon: MoveVertical },
+              ] as const
+            ).map(({ key, label, title: tip, Icon }) => {
+              const isAct = activePreset === key;
+              return (
+                <button
+                  key={key}
+                  type="button"
+                  title={tip}
+                  onClick={() => applyPreset(key)}
+                  className={`flex shrink-0 items-center gap-1 whitespace-nowrap rounded px-1.5 py-0.5 text-[11px] font-medium transition-colors ${
+                    isAct
+                      ? 'bg-kiviAccent text-kiviAccentFg'
+                      : 'text-kiviSecondary hover:bg-kiviElevated hover:text-kiviInk'
+                  }`}
+                >
+                  <Icon className="h-3 w-3 shrink-0" />
+                  <span>{label}</span>
+                </button>
+              );
+            })}
           </div>
 
-          <div className="h-4 w-[1px] bg-kiviElevated mx-0.5" />
+          <div className="flex shrink-0 items-center rounded border border-kiviBorder bg-kiviBg p-0.5">
+            {(
+              [
+                { id: 'shaded', label: 'Mesh' },
+                { id: 'smooth', label: 'Solid' },
+                { id: 'wireframe', label: 'Wire' },
+              ] as const
+            ).map((mode) => (
+              <button
+                key={mode.id}
+                type="button"
+                onClick={() => setRenderMode(mode.id)}
+                className={`shrink-0 whitespace-nowrap rounded px-1.5 py-0.5 text-[11px] font-medium transition-colors ${
+                  renderMode === mode.id
+                    ? 'bg-kiviElevated text-kiviAccent'
+                    : 'text-kiviSecondary hover:text-kiviInk'
+                }`}
+              >
+                {mode.label}
+              </button>
+            ))}
+          </div>
 
-          {/* Shading / Wireframe Toggle */}
           <button
             type="button"
-            title={renderMode === 'shaded' ? 'Switch to Wireframe Only' : 'Switch to Shaded Mesh'}
-            onClick={() => setRenderMode(renderMode === 'shaded' ? 'wireframe' : 'shaded')}
-            className={`px-2 py-1 text-[11px] font-medium rounded border transition-colors flex items-center gap-1 ${
-              renderMode === 'shaded'
-                ? 'bg-kiviElevated text-kiviAccent border-kiviBorderStrong'
-                : 'bg-kiviAccent/15 text-kiviAccent border-kiviAccent/40'
+            title="Toggle 3D Calibration Cage & Axes"
+            onClick={() => setShowCage((v) => !v)}
+            className={`flex shrink-0 items-center gap-1 whitespace-nowrap rounded border px-1.5 py-0.5 text-[11px] font-medium transition-colors ${
+              showCage
+                ? 'border-kiviAccent/40 bg-kiviAccent/10 text-kiviAccent'
+                : 'border-kiviBorder bg-kiviBg text-kiviMuted hover:text-kiviInk'
             }`}
           >
-            <Layers className="h-3 w-3" />
-            <span>{renderMode === 'shaded' ? 'Shaded' : 'Wireframe'}</span>
+            <Layers className="h-3 w-3 shrink-0" />
+            <span>Cage</span>
           </button>
 
-          {/* Base Ghost Wireframe Toggle */}
-          {baseMatrix && (
+          {renderBaseMatrix && (
             <button
               type="button"
               title="Toggle Base ROM Ghost Wireframe"
-              onClick={() => setShowGhost(!showGhost)}
-              className={`px-2 py-1 text-[11px] font-medium rounded border transition-colors flex items-center gap-1 ${
+              onClick={() => setShowGhost((v) => !v)}
+              className={`flex shrink-0 items-center gap-1 whitespace-nowrap rounded border px-1.5 py-0.5 text-[11px] font-medium transition-colors ${
                 showGhost
-                  ? 'bg-kiviWarn/15 text-kiviWarn border-kiviWarn/40'
-                  : 'bg-kiviSurface text-kiviMuted border-kiviBorder'
+                  ? 'border-kiviWarn/40 bg-kiviWarn/15 text-kiviWarn'
+                  : 'border-kiviBorder bg-kiviBg text-kiviMuted hover:text-kiviInk'
               }`}
             >
-              <Ghost className="h-3 w-3" />
+              <Ghost className="h-3 w-3 shrink-0" />
               <span>Ghost</span>
             </button>
           )}
 
-          {/* Color Palette Selector */}
-          <div className="flex items-center gap-1 bg-kiviBg px-1 py-0.5 rounded border border-kiviBorder">
-            <Palette className="h-3 w-3 text-kiviMuted ml-1" />
+          <div className="flex shrink-0 items-center gap-1 rounded border border-kiviBorder bg-kiviBg px-1.5 py-0.5">
+            <Palette className="h-3 w-3 shrink-0 text-kiviMuted" />
             <select
+              aria-label="3D Surface Color Palette"
               value={activePalette}
               onChange={(e) => setActivePalette(e.target.value as SurfacePalette)}
-              className="bg-transparent text-[11px] font-medium text-kiviSecondary focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-kiviAccent cursor-pointer py-0.5 pr-1"
+              className="cursor-pointer bg-transparent text-[11px] font-medium text-kiviSecondary focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-kiviAccent"
             >
               <option value="classic" className="bg-kiviSurface text-kiviInk">
                 Classic
@@ -959,144 +1137,138 @@ export const Surface3DView: React.FC<Surface3DViewProps> = ({
                 Spectrum
               </option>
               <option value="monochrome" className="bg-kiviSurface text-kiviInk">
-                Monochrome
+                Mono
               </option>
             </select>
           </div>
 
-          <div className="h-4 w-[1px] bg-kiviElevated mx-0.5" />
-
-          {/* Zoom Buttons */}
-          <button
-            type="button"
-            title="Zoom In"
-            onClick={() => handleZoom(1.15)}
-            className="p-1 rounded text-kiviMuted hover:text-kiviInk hover:bg-kiviElevated transition-colors"
-          >
-            <ZoomIn className="h-3.5 w-3.5" />
-          </button>
-          <button
-            type="button"
-            title="Zoom Out"
-            onClick={() => handleZoom(0.85)}
-            className="p-1 rounded text-kiviMuted hover:text-kiviInk hover:bg-kiviElevated transition-colors"
-          >
-            <ZoomOut className="h-3.5 w-3.5" />
-          </button>
-
-          {/* Reset Camera Button */}
-          <button
-            type="button"
-            title="Reset Camera & Zoom"
-            onClick={handleResetCamera}
-            className="p-1 rounded text-kiviMuted hover:text-kiviInk hover:bg-kiviElevated transition-colors"
-          >
-            <RotateCcw className="h-3.5 w-3.5" />
-          </button>
+          <div className="flex shrink-0 items-center rounded border border-kiviBorder bg-kiviBg p-0.5">
+            <button
+              type="button"
+              title="Zoom In"
+              onClick={() => handleZoom(1.15)}
+              className="rounded p-1 text-kiviMuted hover:bg-kiviElevated hover:text-kiviInk transition-colors"
+            >
+              <ZoomIn className="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="button"
+              title="Zoom Out"
+              onClick={() => handleZoom(0.85)}
+              className="rounded p-1 text-kiviMuted hover:bg-kiviElevated hover:text-kiviInk transition-colors"
+            >
+              <ZoomOut className="h-3.5 w-3.5" />
+            </button>
+            <button
+              type="button"
+              title="Reset Camera & Zoom"
+              onClick={handleResetCamera}
+              className="rounded p-1 text-kiviMuted hover:bg-kiviElevated hover:text-kiviInk transition-colors"
+            >
+              <RotateCcw className="h-3.5 w-3.5" />
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Main Canvas Viewport */}
-      <div className="relative flex-1 w-full h-full min-h-[380px] overflow-hidden">
+      {/* Dedicated Fixed-Bounds Canvas Host (Immune to Resize Feedback Loops) */}
+      <div
+        ref={canvasHostRef}
+        data-testid="surface3d-canvas-host"
+        className="relative min-h-[220px] min-w-0 flex-1 overflow-hidden"
+      >
         <canvas
           ref={canvasRef}
           onPointerDown={handlePointerDown}
           onPointerMove={handlePointerMove}
           onPointerUp={handlePointerUp}
-          onWheel={handleWheel}
+          onPointerLeave={() => setHoveredCell(null)}
           onContextMenu={(e) => e.preventDefault()}
-          className="w-full h-full cursor-grab active:cursor-grabbing block touch-none"
+          className="absolute inset-0 block h-full w-full cursor-grab active:cursor-grabbing touch-none"
         />
 
-        {/* Live HUD / Coordinates Pill Card */}
         {activeCellCoord && activeCellValue !== null && activeCellValue !== undefined && (
-          <div className="pointer-events-none absolute top-3 left-3 z-20 min-w-[190px] rounded-lg border border-kiviBorderStrong bg-kiviSurface p-2.5 shadow-xl tabular-nums">
-            <div className="mb-1.5 flex items-center justify-between gap-2 border-b border-kiviBorder pb-1 text-[11px] font-semibold text-kiviInk">
+          <div className="pointer-events-none absolute top-2.5 left-2.5 z-10 min-w-[168px] rounded border border-kiviBorderStrong bg-kiviSurface/95 px-2.5 py-2 shadow-lg tabular-nums">
+            <div className="mb-1 flex items-center justify-between gap-2 border-b border-kiviBorder pb-1 text-[10px] font-semibold text-kiviInk">
               <span>
-                Cell [{activeCellCoord.r}, {activeCellCoord.c}]
+                [{activeCellCoord.r}, {activeCellCoord.c}]
               </span>
-              <span className="font-mono text-[10px] text-kiviAccent">
-                {unit}
-              </span>
+              <span className="font-mono text-kiviAccent">{unit}</span>
             </div>
-
-            <div className="space-y-1 font-mono text-[11px]">
-              <div className="flex justify-between text-kiviSecondary">
+            <div className="space-y-0.5 font-mono text-[10px]">
+              <div className="flex justify-between gap-2 text-kiviSecondary">
                 <span className="text-kiviMuted">{yAxisName}:</span>
                 <span>{yLabels?.[activeCellCoord.r] ?? activeCellCoord.r}</span>
               </div>
-              <div className="flex justify-between text-kiviSecondary">
+              <div className="flex justify-between gap-2 text-kiviSecondary">
                 <span className="text-kiviMuted">{xAxisName}:</span>
                 <span>{xLabels?.[activeCellCoord.c] ?? activeCellCoord.c}</span>
               </div>
-              <div className="flex justify-between font-bold text-kiviInk pt-0.5 border-t border-kiviBorder">
-                <span className="text-kiviMuted font-normal">Value:</span>
+              <div className="flex justify-between gap-2 border-t border-kiviBorder pt-0.5 font-bold text-kiviInk">
+                <span className="font-normal text-kiviMuted">Value:</span>
                 <span className="text-kiviAccent">
                   {typeof activeCellValue === 'number'
                     ? activeCellValue.toFixed(decimals)
                     : activeCellValue}
                 </span>
               </div>
-
               {activeDelta !== null && (
-                <div className="flex justify-between items-center text-[10px] pt-0.5">
+                <div className="flex justify-between gap-2">
                   <span className="text-kiviMuted">Delta:</span>
                   <span
-                    className={`font-semibold px-1 rounded ${
+                    className={`font-semibold ${
                       activeDelta > 0
-                        ? 'text-kiviGreen bg-kiviGreen/10'
+                        ? 'text-kiviGreen'
                         : activeDelta < 0
-                        ? 'text-kiviRed bg-kiviRed/10'
-                        : 'text-kiviMuted'
+                          ? 'text-kiviRed'
+                          : 'text-kiviMuted'
                     }`}
                   >
-                    {activeDelta > 0 ? `+${activeDelta.toFixed(decimals)}` : activeDelta.toFixed(decimals)}
+                    {activeDelta > 0
+                      ? `+${activeDelta.toFixed(decimals)}`
+                      : activeDelta.toFixed(decimals)}
                   </span>
                 </div>
               )}
             </div>
           </div>
         )}
+      </div>
 
-        {/* Floating Elevation Multiplier Slider */}
-        <div className="absolute bottom-3 left-3 flex items-center gap-2 bg-kiviSurface border border-kiviBorder px-2.5 py-1.5 rounded-lg text-xs text-kiviSecondary shadow-md">
-          <Sliders className="h-3 w-3 text-kiviAccent" />
-          <span className="text-[11px] font-medium text-kiviMuted">Elevation:</span>
+      {/* Bottom Instrumentation Strip (Outside Canvas so Surface is Unobstructed) */}
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-t border-kiviBorder bg-kiviSurface px-2.5 py-1.5 text-[11px] text-kiviSecondary">
+        <div className="flex items-center gap-2">
+          <Sliders className="h-3 w-3 shrink-0 text-kiviAccent" />
+          <label htmlFor="surface3d-elevation" className="text-[11px] text-kiviMuted">
+            Z-Scale
+          </label>
           <input
+            id="surface3d-elevation"
             type="range"
             min="0.2"
             max="3.0"
             step="0.1"
             value={elevationMultiplier}
             onChange={(e) => setElevationMultiplier(parseFloat(e.target.value))}
-            className="w-20 h-1 bg-kiviBorderStrong rounded-lg appearance-none cursor-pointer accent-kiviAccent"
+            className="h-1 w-24 cursor-pointer appearance-none rounded-lg bg-kiviBorderStrong accent-kiviAccent"
           />
-          <span className="font-mono text-[10px] text-kiviAccent w-8 tabular-nums">
+          <span className="w-8 font-mono text-[10px] text-kiviAccent tabular-nums">
             {elevationMultiplier.toFixed(1)}&times;
           </span>
         </div>
 
-        {/* Live Shortcut Quick Help Pill */}
-        {!readOnly && onChangeMatrix && selectedRange && (
-          <div className="absolute bottom-3 right-3 flex items-center gap-2 bg-kiviSurface border border-kiviBorder px-3 py-1.5 rounded-lg text-[11px] text-kiviMuted shadow-md">
-            <span className="text-kiviSecondary font-medium">Edit:</span>
-            <span className="font-mono bg-kiviElevated px-1 py-0.5 rounded text-kiviInk">
-              +
+        <div className="flex flex-wrap items-center gap-2 font-mono text-[10px] text-kiviMuted tabular-nums">
+          <span>
+            Min {formatCompactTick(extremes.min, decimals)} | Max{' '}
+            {formatCompactTick(extremes.max, decimals)} {unit}
+          </span>
+          {!readOnly && onChangeMatrix && selectedRange && (
+            <span className="hidden sm:inline text-kiviSecondary">
+              Edit: + / - / % | Nav: Arrows | Orbit: Drag | Pan: Shift+Drag
             </span>
-            <span className="font-mono bg-kiviElevated px-1 py-0.5 rounded text-kiviInk">
-              -
-            </span>
-            <span className="font-mono bg-kiviElevated px-1 py-0.5 rounded text-kiviInk">
-              %
-            </span>
-            <span className="text-kiviMuted">|</span>
-            <span className="text-kiviSecondary font-medium">Nav:</span>
-            <span className="font-mono bg-kiviElevated px-1 py-0.5 rounded text-kiviInk">
-              Arrows
-            </span>
-          </div>
-        )}
+          )}
+        </div>
       </div>
     </div>
   );
-};
+});

@@ -9,6 +9,7 @@ import {
   ChevronRight,
   Check,
   Circle,
+  Download,
   Menu,
   X,
 } from 'lucide-react';
@@ -19,7 +20,11 @@ import {
   type MenuBarState,
 } from './menuModel.ts';
 import { WindowTrafficLights } from './WindowTrafficLights.tsx';
-import { bridgeWindowToggleMaximize } from '../../lib/windowControlsBridge.ts';
+import {
+  bridgeWindowStartDragging,
+  bridgeWindowToggleMaximize,
+} from '../../lib/windowControlsBridge.ts';
+import { APP_VERSION } from '../../lib/updaterBridge.ts';
 
 const COMPACT_MENU_LABELS: Record<string, string> = {
   file: 'File',
@@ -58,6 +63,9 @@ export interface KiviMenuBarProps {
   // Global action hooks
   onOpenHowToUse?: () => void;
   onOpenShortcuts?: () => void;
+  updateStatus?: 'available' | 'ready-to-restart' | null;
+  updateVersion?: string | null;
+  onUpdateClick?: () => void;
 }
 
 export const KiviMenuBar: React.FC<KiviMenuBarProps> = ({
@@ -73,9 +81,12 @@ export const KiviMenuBar: React.FC<KiviMenuBarProps> = ({
   romName,
   romSizeBytes = 0,
   brandTitle = 'kiviTuner',
-  brandVersion = 'v0.1.0',
+  brandVersion = `v${APP_VERSION}`,
   onOpenHowToUse,
   onOpenShortcuts,
+  updateStatus = null,
+  updateVersion = null,
+  onUpdateClick,
 }) => {
   // Build menu hierarchy from props or defaults
   const menus = React.useMemo(() => {
@@ -155,7 +166,7 @@ export const KiviMenuBar: React.FC<KiviMenuBarProps> = ({
   return (
     <div
       ref={menuBarRef}
-      className="relative z-[90] flex h-10 w-full shrink-0 select-none items-center justify-between gap-1.5 bg-kiviSurface/95 px-2.5 text-xs text-kiviInk backdrop-blur-sm md:h-8 md:gap-2 md:px-3"
+      className="relative z-[90] flex h-10 w-full shrink-0 select-none items-center justify-between gap-1.5 border-b border-kiviBorder bg-kiviSurface px-2.5 text-xs text-kiviInk md:h-8 md:gap-2 md:px-3"
     >
       {/* Left: Tahoe Traffic Lights + Brand Identity + Mobile Menu Trigger + Desktop Cascading Menus */}
       <div className="flex min-w-0 shrink-0 items-center gap-2">
@@ -164,16 +175,24 @@ export const KiviMenuBar: React.FC<KiviMenuBarProps> = ({
         </div>
 
         {/* Brand Logo & Name */}
-        <div className="flex shrink-0 items-center gap-1.5 pr-1">
+        <div
+          data-tauri-drag-region
+          onMouseDown={(e) => {
+            if (e.button === 0 && e.detail === 1) {
+              void bridgeWindowStartDragging();
+            }
+          }}
+          className="flex shrink-0 items-center gap-1.5 pr-1 cursor-default"
+        >
           <img
             src="/favicon.svg"
             alt="kiviTuner"
-            className="h-4 w-4 shrink-0 rounded"
+            className="pointer-events-none h-4 w-4 shrink-0 rounded"
           />
-          <span className="whitespace-nowrap text-[11px] font-bold tracking-wider text-kiviInk">
+          <span className="pointer-events-none whitespace-nowrap text-[11px] font-bold tracking-wider text-kiviInk">
             {brandTitle}
           </span>
-          <span className="hidden whitespace-nowrap rounded border border-kiviBorder/80 bg-kiviBg/80 px-1 py-0.2 font-mono text-[9px] text-kiviMuted sm:inline-block">
+          <span className="pointer-events-none hidden whitespace-nowrap rounded border border-kiviBorder/80 bg-kiviBg/80 px-1 py-0.5 font-mono text-[9px] text-kiviMuted sm:inline-block">
             {brandVersion}
           </span>
         </div>
@@ -242,12 +261,43 @@ export const KiviMenuBar: React.FC<KiviMenuBarProps> = ({
       <div
         data-tauri-drag-region
         aria-label="Window drag region"
+        onMouseDown={(e) => {
+          if (e.button === 0 && e.detail === 1) {
+            void bridgeWindowStartDragging();
+          }
+        }}
         onDoubleClick={() => void bridgeWindowToggleMaximize(false)}
         className="h-full min-w-[4px] flex-1 cursor-default"
       />
 
       {/* Right: Compact Real-time Status Pills */}
       <div className="flex shrink-0 items-center gap-1 text-[10px] md:gap-1.5">
+        {updateStatus && onUpdateClick && (
+          <button
+            type="button"
+            onClick={onUpdateClick}
+            title={
+              updateStatus === 'ready-to-restart'
+                ? 'Restart kiviTuner to finish applying update'
+                : `New release v${updateVersion ?? ''} available`
+            }
+            className={`flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded border px-2 py-0.5 font-mono text-[10px] font-semibold transition-colors ${
+              updateStatus === 'ready-to-restart'
+                ? 'border-kiviGreen/50 bg-kiviGreen/15 text-kiviGreen hover:bg-kiviGreen/25'
+                : 'border-kiviAccent/50 bg-kiviAccent/15 text-kiviAccent hover:bg-kiviAccent/25'
+            }`}
+          >
+            <Download className="h-3 w-3 shrink-0" />
+            <span>
+              {updateStatus === 'ready-to-restart'
+                ? 'Restart'
+                : updateVersion
+                  ? `v${updateVersion}`
+                  : 'Update'}
+            </span>
+          </button>
+        )}
+
         {/* 1. Checksum Pill */}
         {checksumStatus === 'valid' ? (
           <button

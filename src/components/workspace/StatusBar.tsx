@@ -1,8 +1,14 @@
-import React from 'react';
-import { Redo2, Undo2 } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Layers, Redo2, Undo2 } from 'lucide-react';
 import { useTelemetryStore } from '../../stores/useTelemetryStore';
 import type { UndoStatus } from '../../lib/bridge/windowBridge';
 import type { LayoutPreset } from '../../App';
+import {
+  getMinimizedFloatingWindows,
+  requestRestoreFloatingWindow,
+  subscribeWindowStack,
+  type MinimizedWindowEntry,
+} from '../layout/floatingWindowModel';
 
 export const EcuStatusBarIndicator: React.FC = () => {
   const connectionState = useTelemetryStore((s) => s.connectionState);
@@ -42,7 +48,7 @@ interface StatusBarProps {
   onRedo?: () => void;
 }
 
-export const StatusBar: React.FC<StatusBarProps> = ({
+export const StatusBar: React.FC<StatusBarProps> = React.memo(({
   selectedMapName,
   isDesktop,
   layoutPreset,
@@ -56,7 +62,19 @@ export const StatusBar: React.FC<StatusBarProps> = ({
   undoStatus,
   onUndo,
   onRedo,
-}) => (
+}) => {
+  const [minimizedWindows, setMinimizedWindows] = useState<MinimizedWindowEntry[]>(() =>
+    getMinimizedFloatingWindows()
+  );
+
+  useEffect(() => {
+    setMinimizedWindows(getMinimizedFloatingWindows());
+    return subscribeWindowStack(() => {
+      setMinimizedWindows(getMinimizedFloatingWindows());
+    });
+  }, []);
+
+  return (
   <footer className="no-scrollbar flex h-7 shrink-0 items-center justify-between gap-2 overflow-x-auto border-t border-kiviBorder bg-kiviSurface px-2.5 text-[11px] text-kiviSecondary tabular-nums md:px-3">
     <div className="flex min-w-0 items-center gap-2 whitespace-nowrap md:gap-3">
       <span className="hidden shrink-0 items-center gap-1.5 whitespace-nowrap md:flex">
@@ -69,6 +87,25 @@ export const StatusBar: React.FC<StatusBarProps> = ({
       </span>
       <span className="shrink-0 text-kiviBorderStrong">|</span>
       <EcuStatusBarIndicator />
+      {minimizedWindows.length > 0 && (
+        <>
+          <span className="shrink-0 text-kiviBorderStrong">|</span>
+          <div className="flex shrink-0 items-center gap-1" role="group" aria-label="Minimized tool windows">
+            {minimizedWindows.map((win) => (
+              <button
+                key={win.id}
+                type="button"
+                onClick={() => requestRestoreFloatingWindow(win.id)}
+                title={`Restore ${win.title}`}
+                className="inline-flex h-5 max-w-[140px] shrink-0 items-center gap-1 rounded border border-kiviAccent/50 bg-kiviAccent/15 px-1.5 text-[10px] font-medium text-kiviAccent transition-colors hover:bg-kiviAccent/25"
+              >
+                <Layers className="h-2.5 w-2.5 shrink-0" />
+                <span className="truncate">{win.title}</span>
+              </button>
+            ))}
+          </div>
+        </>
+      )}
       {romLabel && (
         <>
           <span className="hidden shrink-0 text-kiviBorderStrong xl:inline">|</span>
@@ -138,4 +175,5 @@ export const StatusBar: React.FC<StatusBarProps> = ({
       </span>
     </div>
   </footer>
-);
+  );
+});

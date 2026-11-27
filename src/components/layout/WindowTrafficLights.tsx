@@ -32,7 +32,7 @@ export const WindowTrafficLights: React.FC<WindowTrafficLightsProps> = ({
   minimizeLabel,
   maximizeLabel,
 }) => {
-  const isNativeMode = !onClose && !onMinimize && !onToggleMaximize;
+  const isNativeMaximize = !onToggleMaximize;
   const [focused, setFocused] = useState(
     () => (typeof document === 'undefined' ? true : document.hasFocus())
   );
@@ -40,7 +40,7 @@ export const WindowTrafficLights: React.FC<WindowTrafficLightsProps> = ({
   const maximized = controlledMaximized ?? nativeMaximized;
 
   useEffect(() => {
-    if (!isNativeMode) {
+    if (!isNativeMaximize) {
       setFocused(true);
       return;
     }
@@ -58,7 +58,7 @@ export const WindowTrafficLights: React.FC<WindowTrafficLightsProps> = ({
       active = false;
       unsubscribe();
     };
-  }, [isNativeMode]);
+  }, [isNativeMaximize]);
 
   const handleClose = (e: React.MouseEvent<HTMLButtonElement>) => {
     e.stopPropagation();

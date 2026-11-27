@@ -1,0 +1,12 @@
+{
+  "bundle": {
+    "createUpdaterArtifacts": true
+  },
+  "plugins": {
+    "updater": {
+      "endpoints": [
+        "https://github.com/kaivyy/kiviTuner/releases/latest/download/latest.json"
+      ]
+    }
+  }
+}

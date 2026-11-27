@@ -5,7 +5,7 @@
 //! inside [`crate::components::layout::WindowTrafficLights`].
 
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
+use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 
 const HARD_MIN_WIDTH: f64 = 320.0;
 const HARD_MIN_HEIGHT: f64 = 240.0;
@@ -111,9 +111,9 @@ pub fn normalize_window_dimensions(spec: &ToolWindowSpec) -> (f64, f64, f64, f64
 }
 
 /// Opens a separate frameless OS window for `spec.tool_id`, or focuses the
-/// existing window if already open.
+/// existing window if already open. Async dispatch keeps Windows WebView2 COM STA free.
 #[tauri::command]
-pub fn open_tool_window(spec: ToolWindowSpec, app: AppHandle) -> Result<String, String> {
+pub async fn open_tool_window(spec: ToolWindowSpec, app: AppHandle) -> Result<String, String> {
     let label = spec.tool_id.label();
     if let Some(existing) = app.get_webview_window(&label) {
         let _ = existing.unminimize();
@@ -135,7 +135,7 @@ pub fn open_tool_window(spec: ToolWindowSpec, app: AppHandle) -> Result<String, 
     WebviewWindowBuilder::new(&app, &label, WebviewUrl::App(route.into()))
         .title(&title)
         .decorations(false)
-        .shadow(false)
+        .shadow(true)
         .resizable(true)
         .inner_size(width, height)
         .min_inner_size(min_w, min_h)
@@ -149,7 +149,7 @@ pub fn open_tool_window(spec: ToolWindowSpec, app: AppHandle) -> Result<String, 
 
 /// Closes a secondary tool window if it is currently open.
 #[tauri::command]
-pub fn close_tool_window(tool_id: ToolWindowKind, app: AppHandle) -> Result<bool, String> {
+pub async fn close_tool_window(tool_id: ToolWindowKind, app: AppHandle) -> Result<bool, String> {
     let label = tool_id.label();
     if let Some(win) = app.get_webview_window(&label) {
         win.close()
@@ -161,7 +161,7 @@ pub fn close_tool_window(tool_id: ToolWindowKind, app: AppHandle) -> Result<bool
 
 /// Updates whether the calling native window stays pinned on top.
 #[tauri::command]
-pub fn set_current_window_always_on_top(
+pub async fn set_current_window_always_on_top(
     always_on_top: bool,
     window: WebviewWindow,
 ) -> Result<bool, String> {
@@ -169,6 +169,16 @@ pub fn set_current_window_always_on_top(
         .set_always_on_top(always_on_top)
         .map_err(|e| format!("failed to update always-on-top: {e}"))?;
     Ok(always_on_top)
+}
+
+/// Broadcasts a lightweight workspace synchronization payload across all open windows.
+#[tauri::command]
+pub async fn broadcast_workspace_event(
+    event: serde_json::Value,
+    app: AppHandle,
+) -> Result<(), String> {
+    app.emit("kivituner:workspace-sync", event)
+        .map_err(|e| format!("failed to broadcast workspace event: {e}"))
 }
 
 #[cfg(test)]

@@ -119,7 +119,7 @@ export async function runBlindV2WithClassification(
 
 export function blindTableToMapDef(
   entry: ClassifiedBlindEntry,
-  index: number
+  _index: number
 ): MapDef {
   const { table, classification } = entry;
   const isFloat32 = Boolean(table.is_float && table.cell_bits === 32);
@@ -127,14 +127,24 @@ export function blindTableToMapDef(
     ? 'f32'
     : bitsSignedToDtype(table.cell_bits, Boolean(table.is_signed));
   const endian: Endian = littleBoolToEndian(table.little_endian);
+  const addrHex = table.address.toString(16).toUpperCase();
+  const isCurve = Boolean(table.is_curve || table.rows <= 1);
+  const dtypeUpper = dtype.toUpperCase();
   const name = classification
-    ? `${classification.role_name} @ 0x${table.address.toString(16).toUpperCase()}`
-    : `${table.label} (#${index + 1})`;
+    ? `${classification.role_name} (0x${addrHex})`
+    : isCurve
+      ? `${table.cols}-pt ${dtypeUpper} Curve (0x${addrHex})`
+      : `${table.rows}x${table.cols} ${dtypeUpper} Map (0x${addrHex})`;
+  const widthLabel = isFloat32
+    ? '32-bit Float'
+    : table.is_signed
+      ? `${table.cell_bits}-bit Signed`
+      : `${table.cell_bits}-bit`;
   const category = classification
     ? classification.category
-    : table.is_curve || table.rows <= 1
-    ? 'Blind 1D Curves'
-    : 'Blind 2D Maps';
+    : isCurve
+      ? `Auto-Detected / 1D Curves (${widthLabel})`
+      : `Auto-Detected / 2D Tables (${widthLabel})`;
   const scaling = classification
     ? {
         equation: classification.equation,

@@ -86,6 +86,7 @@ export interface MenuBarCallbacks {
   onOpenHowToUse?: () => void;
   onOpenShortcuts?: () => void;
   onResetSettings?: () => void;
+  onCheckForUpdates?: () => void;
   onAbout?: () => void;
 }
 
@@ -977,6 +978,12 @@ export function buildDefaultMenuTree(
           label: 'Reset UI Settings',
           type: 'action',
           onSelect: cb.onResetSettings,
+        },
+        {
+          id: 'help-check-updates',
+          label: 'Check for Updates...',
+          type: 'action',
+          onSelect: cb.onCheckForUpdates,
         },
         { id: 'help-sep-1', label: '', type: 'separator' },
         {
