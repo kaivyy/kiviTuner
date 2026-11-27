@@ -103,10 +103,7 @@ impl Obd2DriverConfig {
         }
 
         for pid in &self.polled_pids {
-            if matches!(
-                pid,
-                Mode01Pid::SupportedPids01_20 | Mode01Pid::SupportedPids21_40
-            ) {
+            if pid.is_bitmap() {
                 return Err(ObdCodecError::UnauthorizedCommand(format!(
                     "Bitmap PID {:?} cannot be polled as a telemetry metric",
                     pid
@@ -163,6 +160,10 @@ pub fn update_frame_from_decoded_pid(
         DecodedMode01Value::IntakeAirTemp(iat) => frame.iat_c = *iat,
         DecodedMode01Value::ControlModuleVoltage(volts) => frame.battery_volts = *volts,
         DecodedMode01Value::VehicleSpeed(kmh) => frame.speed_kph = *kmh,
+        DecodedMode01Value::TimingAdvance(deg) => frame.ignition_advance_deg = *deg,
+        DecodedMode01Value::MonitorStatus(mon) => {
+            frame.status_flags.check_engine_light = mon.mil_on;
+        }
         DecodedMode01Value::WidebandLambda1(sample) => {
             if let Some(stoich) = stoichiometric_ratio {
                 if let Ok(afr) = sample.estimated_afr(stoich) {
@@ -170,6 +171,31 @@ pub fn update_frame_from_decoded_pid(
                 }
             }
         }
+        DecodedMode01Value::WidebandVoltage1 {
+            equivalence_ratio, ..
+        } => {
+            if let Some(stoich) = stoichiometric_ratio {
+                let sample = crate::obd::pid::WidebandO2Sample::new(*equivalence_ratio, 0.0);
+                if let Ok(afr) = sample.estimated_afr(stoich) {
+                    frame.afr = afr;
+                }
+            }
+        }
+        DecodedMode01Value::Scalar {
+            pid: Mode01Pid::CommandedEquivalenceRatio,
+            value: lambda,
+        } => {
+            if let Some(stoich) = stoichiometric_ratio {
+                let sample = crate::obd::pid::WidebandO2Sample::new(*lambda, 0.0);
+                if let Ok(afr) = sample.estimated_afr(stoich) {
+                    frame.afr = afr;
+                }
+            }
+        }
+        DecodedMode01Value::NarrowbandO2 { .. }
+        | DecodedMode01Value::FuelSystemStatus(_, _)
+        | DecodedMode01Value::FreezeDtcCode(_)
+        | DecodedMode01Value::Scalar { .. } => {}
     }
 }
 
@@ -336,11 +362,28 @@ impl<T: ObdTransport + 'static> EcuDriver for Obd2Driver<T> {
             None
         };
 
+        let bitmap_61_80 = if let Some(ref bm) = bitmap_41_60 {
+            if bm.has_next_bitmap_range() {
+                session
+                    .query_supported_pids(Mode01Pid::SupportedPids61_80)
+                    .await
+                    .ok()
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
         let no_21_40_range = bitmap_01_20
             .as_ref()
             .is_some_and(|b| !b.has_next_bitmap_range());
         let no_41_60_range = no_21_40_range
             || bitmap_21_40
+                .as_ref()
+                .is_some_and(|b| !b.has_next_bitmap_range());
+        let no_61_80_range = no_41_60_range
+            || bitmap_41_60
                 .as_ref()
                 .is_some_and(|b| !b.has_next_bitmap_range());
 
@@ -360,6 +403,13 @@ impl<T: ObdTransport + 'static> EcuDriver for Obd2Driver<T> {
                         Some(false)
                     } else {
                         bitmap_41_60.as_ref().map(|b| b.is_supported(pid_num))
+                    }
+                }
+                0x61..=0x80 => {
+                    if no_61_80_range {
+                        Some(false)
+                    } else {
+                        bitmap_61_80.as_ref().map(|b| b.is_supported(pid_num))
                     }
                 }
                 _ => {
@@ -387,6 +437,17 @@ impl<T: ObdTransport + 'static> EcuDriver for Obd2Driver<T> {
             None
         };
 
+        let protocol_name = match self.inner.config.protocol {
+            ProtocolSelection::Can11Bit500k => "ISO 15765-4 (CAN 11/500k)",
+            ProtocolSelection::Can29Bit500k => "ISO 15765-4 (CAN 29/500k)",
+            ProtocolSelection::Can11Bit250k => "ISO 15765-4 (CAN 11/250k)",
+            ProtocolSelection::Can29Bit250k => "ISO 15765-4 (CAN 29/250k)",
+            ProtocolSelection::KwpFastInit => "ISO 14230-4 KWP2000 (Fast Init)",
+            ProtocolSelection::Kwp5BaudInit => "ISO 14230-4 KWP2000 (5-Baud Init)",
+            ProtocolSelection::Iso9141 => "ISO 9141-2 K-Line (5-Baud Init)",
+            ProtocolSelection::Auto => "OBD-II Auto Protocol (ATSP0)",
+        };
+
         let identity = EcuIdentity {
             ecu_id: adapter_identity.elm_version.clone(),
             vin,
@@ -396,7 +457,7 @@ impl<T: ObdTransport + 'static> EcuDriver for Obd2Driver<T> {
             hardware_version: adapter_identity
                 .stn_device_id
                 .unwrap_or_else(|| "ELM327-Compatible".to_string()),
-            protocol_name: "ISO 15765-4 (CAN 11/500k)".to_string(),
+            protocol_name: protocol_name.to_string(),
             is_simulated: false,
         };
 

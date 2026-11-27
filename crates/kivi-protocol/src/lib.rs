@@ -40,11 +40,12 @@ pub use obd::{
     calculate_pid_bitmap_coordinates, classify_command, decode_calibration_id,
     decode_mode01_payload, decode_vin, extract_prompt_framed_response, is_permitted_stream_byte,
     is_pid_supported_in_bitmap, parse_adapter_response, read_framed_response_async, AdapterCommand,
-    CommandClassification, DecodedMode01Value, Mode01Pid, Mode09Item, Obd2Driver,
-    Obd2DriverConfig, ObdAdapterIdentity, ObdCodecError, ObdCommand, ObdSession, ObdSessionConfig,
-    ObdSessionState, ObdTransport, PidBitmapCoordinates, ProtocolSelection, SerialBaudRate,
-    SerialObdTransport, SupportedPidsBitmap, WidebandO2Sample, WifiObdTransport,
-    DEFAULT_MAX_TEXT_RESPONSE_BYTES, DEFAULT_WIFI_OBD_ENDPOINT, MAX_ISOTP_PAYLOAD_BYTES,
+    CommandClassification, DecodedMode01Value, Mode01Pid, Mode09Item, MonitorStatusSample,
+    NarrowbandO2Sample, Obd2Driver, Obd2DriverConfig, ObdAdapterIdentity, ObdCodecError,
+    ObdCommand, ObdSession, ObdSessionConfig, ObdSessionState, ObdTransport,
+    PidBitmapCoordinates, ProtocolSelection, SerialBaudRate, SerialObdTransport,
+    SupportedPidsBitmap, WidebandO2Sample, WifiObdTransport, DEFAULT_MAX_TEXT_RESPONSE_BYTES,
+    DEFAULT_WIFI_OBD_ENDPOINT, MAX_ISOTP_PAYLOAD_BYTES,
 };
 #[cfg(any(test, feature = "test-doubles"))]
 pub use obd::MockObdTransport;

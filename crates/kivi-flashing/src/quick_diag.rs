@@ -9,6 +9,7 @@
 
 use crate::bus_silencing::BusSilencingInterlock;
 use crate::device::{Device, DeviceError};
+use crate::dtc_dictionary::lookup_dtc_description;
 use crate::j2534_types::{tx_flags, PassThruMsg, ProtocolId};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -35,6 +36,8 @@ pub struct DtcRecord {
     pub status_mask: u8,
     pub status_label: String,
     pub source: String,
+    #[serde(default)]
+    pub description: Option<String>,
 }
 
 /// Battery voltage and basic ECU identity strings read over OBD-II / UDS.
@@ -102,7 +105,7 @@ pub struct EcuResetOutcome {
     pub notes: Vec<String>,
 }
 
-fn ensure_connected(device: &dyn Device) -> Result<ProtocolId, QuickDiagError> {
+pub(crate) fn ensure_connected(device: &dyn Device) -> Result<ProtocolId, QuickDiagError> {
     if !device.is_open() {
         return Err(DeviceError::NotOpen.into());
     }
@@ -112,11 +115,11 @@ fn ensure_connected(device: &dyn Device) -> Result<ProtocolId, QuickDiagError> {
     Ok(device.connected_protocol().unwrap_or(ProtocolId::Iso15765))
 }
 
-fn protocol_label(proto: ProtocolId) -> String {
+pub(crate) fn protocol_label(proto: ProtocolId) -> String {
     format!("{proto:?}")
 }
 
-fn exchange_diag_target(
+pub(crate) fn exchange_diag_target(
     device: &mut dyn Device,
     proto: ProtocolId,
     tx_can_id: u32,
@@ -159,7 +162,7 @@ fn exchange_diag_target(
     Err(DeviceError::Timeout.into())
 }
 
-fn check_negative_response(resp: &[u8]) -> Result<(), QuickDiagError> {
+pub(crate) fn check_negative_response(resp: &[u8]) -> Result<(), QuickDiagError> {
     if resp.len() >= 3 && resp[0] == 0x7F {
         return Err(QuickDiagError::NegativeResponse {
             service: resp[1],
@@ -169,7 +172,7 @@ fn check_negative_response(resp: &[u8]) -> Result<(), QuickDiagError> {
     Ok(())
 }
 
-fn extract_ascii_payload(bytes: &[u8]) -> Option<String> {
+pub(crate) fn extract_ascii_payload(bytes: &[u8]) -> Option<String> {
     let cleaned: String = bytes
         .iter()
         .copied()
@@ -184,7 +187,7 @@ fn extract_ascii_payload(bytes: &[u8]) -> Option<String> {
     }
 }
 
-fn parse_mode09_ascii(resp: &[u8], expected_pid: u8) -> Option<String> {
+pub(crate) fn parse_mode09_ascii(resp: &[u8], expected_pid: u8) -> Option<String> {
     if resp.len() < 3 || resp[0] != 0x49 || resp[1] != expected_pid {
         return None;
     }
@@ -217,7 +220,7 @@ fn parse_mode09_cvn(resp: &[u8]) -> Option<String> {
     )
 }
 
-fn decode_j2012_dtc(hi: u8, lo: u8) -> Option<String> {
+pub(crate) fn decode_j2012_dtc(hi: u8, lo: u8) -> Option<String> {
     if hi == 0 && lo == 0 {
         return None;
     }
@@ -232,7 +235,7 @@ fn decode_j2012_dtc(hi: u8, lo: u8) -> Option<String> {
     Some(format!("{prefix}{d1}{d2:X}{lo:02X}"))
 }
 
-fn parse_obd_dtc_response(
+pub(crate) fn parse_obd_dtc_response(
     resp: &[u8],
     expected_sid: u8,
     status_mask: u8,
@@ -260,11 +263,13 @@ fn parse_obd_dtc_response(
     let mut out = Vec::new();
     for pair in body.chunks_exact(2) {
         if let Some(code) = decode_j2012_dtc(pair[0], pair[1]) {
+            let desc = lookup_dtc_description(&code).summary;
             out.push(DtcRecord {
                 code,
                 status_mask,
                 status_label: status_label.to_string(),
                 source: source.to_string(),
+                description: Some(desc),
             });
         }
     }
@@ -281,7 +286,7 @@ fn uds_status_label(mask: u8) -> String {
     }
 }
 
-fn derive_rx_can_id_for_diag(tx_id: u32) -> u32 {
+pub(crate) fn derive_rx_can_id_for_diag(tx_id: u32) -> u32 {
     if tx_id == 0x7DF {
         0x7E8
     } else if (tx_id >> 16) == 0x18DA {
@@ -291,7 +296,7 @@ fn derive_rx_can_id_for_diag(tx_id: u32) -> u32 {
     }
 }
 
-fn prepare_diag_target(device: &mut dyn Device, proto: ProtocolId, tx_can_id: u32) -> Result<(), QuickDiagError> {
+pub(crate) fn prepare_diag_target(device: &mut dyn Device, proto: ProtocolId, tx_can_id: u32) -> Result<(), QuickDiagError> {
     if tx_can_id != 0x0000_07E0 && matches!(proto, ProtocolId::Iso15765 | ProtocolId::Can) {
         device.configure_can_ids(tx_can_id, derive_rx_can_id_for_diag(tx_can_id))?;
     }
@@ -400,11 +405,15 @@ pub fn read_dtcs_for_can_id(
             let dtcs = parsed
                 .into_iter()
                 .filter(|(code, _)| code != "P0000")
-                .map(|(code, status)| DtcRecord {
-                    code,
-                    status_mask: status,
-                    status_label: uds_status_label(status),
-                    source: "uds_0x19".to_string(),
+                .map(|(code, status)| {
+                    let desc = lookup_dtc_description(&code).summary;
+                    DtcRecord {
+                        code,
+                        status_mask: status,
+                        status_label: uds_status_label(status),
+                        source: "uds_0x19".to_string(),
+                        description: Some(desc),
+                    }
                 })
                 .collect();
             return Ok(DtcReadOutcome {

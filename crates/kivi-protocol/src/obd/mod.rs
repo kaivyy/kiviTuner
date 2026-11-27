@@ -40,7 +40,10 @@ pub use framing::{
 pub use metadata::{decode_calibration_id, decode_vin};
 #[cfg(any(test, feature = "test-doubles"))]
 pub use mock::MockObdTransport;
-pub use pid::{decode_mode01_payload, DecodedMode01Value, WidebandO2Sample};
+pub use pid::{
+    decode_mode01_payload, DecodedMode01Value, MonitorStatusSample, NarrowbandO2Sample,
+    WidebandO2Sample,
+};
 pub use serial::SerialObdTransport;
 pub use session::{
     is_recognized_adapter_banner, ObdAdapterIdentity, ObdSession, ObdSessionConfig, ObdSessionState,

@@ -2,34 +2,187 @@
 //! (including ELM327 USB/serial cables, OpenPort 2.0, J2534, DoIP, and SocketCAN).
 
 use crate::flash_commands::FlashEngineState;
+use kivi_flashing::dtc_dictionary::{lookup_dtc_description, DtcDescription};
 use kivi_flashing::quick_diag::{
-    clear_dtcs, ecu_reset, read_dtcs, read_ecu_identity, DtcClearOutcome, DtcReadOutcome,
-    EcuIdentitySummary, EcuResetMode, EcuResetOutcome,
+    clear_dtcs_for_can_id, ecu_reset_for_can_id, read_dtcs_for_can_id, read_ecu_identity_for_can_id,
+    DtcClearOutcome, DtcReadOutcome, EcuIdentitySummary, EcuResetMode, EcuResetOutcome,
 };
 use kivi_flashing::serial_elm_device::{probe_elm_capabilities, ElmCapabilityReport};
+use kivi_flashing::uds_diagnostics::{
+    read_freeze_frame, read_im_readiness, read_mode06_monitors, read_obd_live_snapshot,
+    scan_ecu_modules, uds_enter_session, uds_io_control, uds_read_standard_dids,
+    uds_routine_control, DiscoveredEcuModule, FreezeFrameSummary, ImReadinessSummary,
+    Mode06TestResult, ObdLiveSnapshot, UdsDidValue, UdsIoControlOutcome, UdsRoutineOutcome,
+};
 use tauri::State;
 
-/// Reads battery voltage, VIN, Calibration ID, and CVN using the active adapter.
+/// Reads battery voltage, VIN, Calibration ID, and CVN from the specified or default (`0x7E0`) ECU.
+pub fn diag_read_ecu_info_for_can_id_inner(
+    tx_can_id: Option<u32>,
+    state: &FlashEngineState,
+) -> Result<EcuIdentitySummary, String> {
+    let target = tx_can_id.unwrap_or(0x0000_07E0);
+    state.with_attached_device(|dev| read_ecu_identity_for_can_id(dev, target).map_err(|e| e.to_string()))
+}
+
+/// Reads battery voltage, VIN, Calibration ID, and CVN using the active adapter (`0x7E0`).
 pub fn diag_read_ecu_info_inner(state: &FlashEngineState) -> Result<EcuIdentitySummary, String> {
-    state.with_attached_device(|dev| read_ecu_identity(dev).map_err(|e| e.to_string()))
+    diag_read_ecu_info_for_can_id_inner(None, state)
 }
 
 /// Reads stored/confirmed and pending DTCs via UDS `0x19` with OBD Mode `03`/`07` fallback.
+pub fn diag_read_dtcs_for_can_id_inner(
+    tx_can_id: Option<u32>,
+    state: &FlashEngineState,
+) -> Result<DtcReadOutcome, String> {
+    let target = tx_can_id.unwrap_or(0x0000_07E0);
+    state.with_attached_device(|dev| read_dtcs_for_can_id(dev, target).map_err(|e| e.to_string()))
+}
+
+/// Reads stored/confirmed and pending DTCs from the default (`0x7E0`) ECU.
 pub fn diag_read_dtcs_inner(state: &FlashEngineState) -> Result<DtcReadOutcome, String> {
-    state.with_attached_device(|dev| read_dtcs(dev).map_err(|e| e.to_string()))
+    diag_read_dtcs_for_can_id_inner(None, state)
 }
 
 /// Clears DTCs and freeze frames via UDS `0x14` with OBD Mode `04` fallback.
-pub fn diag_clear_dtcs_inner(state: &FlashEngineState) -> Result<DtcClearOutcome, String> {
-    state.with_attached_device(|dev| clear_dtcs(dev).map_err(|e| e.to_string()))
+pub fn diag_clear_dtcs_for_can_id_inner(
+    tx_can_id: Option<u32>,
+    state: &FlashEngineState,
+) -> Result<DtcClearOutcome, String> {
+    let target = tx_can_id.unwrap_or(0x0000_07E0);
+    state.with_attached_device(|dev| clear_dtcs_for_can_id(dev, target).map_err(|e| e.to_string()))
 }
 
-/// Issues a UDS `0x11` ECU reset (`Hard`, `KeyOffOn`, or `Soft`).
+/// Clears DTCs and freeze frames from the default (`0x7E0`) ECU.
+pub fn diag_clear_dtcs_inner(state: &FlashEngineState) -> Result<DtcClearOutcome, String> {
+    diag_clear_dtcs_for_can_id_inner(None, state)
+}
+
+/// Issues a UDS `0x11` ECU reset (`Hard`, `KeyOffOn`, or `Soft`) to the target ECU.
+pub fn diag_ecu_reset_for_can_id_inner(
+    mode: EcuResetMode,
+    tx_can_id: Option<u32>,
+    state: &FlashEngineState,
+) -> Result<EcuResetOutcome, String> {
+    let target = tx_can_id.unwrap_or(0x0000_07E0);
+    state.with_attached_device(|dev| ecu_reset_for_can_id(dev, target, mode).map_err(|e| e.to_string()))
+}
+
+/// Issues a UDS `0x11` ECU reset (`Hard`, `KeyOffOn`, or `Soft`) to `0x7E0`.
 pub fn diag_ecu_reset_inner(
     mode: EcuResetMode,
     state: &FlashEngineState,
 ) -> Result<EcuResetOutcome, String> {
-    state.with_attached_device(|dev| ecu_reset(dev, mode).map_err(|e| e.to_string()))
+    diag_ecu_reset_for_can_id_inner(mode, None, state)
+}
+
+/// Looks up offline J2012 / OEM DTC descriptions.
+pub fn diag_lookup_dtc_inner(code: &str) -> DtcDescription {
+    lookup_dtc_description(code)
+}
+
+/// Reads supported OBD Mode 01 live sensor PIDs (`0x04..=0x63`).
+pub fn diag_read_live_pids_inner(
+    tx_can_id: Option<u32>,
+    pids: Option<Vec<u8>>,
+    state: &FlashEngineState,
+) -> Result<ObdLiveSnapshot, String> {
+    let target = tx_can_id.unwrap_or(0x0000_07E0);
+    state.with_attached_device(|dev| {
+        read_obd_live_snapshot(dev, target, pids.as_deref()).map_err(|e| e.to_string())
+    })
+}
+
+/// Reads Mode 01 PID `0x01` I/M readiness monitors and Mode `0x0A` permanent DTCs.
+pub fn diag_read_im_readiness_inner(
+    tx_can_id: Option<u32>,
+    state: &FlashEngineState,
+) -> Result<ImReadinessSummary, String> {
+    let target = tx_can_id.unwrap_or(0x0000_07E0);
+    state.with_attached_device(|dev| read_im_readiness(dev, target).map_err(|e| e.to_string()))
+}
+
+/// Reads Mode 02 Freeze Frame snapshot (frame `0x00`).
+pub fn diag_read_freeze_frame_inner(
+    tx_can_id: Option<u32>,
+    state: &FlashEngineState,
+) -> Result<FreezeFrameSummary, String> {
+    let target = tx_can_id.unwrap_or(0x0000_07E0);
+    state.with_attached_device(|dev| read_freeze_frame(dev, target).map_err(|e| e.to_string()))
+}
+
+/// Reads Mode 06 CAN on-board monitor test values.
+pub fn diag_read_mode06_monitors_inner(
+    tx_can_id: Option<u32>,
+    mids: Option<Vec<u8>>,
+    state: &FlashEngineState,
+) -> Result<Vec<Mode06TestResult>, String> {
+    let target = tx_can_id.unwrap_or(0x0000_07E0);
+    state.with_attached_device(|dev| {
+        read_mode06_monitors(dev, target, mids.as_deref()).map_err(|e| e.to_string())
+    })
+}
+
+/// Scans standard 11-bit (`0x7E0..=0x7E7`) and optional 29-bit ECUs on the active bus.
+pub fn diag_scan_ecu_modules_inner(
+    include_29bit: bool,
+    state: &FlashEngineState,
+) -> Result<Vec<DiscoveredEcuModule>, String> {
+    state.with_attached_device(|dev| scan_ecu_modules(dev, include_29bit).map_err(|e| e.to_string()))
+}
+
+/// Switches UDS DiagnosticSessionControl (`0x10`).
+pub fn diag_uds_enter_session_inner(
+    tx_can_id: Option<u32>,
+    session_subfunction: u8,
+    state: &FlashEngineState,
+) -> Result<String, String> {
+    let target = tx_can_id.unwrap_or(0x0000_07E0);
+    state.with_attached_device(|dev| {
+        uds_enter_session(dev, target, session_subfunction).map_err(|e| e.to_string())
+    })
+}
+
+/// Reads standard or custom UDS DIDs via service `0x22`.
+pub fn diag_uds_read_dids_inner(
+    tx_can_id: Option<u32>,
+    dids: Option<Vec<u16>>,
+    state: &FlashEngineState,
+) -> Result<Vec<UdsDidValue>, String> {
+    let target = tx_can_id.unwrap_or(0x0000_07E0);
+    state.with_attached_device(|dev| {
+        uds_read_standard_dids(dev, target, dids.as_deref()).map_err(|e| e.to_string())
+    })
+}
+
+/// Runs UDS RoutineControl (`0x31`) for service resets and adaptations.
+pub fn diag_uds_routine_control_inner(
+    tx_can_id: Option<u32>,
+    subfunction: u8,
+    routine_id: u16,
+    option_record: Option<Vec<u8>>,
+    state: &FlashEngineState,
+) -> Result<UdsRoutineOutcome, String> {
+    let target = tx_can_id.unwrap_or(0x0000_07E0);
+    let rec = option_record.unwrap_or_default();
+    state.with_attached_device(|dev| {
+        uds_routine_control(dev, target, subfunction, routine_id, &rec).map_err(|e| e.to_string())
+    })
+}
+
+/// Runs UDS InputOutputControlByIdentifier (`0x2F`) for actuator tests.
+pub fn diag_uds_io_control_inner(
+    tx_can_id: Option<u32>,
+    did: u16,
+    control_param: u8,
+    control_state: Option<Vec<u8>>,
+    state: &FlashEngineState,
+) -> Result<UdsIoControlOutcome, String> {
+    let target = tx_can_id.unwrap_or(0x0000_07E0);
+    let st = control_state.unwrap_or_default();
+    state.with_attached_device(|dev| {
+        uds_io_control(dev, target, did, control_param, &st).map_err(|e| e.to_string())
+    })
 }
 
 /// Probes ELM327 / STN clone firmware capabilities (`ATSH`, `ATCAF0`, K-Line, `STDI`).
@@ -51,26 +204,123 @@ pub fn diag_send_raw_command_inner(
 }
 
 #[tauri::command]
-pub fn diag_read_ecu_info(state: State<'_, FlashEngineState>) -> Result<EcuIdentitySummary, String> {
-    diag_read_ecu_info_inner(&state)
+pub fn diag_read_ecu_info(
+    tx_can_id: Option<u32>,
+    state: State<'_, FlashEngineState>,
+) -> Result<EcuIdentitySummary, String> {
+    diag_read_ecu_info_for_can_id_inner(tx_can_id, &state)
 }
 
 #[tauri::command]
-pub fn diag_read_dtcs(state: State<'_, FlashEngineState>) -> Result<DtcReadOutcome, String> {
-    diag_read_dtcs_inner(&state)
+pub fn diag_read_dtcs(
+    tx_can_id: Option<u32>,
+    state: State<'_, FlashEngineState>,
+) -> Result<DtcReadOutcome, String> {
+    diag_read_dtcs_for_can_id_inner(tx_can_id, &state)
 }
 
 #[tauri::command]
-pub fn diag_clear_dtcs(state: State<'_, FlashEngineState>) -> Result<DtcClearOutcome, String> {
-    diag_clear_dtcs_inner(&state)
+pub fn diag_clear_dtcs(
+    tx_can_id: Option<u32>,
+    state: State<'_, FlashEngineState>,
+) -> Result<DtcClearOutcome, String> {
+    diag_clear_dtcs_for_can_id_inner(tx_can_id, &state)
 }
 
 #[tauri::command]
 pub fn diag_ecu_reset(
     mode: EcuResetMode,
+    tx_can_id: Option<u32>,
     state: State<'_, FlashEngineState>,
 ) -> Result<EcuResetOutcome, String> {
-    diag_ecu_reset_inner(mode, &state)
+    diag_ecu_reset_for_can_id_inner(mode, tx_can_id, &state)
+}
+
+#[tauri::command]
+pub fn diag_lookup_dtc(code: String) -> DtcDescription {
+    diag_lookup_dtc_inner(&code)
+}
+
+#[tauri::command]
+pub fn diag_read_live_pids(
+    tx_can_id: Option<u32>,
+    pids: Option<Vec<u8>>,
+    state: State<'_, FlashEngineState>,
+) -> Result<ObdLiveSnapshot, String> {
+    diag_read_live_pids_inner(tx_can_id, pids, &state)
+}
+
+#[tauri::command]
+pub fn diag_read_im_readiness(
+    tx_can_id: Option<u32>,
+    state: State<'_, FlashEngineState>,
+) -> Result<ImReadinessSummary, String> {
+    diag_read_im_readiness_inner(tx_can_id, &state)
+}
+
+#[tauri::command]
+pub fn diag_read_freeze_frame(
+    tx_can_id: Option<u32>,
+    state: State<'_, FlashEngineState>,
+) -> Result<FreezeFrameSummary, String> {
+    diag_read_freeze_frame_inner(tx_can_id, &state)
+}
+
+#[tauri::command]
+pub fn diag_read_mode06_monitors(
+    tx_can_id: Option<u32>,
+    mids: Option<Vec<u8>>,
+    state: State<'_, FlashEngineState>,
+) -> Result<Vec<Mode06TestResult>, String> {
+    diag_read_mode06_monitors_inner(tx_can_id, mids, &state)
+}
+
+#[tauri::command]
+pub fn diag_scan_ecu_modules(
+    include_29bit: Option<bool>,
+    state: State<'_, FlashEngineState>,
+) -> Result<Vec<DiscoveredEcuModule>, String> {
+    diag_scan_ecu_modules_inner(include_29bit.unwrap_or(false), &state)
+}
+
+#[tauri::command]
+pub fn diag_uds_enter_session(
+    tx_can_id: Option<u32>,
+    session_subfunction: u8,
+    state: State<'_, FlashEngineState>,
+) -> Result<String, String> {
+    diag_uds_enter_session_inner(tx_can_id, session_subfunction, &state)
+}
+
+#[tauri::command]
+pub fn diag_uds_read_dids(
+    tx_can_id: Option<u32>,
+    dids: Option<Vec<u16>>,
+    state: State<'_, FlashEngineState>,
+) -> Result<Vec<UdsDidValue>, String> {
+    diag_uds_read_dids_inner(tx_can_id, dids, &state)
+}
+
+#[tauri::command]
+pub fn diag_uds_routine_control(
+    tx_can_id: Option<u32>,
+    subfunction: u8,
+    routine_id: u16,
+    option_record: Option<Vec<u8>>,
+    state: State<'_, FlashEngineState>,
+) -> Result<UdsRoutineOutcome, String> {
+    diag_uds_routine_control_inner(tx_can_id, subfunction, routine_id, option_record, &state)
+}
+
+#[tauri::command]
+pub fn diag_uds_io_control(
+    tx_can_id: Option<u32>,
+    did: u16,
+    control_param: u8,
+    control_state: Option<Vec<u8>>,
+    state: State<'_, FlashEngineState>,
+) -> Result<UdsIoControlOutcome, String> {
+    diag_uds_io_control_inner(tx_can_id, did, control_param, control_state, &state)
 }
 
 #[tauri::command]
@@ -250,5 +500,42 @@ mod tests {
         assert!(!caps.supports_atbi);
         assert!(!caps.supports_st_commands);
         assert!(caps.warnings.len() >= 2);
+    }
+
+    #[test]
+    fn phase2_diag_wrappers_cover_dtc_lookup_live_pids_readiness_and_uds_services() {
+        let info = diag_lookup_dtc_inner("P0300");
+        assert!(info.summary.contains("Misfire"));
+
+        let state = attach_scripted_elm(vec![
+            // live pids: bitmap 01-20 (RPM only) + RPM 2500
+            reply(vec![0x41, 0x00, 0x00, 0x10, 0x00, 0x00]),
+            reply(vec![0x41, 0x0C, 0x27, 0x10]),
+            // readiness 01 01 + mode 0A empty
+            reply(vec![0x41, 0x01, 0x00, 0x07, 0x01, 0x00]),
+            reply(vec![0x4A, 0x00]),
+            // uds session 0x03 + did 0xF187 + routine 0xFF00 + io 0x1234
+            reply(vec![0x50, 0x03, 0x00, 0x32]),
+            reply(vec![0x62, 0xF1, 0x87, b'K', b'I', b'V', b'I']),
+            reply(vec![0x71, 0x01, 0xFF, 0x00]),
+            reply(vec![0x6F, 0x12, 0x34, 0x00]),
+        ]);
+
+        let live = diag_read_live_pids_inner(None, None, &state).unwrap();
+        assert_eq!(live.readings.len(), 1);
+        assert_eq!(live.readings[0].value, 2500.0);
+
+        let readiness = diag_read_im_readiness_inner(None, &state).unwrap();
+        assert!(!readiness.mil_on);
+        assert_eq!(readiness.monitors.len(), 4);
+
+        let sess = diag_uds_enter_session_inner(None, 0x03, &state).unwrap();
+        assert!(sess.contains("0x03"));
+        let dids = diag_uds_read_dids_inner(None, Some(vec![0xF187]), &state).unwrap();
+        assert_eq!(dids[0].ascii.as_deref(), Some("KIVI"));
+        let routine = diag_uds_routine_control_inner(None, 0x01, 0xFF00, None, &state).unwrap();
+        assert!(routine.acknowledged);
+        let io = diag_uds_io_control_inner(None, 0x1234, 0x00, None, &state).unwrap();
+        assert!(io.acknowledged);
     }
 }

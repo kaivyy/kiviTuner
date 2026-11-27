@@ -639,3 +639,64 @@ fn test_decode_mode09_calibration_id() {
     let cal_id = decode_calibration_id(&payload).expect("Decode Cal ID failed");
     assert_eq!(cal_id, "38770-KV1-0000");
 }
+
+#[test]
+fn test_decode_extended_mode01_pids_and_registry() {
+    use kivi_protocol::{MonitorStatusSample, NarrowbandO2Sample};
+
+    assert!(Mode01Pid::all_sensor_pids().len() >= 50);
+    assert_eq!(Mode01Pid::from_u8(0x0E), Some(Mode01Pid::TimingAdvance));
+    assert_eq!(Mode01Pid::from_u8(0x63), Some(Mode01Pid::ReferenceTorque));
+    assert!(Mode01Pid::SupportedPids61_80.is_bitmap());
+    assert!(!Mode01Pid::TimingAdvance.is_bitmap());
+    assert_eq!(ObdCommand::Mode01(Mode01Pid::TimingAdvance).encode(), "01 0E\r");
+    assert_eq!(ObdCommand::Mode01(Mode01Pid::EngineOilTemp).encode(), "01 5C\r");
+
+    // Monitor status: MIL on (0x80), 3 DTCs
+    let mon = decode_mode01_payload(Mode01Pid::MonitorStatus, &[0x41, 0x01, 0x83, 0x07, 0x65, 0x00]).unwrap();
+    assert_eq!(
+        mon,
+        DecodedMode01Value::MonitorStatus(MonitorStatusSample {
+            mil_on: true,
+            dtc_count: 3,
+            compression_ignition: false,
+            raw_bytes: [0x83, 0x07, 0x65, 0x00],
+        })
+    );
+
+    // Freeze DTC P0301 -> 0x03 0x01
+    assert_eq!(
+        decode_mode01_payload(Mode01Pid::FreezeDtc, &[0x41, 0x02, 0x03, 0x01]).unwrap(),
+        DecodedMode01Value::FreezeDtcCode("P0301".to_string())
+    );
+
+    // Timing Advance: 0x9E = 158 -> 158/2 - 64 = +15.0 deg
+    assert_eq!(
+        decode_mode01_payload(Mode01Pid::TimingAdvance, &[0x41, 0x0E, 0x9E]).unwrap(),
+        DecodedMode01Value::TimingAdvance(15.0)
+    );
+
+    // Narrowband O2: 0.450 V, STFT +6.25% (136 * 100 / 128 - 100 = 6.25)
+    assert_eq!(
+        decode_mode01_payload(Mode01Pid::O2Bank1Sensor1, &[0x41, 0x14, 90, 136]).unwrap(),
+        DecodedMode01Value::NarrowbandO2 {
+            sensor: 1,
+            sample: NarrowbandO2Sample {
+                voltage_v: 0.45,
+                stft_pct: Some(6.25),
+            },
+        }
+    );
+
+    // Oil temp: 135 - 40 = 95 C
+    let oil = decode_mode01_payload(Mode01Pid::EngineOilTemp, &[0x41, 0x5C, 135]).unwrap();
+    assert_eq!(oil.numeric_value(), Some(95.0));
+
+    // Fuel rate: 250 / 20 = 12.5 L/h
+    let rate = decode_mode01_payload(Mode01Pid::EngineFuelRate, &[0x41, 0x5E, 0x00, 0xFA]).unwrap();
+    assert_eq!(rate.numeric_value(), Some(12.5));
+
+    // Reference torque: 0x0190 = 400 Nm
+    let tq = decode_mode01_payload(Mode01Pid::ReferenceTorque, &[0x41, 0x63, 0x01, 0x90]).unwrap();
+    assert_eq!(tq.numeric_value(), Some(400.0));
+}
