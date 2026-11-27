@@ -34,6 +34,7 @@ use kivi_flashing::j2534_loader::{
 };
 use kivi_flashing::j2534_types::ProtocolId;
 use kivi_flashing::kernel_session::KernelSession;
+use kivi_flashing::kline_serial_device::{RawKLineDevice, DEFAULT_KLINE_BAUD};
 use kivi_flashing::openport2_serial::LiveOpenPort2Device;
 use kivi_flashing::passthru_discovery::{
     list_serial_ports as discover_serial_ports, list_socketcan_interfaces, scan_standard_paths,
@@ -42,7 +43,9 @@ use kivi_flashing::passthru_discovery::{
 use kivi_flashing::ram_kernel::KernelArchitecture;
 use kivi_flashing::recovery_journal::{JournalStage, RecoveryJournalManager};
 use kivi_flashing::seed_key_registry::is_seed_key_verified_for_live;
-use kivi_flashing::serial_elm_device::SerialElmDevice;
+use kivi_flashing::serial_elm_device::{
+    derive_elm_rx_can_id, ElmBusProfile, SerialElmDevice, WifiElmDevice, ELM_AUTO_BAUD_CANDIDATES,
+};
 use kivi_flashing::socketcan_device::SocketCanDevice;
 use kivi_flashing::specialized_kernel_sessions::{
     HondaKLineKernelSession, RamKernelHardwareSession,
@@ -123,8 +126,12 @@ pub enum TransportChoice {
     J2534,
     /// Native Tactrix OpenPort 2.0 USB-CDC (`at...` firmware protocol).
     OpenPort2,
-    /// Serial ELM327 / STN1110 / OBDLink adapter.
+    /// Serial / USB / Bluetooth SPP ELM327 / STN1110 / OBDLink adapter.
     Serial,
+    /// Wi-Fi TCP ELM327 / STN1110 adapter (`192.168.0.10:35000`).
+    ElmWifi,
+    /// Raw USB-UART K-Line cable (FTDI / CH340 KKL 409.1).
+    KLineSerial,
     /// ISO 13400 Diagnostics over IP (DoIP) Ethernet gateway.
     DoIp,
     /// Linux SocketCAN (`AF_CAN` raw CAN/ISO-TP interface).
@@ -137,6 +144,8 @@ impl TransportChoice {
             TransportChoice::J2534 => "j2534",
             TransportChoice::OpenPort2 => "openport2",
             TransportChoice::Serial => "serial",
+            TransportChoice::ElmWifi => "elm_wifi",
+            TransportChoice::KLineSerial => "kline_serial",
             TransportChoice::DoIp => "doip",
             TransportChoice::SocketCan => "socketcan",
         }
@@ -152,7 +161,8 @@ pub fn describe_transport(choice: TransportChoice, name: &str) -> FlashDeviceDes
         transport: match choice {
             TransportChoice::J2534 => "Usb".to_string(),
             TransportChoice::OpenPort2 => "UsbSerial".to_string(),
-            TransportChoice::Serial => "Serial".to_string(),
+            TransportChoice::Serial | TransportChoice::KLineSerial => "Serial".to_string(),
+            TransportChoice::ElmWifi => "Wifi".to_string(),
             TransportChoice::DoIp => "TcpIp".to_string(),
             TransportChoice::SocketCan => "Can".to_string(),
         },
@@ -501,8 +511,11 @@ fn try_open_and_connect(
 fn shares_hardware_port_family(a: Option<TransportChoice>, b: TransportChoice) -> bool {
     match a {
         Some(prev) if prev == b => true,
-        Some(TransportChoice::Serial | TransportChoice::OpenPort2)
-            if matches!(b, TransportChoice::Serial | TransportChoice::OpenPort2) =>
+        Some(TransportChoice::Serial | TransportChoice::OpenPort2 | TransportChoice::KLineSerial)
+            if matches!(
+                b,
+                TransportChoice::Serial | TransportChoice::OpenPort2 | TransportChoice::KLineSerial
+            ) =>
         {
             true
         }
@@ -734,9 +747,9 @@ pub fn attach_openport2_inner(port: &str, state: &FlashEngineState) -> Result<()
     )
 }
 
-/// Attach an ELM327 / STN1110 / OBDLink serial adapter at the given baud rate.
+/// Attach an ELM327 / STN1110 / OBDLink serial or Bluetooth SPP adapter (auto-probing common baud rates).
 pub fn attach_serial_inner(port: &str, state: &FlashEngineState) -> Result<(), String> {
-    attach_serial_with_baud_inner(port, 115_200, state)
+    attach_serial_configured_inner(port, None, Some(ElmBusProfile::Auto), state).map(|_| ())
 }
 
 /// Attach an ELM327 / STN1110 serial adapter at a custom baud rate.
@@ -745,13 +758,129 @@ pub fn attach_serial_with_baud_inner(
     baud_rate: u32,
     state: &FlashEngineState,
 ) -> Result<(), String> {
+    attach_serial_configured_inner(port, Some(baud_rate), None, state).map(|_| ())
+}
+
+/// Attach an ELM327 USB / Bluetooth SPP adapter with optional baud auto-probe and vehicle bus profile.
+pub fn attach_serial_configured_inner(
+    port: &str,
+    baud_rate: Option<u32>,
+    bus_profile: Option<ElmBusProfile>,
+    state: &FlashEngineState,
+) -> Result<u32, String> {
+    let profile = bus_profile.unwrap_or(ElmBusProfile::Auto);
+    let target_proto = profile.protocol_id();
+    let target_bus_baud = profile.bus_baud_rate();
+
+    if let Some(baud) = baud_rate.filter(|&b| b > 0) {
+        let mut dev = SerialElmDevice::new(port, baud);
+        if let Some(p) = bus_profile {
+            dev = dev.with_bus_profile(p);
+        }
+        attach_real_device(
+            state,
+            Box::new(dev),
+            TransportChoice::Serial,
+            target_proto,
+            target_bus_baud,
+        )?;
+        return Ok(baud);
+    }
+
+    let mut last_err = String::from("ELM327 serial adapter did not respond on any baud rate");
+    for &baud in ELM_AUTO_BAUD_CANDIDATES {
+        let dev = SerialElmDevice::new(port, baud).with_bus_profile(profile);
+        match attach_real_device(
+            state,
+            Box::new(dev),
+            TransportChoice::Serial,
+            target_proto,
+            target_bus_baud,
+        ) {
+            Ok(()) => return Ok(baud),
+            Err(e) => {
+                if is_missing_driver_or_target(&e)
+                    || e.to_ascii_lowercase().contains("permission denied")
+                    || e.to_ascii_lowercase().contains("access is denied")
+                {
+                    return Err(e);
+                }
+                last_err = e;
+            }
+        }
+    }
+    Err(last_err)
+}
+
+/// Attach a Wi-Fi TCP ELM327 / STN adapter (`192.168.0.10:35000` default).
+pub fn attach_elm_wifi_inner(
+    host_port: &str,
+    bus_profile: Option<ElmBusProfile>,
+    state: &FlashEngineState,
+) -> Result<(), String> {
+    let profile = bus_profile.unwrap_or(ElmBusProfile::Auto);
+    let mut dev = WifiElmDevice::new(host_port);
+    dev = dev.with_bus_profile(profile);
     attach_real_device(
         state,
-        Box::new(SerialElmDevice::new(port, baud_rate)),
-        TransportChoice::Serial,
-        ProtocolId::Iso15765,
-        500_000,
+        Box::new(dev),
+        TransportChoice::ElmWifi,
+        profile.protocol_id(),
+        profile.bus_baud_rate(),
     )
+}
+
+/// Attach a raw USB-UART K-Line cable (FTDI / CH340 KKL 409.1) for Honda/Yamaha K-Line ECUs.
+pub fn attach_kline_serial_inner(
+    port: &str,
+    baud_rate: Option<u32>,
+    state: &FlashEngineState,
+) -> Result<(), String> {
+    let baud = baud_rate.filter(|&b| b > 0).unwrap_or(DEFAULT_KLINE_BAUD);
+    attach_real_device(
+        state,
+        Box::new(RawKLineDevice::new(port, baud)),
+        TransportChoice::KLineSerial,
+        ProtocolId::Iso14230,
+        baud,
+    )
+}
+
+fn parse_protocol_name(raw: &str) -> Result<ProtocolId, String> {
+    match raw.trim().to_ascii_lowercase().as_str() {
+        "iso15765" | "isotp" | "can_isotp" => Ok(ProtocolId::Iso15765),
+        "can" | "raw_can" => Ok(ProtocolId::Can),
+        "iso14230" | "kwp2000" | "kwp" => Ok(ProtocolId::Iso14230),
+        "iso9141" | "kline" => Ok(ProtocolId::Iso9141),
+        "j1850_vpw" | "vpw" => Ok(ProtocolId::J1850Vpw),
+        "j1850_pwm" | "pwm" => Ok(ProtocolId::J1850Pwm),
+        other => Err(format!("Unsupported transport protocol '{other}'")),
+    }
+}
+
+/// Reconfigures protocol, bus baud rate, CAN TX/RX arbitration IDs, and K-Line checksum mode on the attached device.
+pub fn reconfigure_transport_protocol_inner(
+    protocol: &str,
+    baud_rate: u32,
+    tx_can_id: Option<u32>,
+    rx_can_id: Option<u32>,
+    kline_no_checksum: Option<bool>,
+    state: &FlashEngineState,
+) -> Result<(), String> {
+    let proto = parse_protocol_name(protocol)?;
+    state.with_attached_device(|dev| {
+        if let Some(no_cs) = kline_no_checksum {
+            dev.set_kline_no_checksum(no_cs);
+        }
+        let effective_tx = tx_can_id.unwrap_or(0x07E0);
+        let effective_rx = rx_can_id.unwrap_or_else(|| derive_elm_rx_can_id(effective_tx));
+        if tx_can_id.is_some() || rx_can_id.is_some() {
+            dev.configure_can_ids(effective_tx, effective_rx)
+                .map_err(|e| e.to_string())?;
+        }
+        let _ = dev.disconnect();
+        dev.connect(proto, baud_rate).map_err(|e| e.to_string())
+    })
 }
 
 /// Attach an ISO 13400 DoIP gateway over TCP (`host:13400`).
@@ -1075,15 +1204,22 @@ pub fn auto_connect_flash_transport_inner(state: &FlashEngineState) -> AutoConne
         }
     }
 
-    // 5. Fallback to ELM327 / USB serial (read-only live data + UDS 0x23)
-    for p in ports.iter().filter(|p| p.adapter_hint == "elm327_candidate" || p.vid.is_some()) {
-        match attach_serial_with_baud_inner(&p.port_name, 115_200, state) {
-            Ok(()) => {
-                attempts.push(format!("Connected read-only serial adapter on {} ({})", p.port_name, p.description));
+    // 5. Fallback to ELM327 / USB serial / Bluetooth SPP (auto-baud 38400/115200/9600, read-only live data + diag)
+    for p in ports.iter().filter(|p| {
+        p.adapter_hint == "elm327_candidate"
+            || p.adapter_hint == "bluetooth_spp"
+            || p.vid.is_some()
+    }) {
+        match attach_serial_configured_inner(&p.port_name, None, Some(ElmBusProfile::Auto), state) {
+            Ok(baud) => {
+                attempts.push(format!(
+                    "Connected read-only ELM327 adapter on {} @ {baud} bps ({})",
+                    p.port_name, p.description
+                ));
                 return AutoConnectOutcome {
                     connected: true,
                     transport: Some(TransportChoice::Serial),
-                    device_name: Some(format!("Serial ({})", p.port_name)),
+                    device_name: Some(format!("ELM327 ({} @ {baud} bps)", p.port_name)),
                     target: Some(p.port_name.clone()),
                     attempts,
                 };
@@ -1342,6 +1478,12 @@ where
     let mut s = lock_or_err(&state.session, "flash_session")?;
     {
         let bench = s.bench.as_ref().ok_or("No flash device attached")?;
+        if !bench.device.supports_flashing() {
+            return Err(format!(
+                "Attached transport '{}' is read/diagnostic-only (cannot sustain ECU ROM flashing).",
+                bench.device.info().name
+            ));
+        }
         if !bench.device.is_mock() {
             if !state.is_experimental_write_unlocked() {
                 return Err(
@@ -1533,9 +1675,47 @@ pub fn attach_openport2_transport(
 pub fn attach_serial_transport(
     port: String,
     baud_rate: Option<u32>,
+    bus_profile: Option<ElmBusProfile>,
+    state: State<'_, FlashEngineState>,
+) -> Result<u32, String> {
+    attach_serial_configured_inner(&port, baud_rate, bus_profile, &state)
+}
+
+#[tauri::command]
+pub fn attach_elm_wifi_transport(
+    host_port: String,
+    bus_profile: Option<ElmBusProfile>,
     state: State<'_, FlashEngineState>,
 ) -> Result<(), String> {
-    attach_serial_with_baud_inner(&port, baud_rate.unwrap_or(115_200), &state)
+    attach_elm_wifi_inner(&host_port, bus_profile, &state)
+}
+
+#[tauri::command]
+pub fn attach_kline_serial_transport(
+    port: String,
+    baud_rate: Option<u32>,
+    state: State<'_, FlashEngineState>,
+) -> Result<(), String> {
+    attach_kline_serial_inner(&port, baud_rate, &state)
+}
+
+#[tauri::command]
+pub fn reconfigure_transport_protocol(
+    protocol: String,
+    baud_rate: u32,
+    tx_can_id: Option<u32>,
+    rx_can_id: Option<u32>,
+    kline_no_checksum: Option<bool>,
+    state: State<'_, FlashEngineState>,
+) -> Result<(), String> {
+    reconfigure_transport_protocol_inner(
+        &protocol,
+        baud_rate,
+        tx_can_id,
+        rx_can_id,
+        kline_no_checksum,
+        &state,
+    )
 }
 
 #[tauri::command]

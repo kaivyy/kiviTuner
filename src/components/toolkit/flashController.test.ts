@@ -309,11 +309,15 @@ test('a j2534 transport can flash', async () => {
   assert.equal(transportCanFlash('j2534'), true);
 });
 
-test('an openport2, doip, or socketcan transport can flash', async () => {
-  const { transportCanFlash } = await import('./flashController.ts');
+test('an openport2, kline_serial, doip, or socketcan transport can flash while elm_wifi cannot', async () => {
+  const { transportCanFlash, describeTransportCapability } = await import('./flashController.ts');
   assert.equal(transportCanFlash('openport2'), true);
+  assert.equal(transportCanFlash('kline_serial'), true);
   assert.equal(transportCanFlash('doip'), true);
   assert.equal(transportCanFlash('socketcan'), true);
+  assert.equal(transportCanFlash('elm_wifi'), false);
+  assert.match(describeTransportCapability('elm_wifi'), /cannot flash/i);
+  assert.match(describeTransportCapability('kline_serial'), /k-line/i);
 });
 
 test('no transport means no flashing', async () => {
@@ -478,5 +482,77 @@ test('quick diagnostics controller wrappers handle ok, no-backend, and errors cl
   assert.equal(dtcOk.kind, 'ok');
   if (dtcOk.kind === 'ok') {
     assert.match(summariseDtcRead(dtcOk.data), /1 trouble code/);
+  }
+});
+
+test('Phase 1 ELM Wi-Fi, K-Line, configured serial, protocol override, and capability probe actions validate inputs cleanly', async () => {
+  const {
+    runAttachSerialConfigured,
+    runAttachElmWifi,
+    runAttachKLineSerial,
+    runReconfigureTransport,
+    runProbeElmCapabilities,
+    runSendRawDiagCommand,
+  } = await import('./flashController.ts');
+
+  const wifiErr = await runAttachElmWifi('   ', 'auto');
+  assert.match(wifiErr.error as string, /host:port/i);
+
+  const wifiOk = await runAttachElmWifi('192.168.0.10:35000', 'honda_kline_experimental', async () => null);
+  assert.equal(wifiOk.choice, 'elm_wifi');
+  assert.equal(wifiOk.error, null);
+
+  const klineErr = await runAttachKLineSerial('', 10400);
+  assert.match(klineErr.error as string, /required/i);
+
+  const klineOk = await runAttachKLineSerial('/dev/ttyUSB0', 10400, async () => null);
+  assert.equal(klineOk.choice, 'kline_serial');
+  assert.equal(klineOk.error, null);
+
+  let seenArgs: unknown[] = [];
+  const serOk = await runAttachSerialConfigured(
+    '/dev/rfcomm0',
+    undefined,
+    'kwp_fast_init',
+    async (p, b, prof) => {
+      seenArgs = [p, b, prof];
+      return null;
+    }
+  );
+  assert.equal(serOk.choice, 'serial');
+  assert.deepEqual(seenArgs, ['/dev/rfcomm0', undefined, 'kwp_fast_init']);
+
+  assert.match(
+    (await runReconfigureTransport('iso14230', 0, undefined, undefined, true)) as string,
+    /positive integer/i
+  );
+  assert.equal(
+    await runReconfigureTransport('iso14230', 10400, 0x7e0, 0x7e8, true, async () => null),
+    null
+  );
+
+  const blankCmd = await runSendRawDiagCommand('   ');
+  assert.equal(blankCmd.kind, 'error');
+
+  const okCmd = await runSendRawDiagCommand('ATI', async () => 'ELM327 v1.5');
+  assert.equal(okCmd.kind, 'ok');
+  if (okCmd.kind === 'ok') {
+    assert.equal(okCmd.data, 'ELM327 v1.5');
+  }
+
+  const okCaps = await runProbeElmCapabilities(async () => ({
+    adapter_banner: 'ELM327 v1.5',
+    chip_tier: 'pic18_v15_compatible',
+    active_protocol: 'A6',
+    supports_atsh: true,
+    supports_atcaf0: true,
+    supports_kline_atsp5: true,
+    supports_atbi: true,
+    supports_st_commands: false,
+    warnings: [],
+  }));
+  assert.equal(okCaps.kind, 'ok');
+  if (okCaps.kind === 'ok') {
+    assert.equal(okCaps.data.chip_tier, 'pic18_v15_compatible');
   }
 });

@@ -12,6 +12,30 @@ use std::collections::VecDeque;
 use std::io::{Read, Write};
 use std::time::{Duration, Instant};
 
+pub fn op2_connect_flags(protocol: ProtocolId, is_29bit: bool, kline_no_checksum: bool) -> u32 {
+    if is_29bit && matches!(protocol, ProtocolId::Can | ProtocolId::Iso15765) {
+        connect_flags::CAN_29BIT_ID
+    } else if kline_no_checksum && matches!(protocol, ProtocolId::Iso9141 | ProtocolId::Iso14230) {
+        connect_flags::ISO9141_NO_CHECKSUM | connect_flags::ISO9141_K_LINE_ONLY
+    } else {
+        0
+    }
+}
+
+pub fn effective_op2_tx_flags(proto: ProtocolId, requested_tx_flags: u32, data: &[u8]) -> u32 {
+    let mut flags = requested_tx_flags;
+    if proto.is_iso15765() && flags == 0 {
+        flags |= tx_flags::ISO15765_FRAME_PAD;
+    }
+    if matches!(proto, ProtocolId::Iso15765 | ProtocolId::Can) && data.len() >= 4 {
+        let can_id = u32::from_be_bytes([data[0], data[1], data[2], data[3]]);
+        if can_id > 0x7FF {
+            flags |= tx_flags::CAN_29BIT_ID;
+        }
+    }
+    flags
+}
+
 pub fn parse_op2_vbatt_reply(rep: &str, expected_seq: u32) -> Result<u32, DeviceError> {
     let tokens: Vec<&str> = rep.split_whitespace().collect();
     let seq_str = expected_seq.to_string();
@@ -66,6 +90,8 @@ pub struct LiveOpenPort2Device {
     port: Option<Box<dyn SerialPort>>,
     firmware_version: Option<String>,
     protocol: Option<ProtocolId>,
+    last_baud_rate: u32,
+    kline_no_checksum: bool,
     channel_slot: u32,
     seq: u32,
     tx_can_id: u32,
@@ -91,6 +117,8 @@ impl LiveOpenPort2Device {
             port: None,
             firmware_version: None,
             protocol: None,
+            last_baud_rate: 500_000,
+            kline_no_checksum: false,
             channel_slot: 0,
             seq: 1,
             tx_can_id: 0x07E0,
@@ -368,11 +396,8 @@ impl Device for LiveOpenPort2Device {
         self.partial_rx_proto = None;
 
         let is_29bit = self.tx_can_id > 0x7FF || self.rx_can_id > 0x7FF;
-        let conn_flag = if is_29bit && matches!(protocol, ProtocolId::Can | ProtocolId::Iso15765) {
-            connect_flags::CAN_29BIT_ID
-        } else {
-            0
-        };
+        let conn_flag = op2_connect_flags(protocol, is_29bit, self.kline_no_checksum);
+        self.last_baud_rate = baud_rate;
         let cmd = format!(
             "ato{} {} {} {}",
             protocol.as_u32(),
@@ -419,11 +444,12 @@ impl Device for LiveOpenPort2Device {
                 PASSTHRU_MSG_DATA_CAPACITY
             )));
         }
+        let eff_flags = effective_op2_tx_flags(proto, msg.tx_flags, &msg.data);
         let cmd = format!(
             "att{} {} {} 2000000",
             proto.as_u32(),
             msg.data.len(),
-            msg.tx_flags
+            eff_flags
         );
         let _ = self.send_cmd_wait_reply(&cmd, Some(&msg.data), 2500)?;
         Ok(())
@@ -484,11 +510,54 @@ impl Device for LiveOpenPort2Device {
     fn is_mock(&self) -> bool {
         false
     }
+
+    fn configure_can_ids(&mut self, tx_id: u32, rx_id: u32) -> Result<(), DeviceError> {
+        let changed = self.tx_can_id != tx_id || self.rx_can_id != rx_id;
+        self.tx_can_id = tx_id;
+        self.rx_can_id = rx_id;
+        if changed {
+            if let Some(proto) = self.protocol {
+                if matches!(proto, ProtocolId::Iso15765 | ProtocolId::Can) {
+                    let baud = self.last_baud_rate;
+                    self.connect(proto, baud)?;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn set_kline_no_checksum(&mut self, enabled: bool) {
+        self.kline_no_checksum = enabled;
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn op2_connect_and_tx_flags_handle_kline_nochecksum_and_can_29bit_pad() {
+        assert_eq!(
+            op2_connect_flags(ProtocolId::Iso14230, false, true),
+            connect_flags::ISO9141_NO_CHECKSUM | connect_flags::ISO9141_K_LINE_ONLY
+        );
+        assert_eq!(
+            op2_connect_flags(ProtocolId::Iso15765, true, false),
+            connect_flags::CAN_29BIT_ID
+        );
+        assert_eq!(
+            effective_op2_tx_flags(ProtocolId::Iso15765, 0, &[0x00, 0x00, 0x07, 0xE0, 0x01, 0x00]),
+            tx_flags::ISO15765_FRAME_PAD
+        );
+        assert_eq!(
+            effective_op2_tx_flags(
+                ProtocolId::Iso15765,
+                0,
+                &[0x18, 0xDA, 0x10, 0xF1, 0x22, 0xF1, 0x90]
+            ),
+            tx_flags::ISO15765_FRAME_PAD | tx_flags::CAN_29BIT_ID
+        );
+    }
 
     #[test]
     fn vbatt_reply_parser_requires_pin_16_and_trailing_seq() {

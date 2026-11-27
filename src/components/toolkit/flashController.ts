@@ -6,7 +6,9 @@
 
 import {
   bridgeAttachDoIpTransport,
+  bridgeAttachElmWifiTransport,
   bridgeAttachJ2534Transport,
+  bridgeAttachKLineSerialTransport,
   bridgeAttachOpenPort2Transport,
   bridgeAttachSerialTransport,
   bridgeAttachSocketCanTransport,
@@ -14,14 +16,17 @@ import {
   bridgeDetachTransport,
   bridgeDiagClearDtcs,
   bridgeDiagEcuReset,
+  bridgeDiagProbeElmCapabilities,
   bridgeDiagReadDtcs,
   bridgeDiagReadEcuInfo,
+  bridgeDiagSendRawCommand,
   bridgeDumpEcu,
   bridgeDumpEcuUds23,
   bridgeFlashEcu,
   bridgeListFlashDevices,
   bridgeListJ2534Drivers,
   bridgeListSerialPorts,
+  bridgeReconfigureTransportProtocol,
   bridgeSelectedTransport,
   type AutoConnectOutcome,
   type DiscoveredDriver,
@@ -31,6 +36,8 @@ import {
   type EcuIdentitySummary,
   type EcuResetMode,
   type EcuResetOutcome,
+  type ElmBusProfile,
+  type ElmCapabilityReport,
   type FlashDeviceDescriptor,
   type FlashResultPayload,
   type SerialPortRow,
@@ -47,8 +54,26 @@ export type {
   EcuIdentitySummary,
   EcuResetMode,
   EcuResetOutcome,
+  ElmBusProfile,
+  ElmCapabilityReport,
   TransportChoice,
 };
+
+export const ELM_BUS_PROFILE_OPTIONS: Array<{ value: ElmBusProfile; label: string }> = [
+  { value: 'auto', label: 'Auto Detect (ATSP0)' },
+  { value: 'can_11bit_500k', label: 'CAN 11-bit 500k (ATSP6 | Cars / Euro 5 Bikes)' },
+  { value: 'can_29bit_500k', label: 'CAN 29-bit 500k (ATSP7 | Honda CAN / Euro 5)' },
+  { value: 'can_11bit_250k', label: 'CAN 11-bit 250k (ATSP8)' },
+  { value: 'can_29bit_250k', label: 'CAN 29-bit 250k (ATSP9)' },
+  { value: 'kwp_fast_init', label: 'K-Line KWP2000 Fast (ATSP5 | Yamaha 3/4-pin / Cars)' },
+  { value: 'kwp_5baud_init', label: 'K-Line KWP2000 5-Baud (ATSP4)' },
+  { value: 'iso9141', label: 'K-Line ISO 9141-2 (ATSP3)' },
+  { value: 'kawasaki_kds', label: 'Kawasaki KDS K-Line (ATSP5 + 81 11 F1)' },
+  { value: 'suzuki_sds', label: 'Suzuki SDS K-Line (ATSP5 + 81 12 F1)' },
+  { value: 'honda_kline_experimental', label: 'Honda 4-pin K-Line (Experimental ELM ATBI)' },
+  { value: 'j1850_pwm', label: 'SAE J1850 PWM (ATSP1)' },
+  { value: 'j1850_vpw', label: 'SAE J1850 VPW (ATSP2)' },
+];
 
 export type FlashState<T> =
   | { kind: 'ok'; data: T }
@@ -242,7 +267,7 @@ export async function runAttachOpenPort2(
 
 export async function runAttachSerial(
   port: string,
-  attachFn: (p: string) => Promise<string | null> = bridgeAttachSerialTransport
+  attachFn: (p: string) => Promise<string | null> = (p) => bridgeAttachSerialTransport(p)
 ): Promise<TransportStatus> {
   if (port.trim() === '') return { choice: null, error: 'A serial port is required.' };
   try {
@@ -250,6 +275,80 @@ export async function runAttachSerial(
     return err !== null ? { choice: null, error: err } : { choice: 'serial', error: null };
   } catch (e) {
     return { choice: null, error: String(e) };
+  }
+}
+
+export async function runAttachSerialConfigured(
+  port: string,
+  baudRate: number | undefined,
+  busProfile: ElmBusProfile | undefined,
+  attachFn: (
+    p: string,
+    b?: number,
+    prof?: ElmBusProfile
+  ) => Promise<string | null> = bridgeAttachSerialTransport
+): Promise<TransportStatus> {
+  if (port.trim() === '') return { choice: null, error: 'A serial port is required.' };
+  try {
+    const err = await attachFn(port, baudRate, busProfile);
+    return err !== null ? { choice: null, error: err } : { choice: 'serial', error: null };
+  } catch (e) {
+    return { choice: null, error: String(e) };
+  }
+}
+
+export async function runAttachElmWifi(
+  hostPort: string,
+  busProfile: ElmBusProfile | undefined,
+  attachFn: (hp: string, prof?: ElmBusProfile) => Promise<string | null> =
+    bridgeAttachElmWifiTransport
+): Promise<TransportStatus> {
+  if (hostPort.trim() === '') {
+    return { choice: null, error: 'An ELM327 Wi-Fi host:port address is required.' };
+  }
+  try {
+    const err = await attachFn(hostPort, busProfile);
+    return err !== null ? { choice: null, error: err } : { choice: 'elm_wifi', error: null };
+  } catch (e) {
+    return { choice: null, error: String(e) };
+  }
+}
+
+export async function runAttachKLineSerial(
+  port: string,
+  baudRate: number | undefined,
+  attachFn: (p: string, b?: number) => Promise<string | null> = bridgeAttachKLineSerialTransport
+): Promise<TransportStatus> {
+  if (port.trim() === '') return { choice: null, error: 'A K-Line serial port is required.' };
+  try {
+    const err = await attachFn(port, baudRate);
+    return err !== null ? { choice: null, error: err } : { choice: 'kline_serial', error: null };
+  } catch (e) {
+    return { choice: null, error: String(e) };
+  }
+}
+
+export async function runReconfigureTransport(
+  protocol: string,
+  baudRate: number,
+  txCanId: number | undefined,
+  rxCanId: number | undefined,
+  klineNoChecksum: boolean | undefined,
+  fn: (
+    proto: string,
+    baud: number,
+    tx?: number,
+    rx?: number,
+    noCs?: boolean
+  ) => Promise<string | null> = bridgeReconfigureTransportProtocol
+): Promise<string | null> {
+  if (!Number.isInteger(baudRate) || baudRate <= 0) {
+    return 'Baud rate must be a positive integer.';
+  }
+  try {
+    return await fn(protocol, baudRate, txCanId, rxCanId, klineNoChecksum);
+  } catch (e) {
+    return String(e);
   }
 }
 
@@ -304,6 +403,7 @@ export function transportCanFlash(choice: TransportChoice | null): boolean {
   return (
     choice === 'j2534' ||
     choice === 'openport2' ||
+    choice === 'kline_serial' ||
     choice === 'doip' ||
     choice === 'socketcan'
   );
@@ -315,12 +415,16 @@ export function describeTransportCapability(choice: TransportChoice | null): str
       return 'J2534 pass-thru. Can read and flash a real ECU.';
     case 'openport2':
       return 'Tactrix OpenPort 2.0 native USB-CDC. Can read and flash a real ECU.';
+    case 'kline_serial':
+      return 'Raw K-Line USB-UART cable (KKL FTDI). Supports Honda/Yamaha K-Line diagnostics, dump, and flash.';
     case 'doip':
       return 'ISO 13400 DoIP Ethernet gateway. Can read and flash a real ECU.';
     case 'socketcan':
       return 'Linux SocketCAN interface. Can read and flash over native CAN/ISO-TP.';
     case 'serial':
-      return 'Serial OBD adapter. Can read live data and UDS 0x23 memory, but cannot flash.';
+      return 'ELM327 serial / Bluetooth SPP adapter. Supports live data, DTC/UDS diagnostics, and ECU resets, but cannot flash.';
+    case 'elm_wifi':
+      return 'ELM327 Wi-Fi TCP adapter. Supports live data, DTC/UDS diagnostics, and ECU resets, but cannot flash.';
     default:
       return 'No transport attached.';
   }
@@ -396,6 +500,22 @@ export function runEcuReset(
   fn: (m: EcuResetMode) => Promise<EcuResetOutcome | null> = bridgeDiagEcuReset
 ): Promise<FlashState<EcuResetOutcome>> {
   return runDiagCall(() => fn(mode));
+}
+
+export function runProbeElmCapabilities(
+  fn: () => Promise<ElmCapabilityReport | null> = bridgeDiagProbeElmCapabilities
+): Promise<FlashState<ElmCapabilityReport>> {
+  return runDiagCall(fn);
+}
+
+export function runSendRawDiagCommand(
+  command: string,
+  fn: (cmd: string) => Promise<string | null> = bridgeDiagSendRawCommand
+): Promise<FlashState<string>> {
+  if (command.trim() === '') {
+    return Promise.resolve({ kind: 'error', message: 'Enter an AT or OBD hex command first.' });
+  }
+  return runDiagCall(() => fn(command));
 }
 
 export function summariseEcuInfo(info: EcuIdentitySummary): string {

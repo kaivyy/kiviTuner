@@ -102,6 +102,27 @@ impl KernelSession for HondaKLineKernelSession {
     }
 
     fn start(&mut self, operation: KernelOperation) -> Result<(), KernelError> {
+        {
+            let mut dev = self.device.0.lock().map_err(|_| KernelError::UploadRejected)?;
+            if !dev.is_mock()
+                && !matches!(
+                    dev.connected_protocol(),
+                    Some(ProtocolId::Iso14230 | ProtocolId::Iso9141)
+                )
+            {
+                dev.set_kline_no_checksum(true);
+                let _ = dev.disconnect();
+                if dev.connect(ProtocolId::Iso14230, 10_400).is_err() {
+                    dev.connect(ProtocolId::Iso9141, 10_400)
+                        .map_err(|_| KernelError::KernelDidNotStart)?;
+                }
+            }
+            match dev.kline_wakeup_pulse(70, 120) {
+                Ok(()) | Err(crate::device::DeviceError::Unsupported(_)) => {}
+                Err(_) => return Err(KernelError::KernelDidNotStart),
+            }
+        }
+
         let wakeup = HondaKLineSession::build_wakeup_packet();
         let _ = self.exchange_frame(&wakeup)?;
 

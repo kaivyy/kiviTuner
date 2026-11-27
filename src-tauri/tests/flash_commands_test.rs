@@ -364,3 +364,67 @@ fn live_device_safety_gate_locks_writes_until_unlocked_and_blocks_simulated_seed
     assert!(clear_bus_flight_log_inner(&state) >= 3);
     assert!(get_bus_flight_log_inner(None, &state).is_empty());
 }
+
+#[test]
+fn read_only_non_flashable_live_transport_refuses_flash_even_when_unlocked() {
+    use kivi_flashing::device::{Device, DeviceError, DeviceInfo};
+    use kivi_flashing::j2534_types::{PassThruMsg, ProtocolId};
+    use kivituner::flash_commands::set_experimental_write_unlock_inner;
+
+    struct NonFlashableLiveDevice(MockDevice);
+    impl Device for NonFlashableLiveDevice {
+        fn open(&mut self) -> Result<(), DeviceError> {
+            self.0.open()
+        }
+        fn close(&mut self) -> Result<(), DeviceError> {
+            self.0.close()
+        }
+        fn connect(&mut self, p: ProtocolId, b: u32) -> Result<(), DeviceError> {
+            self.0.connect(p, b)
+        }
+        fn disconnect(&mut self) -> Result<(), DeviceError> {
+            self.0.disconnect()
+        }
+        fn send(&mut self, m: &PassThruMsg) -> Result<(), DeviceError> {
+            self.0.send(m)
+        }
+        fn receive(&mut self) -> Result<PassThruMsg, DeviceError> {
+            self.0.receive()
+        }
+        fn read_voltage_millivolts(&mut self) -> Result<u32, DeviceError> {
+            self.0.read_voltage_millivolts()
+        }
+        fn info(&self) -> DeviceInfo {
+            self.0.info()
+        }
+        fn is_open(&self) -> bool {
+            self.0.is_open()
+        }
+        fn is_connected(&self) -> bool {
+            self.0.is_connected()
+        }
+        fn connected_protocol(&self) -> Option<ProtocolId> {
+            self.0.connected_protocol()
+        }
+        fn is_mock(&self) -> bool {
+            false
+        }
+        fn supports_flashing(&self) -> bool {
+            false
+        }
+    }
+
+    let state = FlashEngineState::default();
+    let mock = MockDevice::new(DeviceKind::ElmWifi, "ELM327 Wi-Fi Clone", TransportKind::Wifi);
+    state.attach_custom_transport(
+        Box::new(NonFlashableLiveDevice(mock)),
+        Box::new(MockKernelSession::new(0x100)),
+        TransportChoice::ElmWifi,
+    );
+    enable_valid_safety(&state, 0x100);
+    set_experimental_write_unlock_inner(true, &state);
+
+    let err = flash_ecu_inner(0, &[0x5A; 0x100], 0x100, &state)
+        .expect_err("ELM327 adapters must never be allowed to flash ECUs");
+    assert!(err.contains("read/diagnostic-only"), "got {err}");
+}

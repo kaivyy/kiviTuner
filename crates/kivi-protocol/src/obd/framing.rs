@@ -25,6 +25,18 @@ pub enum ProtocolSelection {
     /// ISO 15765-4 CAN (11-bit ID, 500 kbaud) via `ATSP6\r` (standard default).
     #[default]
     Can11Bit500k,
+    /// ISO 15765-4 CAN (29-bit ID, 500 kbaud) via `ATSP7\r`.
+    Can29Bit500k,
+    /// ISO 15765-4 CAN (11-bit ID, 250 kbaud) via `ATSP8\r`.
+    Can11Bit250k,
+    /// ISO 15765-4 CAN (29-bit ID, 250 kbaud) via `ATSP9\r`.
+    Can29Bit250k,
+    /// ISO 14230-4 KWP2000 Fast Init (10.4 kbaud) via `ATSP5\r`.
+    KwpFastInit,
+    /// ISO 14230-4 KWP2000 5-Baud Init (10.4 kbaud) via `ATSP4\r`.
+    Kwp5BaudInit,
+    /// ISO 9141-2 5-Baud Init (10.4 kbaud) via `ATSP3\r`.
+    Iso9141,
     /// Explicit automatic protocol search via `ATSP0\r`.
     ///
     /// Note: `Auto` initiates an on-bus protocol search during diagnostic queries.
@@ -37,6 +49,12 @@ impl ProtocolSelection {
     pub const fn to_adapter_command(&self) -> AdapterCommand {
         match self {
             Self::Can11Bit500k => AdapterCommand::SetProtocolCan11_500,
+            Self::Can29Bit500k => AdapterCommand::SetProtocolCan29_500,
+            Self::Can11Bit250k => AdapterCommand::SetProtocolCan11_250,
+            Self::Can29Bit250k => AdapterCommand::SetProtocolCan29_250,
+            Self::KwpFastInit => AdapterCommand::SetProtocolKwpFastInit,
+            Self::Kwp5BaudInit => AdapterCommand::SetProtocolKwp5BaudInit,
+            Self::Iso9141 => AdapterCommand::SetProtocolIso9141,
             Self::Auto => AdapterCommand::SetProtocolAuto,
         }
     }
@@ -48,19 +66,28 @@ impl ProtocolSelection {
 /// Does not implement or imply automatic baud probing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 pub enum SerialBaudRate {
+    /// 9,600 baud (legacy serial adapters).
+    Baud9600,
     /// 115,200 baud (standard factory default for STN11xx / OBDLink SX).
     #[default]
     Baud115200,
     /// 38,400 baud (standard factory default for genuine ELM327 and generic clones).
     Baud38400,
+    /// 230,400 baud (high-speed USB-UART bridges).
+    Baud230400,
+    /// 500,000 baud (FTDI high-throughput bridges).
+    Baud500000,
 }
 
 impl SerialBaudRate {
     /// Returns the integer baud rate.
     pub const fn as_u32(&self) -> u32 {
         match self {
+            Self::Baud9600 => 9_600,
             Self::Baud115200 => 115_200,
             Self::Baud38400 => 38_400,
+            Self::Baud230400 => 230_400,
+            Self::Baud500000 => 500_000,
         }
     }
 }

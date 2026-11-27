@@ -22,6 +22,7 @@ pub mod pid;
 pub mod serial;
 pub mod session;
 pub mod transport;
+pub mod wifi;
 
 pub use adapter::{parse_adapter_response, MAX_ISOTP_PAYLOAD_BYTES};
 pub use bitmap::{
@@ -45,3 +46,4 @@ pub use session::{
     is_recognized_adapter_banner, ObdAdapterIdentity, ObdSession, ObdSessionConfig, ObdSessionState,
 };
 pub use transport::ObdTransport;
+pub use wifi::{normalize_wifi_obd_endpoint, WifiObdTransport, DEFAULT_WIFI_OBD_ENDPOINT};

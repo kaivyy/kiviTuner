@@ -12,6 +12,7 @@ use crate::obd::command::ObdCommand;
 use crate::obd::errors::ObdCodecError;
 use crate::obd::framing::{read_framed_response_async, SerialBaudRate};
 use crate::obd::transport::ObdTransport;
+use crate::obd::wifi::NulStrippingAsyncReader;
 
 /// Default provisional settling delay after opening physical serial port (75 ms).
 ///
@@ -154,7 +155,8 @@ impl ObdTransport for SerialObdTransport {
                 expected: "Open".to_string(),
             })?;
 
-        read_framed_response_async(stream, &mut self.buffer, max_bytes, timeout).await
+        let mut clean = NulStrippingAsyncReader(stream);
+        read_framed_response_async(&mut clean, &mut self.buffer, max_bytes, timeout).await
     }
 
     /// Reports whether the transport currently holds an open serial stream handle.

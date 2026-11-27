@@ -36,6 +36,13 @@ pub enum BridgeRequest {
     },
     Receive,
     ReadVoltageMv,
+    ConfigureCanIds {
+        tx_id: u32,
+        rx_id: u32,
+    },
+    SetKlineNoChecksum {
+        enabled: bool,
+    },
     Disconnect,
     Close,
 }
@@ -287,6 +294,8 @@ pub struct BridgedJ2534Device {
     process: Option<BridgeProcess>,
     open: bool,
     protocol: Option<ProtocolId>,
+    kline_no_checksum: bool,
+    can_ids: Option<(u32, u32)>,
 }
 
 impl Drop for BridgedJ2534Device {
@@ -313,6 +322,8 @@ impl BridgedJ2534Device {
             process: None,
             open: false,
             protocol: None,
+            kline_no_checksum: false,
+            can_ids: None,
         }
     }
 
@@ -380,6 +391,14 @@ impl Device for BridgedJ2534Device {
                 self.process = Some(proc);
                 self.open = true;
                 self.protocol = None;
+                if self.kline_no_checksum {
+                    let _ = self.exchange_response(BridgeRequest::SetKlineNoChecksum {
+                        enabled: true,
+                    });
+                }
+                if let Some((tx_id, rx_id)) = self.can_ids {
+                    let _ = self.exchange_response(BridgeRequest::ConfigureCanIds { tx_id, rx_id });
+                }
                 Ok(())
             }
             Ok(BridgeResponse::Err {
@@ -525,6 +544,24 @@ impl Device for BridgedJ2534Device {
 
     fn is_mock(&self) -> bool {
         false
+    }
+
+    fn configure_can_ids(&mut self, tx_id: u32, rx_id: u32) -> Result<(), DeviceError> {
+        self.can_ids = Some((tx_id, rx_id));
+        if !self.open {
+            return Ok(());
+        }
+        match self.exchange_response(BridgeRequest::ConfigureCanIds { tx_id, rx_id })? {
+            BridgeResponse::Ok => Ok(()),
+            _ => Err(DeviceError::Transport("unexpected bridge configure_can_ids reply".into())),
+        }
+    }
+
+    fn set_kline_no_checksum(&mut self, enabled: bool) {
+        self.kline_no_checksum = enabled;
+        if self.open {
+            let _ = self.exchange_response(BridgeRequest::SetKlineNoChecksum { enabled });
+        }
     }
 }
 
@@ -682,6 +719,35 @@ where
                 ),
             }
         }
+        BridgeRequest::ConfigureCanIds { tx_id, rx_id } => {
+            let Some(dev) = dev_slot.as_mut() else {
+                return (device_error_to_bridge(DeviceError::NotOpen), false);
+            };
+            let res = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                dev.configure_can_ids(tx_id, rx_id)
+            }));
+            match res {
+                Ok(Ok(())) => (BridgeResponse::Ok, false),
+                Ok(Err(e)) => (device_error_to_bridge(e), false),
+                Err(_) => (
+                    BridgeResponse::Err {
+                        kind: BridgeErrorKind::Transport,
+                        code: None,
+                        message: "J2534 driver panicked during ConfigureCanIds".into(),
+                    },
+                    false,
+                ),
+            }
+        }
+        BridgeRequest::SetKlineNoChecksum { enabled } => {
+            let Some(dev) = dev_slot.as_mut() else {
+                return (device_error_to_bridge(DeviceError::NotOpen), false);
+            };
+            let _ = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                dev.set_kline_no_checksum(enabled);
+            }));
+            (BridgeResponse::Ok, false)
+        }
         BridgeRequest::Disconnect => {
             let Some(dev) = dev_slot.as_mut() else {
                 return (device_error_to_bridge(DeviceError::NotOpen), false);
@@ -806,6 +872,12 @@ mod tests {
             })
             .unwrap(),
             serde_json::to_string(&BridgeRequest::Receive).unwrap(),
+            serde_json::to_string(&BridgeRequest::ConfigureCanIds {
+                tx_id: 0x7E1,
+                rx_id: 0x7E9,
+            })
+            .unwrap(),
+            serde_json::to_string(&BridgeRequest::SetKlineNoChecksum { enabled: true }).unwrap(),
             serde_json::to_string(&BridgeRequest::Disconnect).unwrap(),
             serde_json::to_string(&BridgeRequest::Close).unwrap(),
         ]
@@ -829,7 +901,7 @@ mod tests {
             .map(|l| serde_json::from_str::<BridgeResponse>(l).unwrap())
             .collect();
 
-        assert_eq!(lines.len(), 8);
+        assert_eq!(lines.len(), 10);
         assert!(matches!(lines[0], BridgeResponse::Pong { .. }));
         assert!(matches!(lines[1], BridgeResponse::OpenOk { .. }));
         assert_eq!(lines[2], BridgeResponse::Ok);
@@ -846,6 +918,8 @@ mod tests {
         );
         assert_eq!(lines[6], BridgeResponse::Ok);
         assert_eq!(lines[7], BridgeResponse::Ok);
+        assert_eq!(lines[8], BridgeResponse::Ok);
+        assert_eq!(lines[9], BridgeResponse::Ok);
     }
 
     #[test]

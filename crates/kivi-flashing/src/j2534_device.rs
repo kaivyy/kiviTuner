@@ -56,6 +56,32 @@ fn map_ffi_error(e: FfiError) -> DeviceError {
     }
 }
 
+/// Computes J2534 TX flags (adding `ISO15765_FRAME_PAD` by default and `CAN_29BIT_ID` for extended IDs).
+pub fn effective_j2534_tx_flags(proto: ProtocolId, requested_tx_flags: u32, data: &[u8]) -> u32 {
+    let mut flags = requested_tx_flags;
+    if proto.is_iso15765() && flags == 0 {
+        flags |= tx_flags::ISO15765_FRAME_PAD;
+    }
+    if (proto.is_iso15765() || proto == ProtocolId::Can) && data.len() >= 4 {
+        let can_id = u32::from_be_bytes([data[0], data[1], data[2], data[3]]);
+        if can_id > 0x7FF {
+            flags |= tx_flags::CAN_29BIT_ID;
+        }
+    }
+    flags
+}
+
+/// Computes `PassThruConnect` flags for CAN 29-bit and K-Line raw no-checksum modes.
+pub fn j2534_connect_flags(protocol: ProtocolId, is_29bit: bool, kline_no_checksum: bool) -> u32 {
+    if is_29bit && (protocol.is_iso15765() || protocol == ProtocolId::Can) {
+        connect_flags::CAN_29BIT_ID
+    } else if kline_no_checksum && matches!(protocol, ProtocolId::Iso9141 | ProtocolId::Iso14230) {
+        connect_flags::ISO9141_NO_CHECKSUM | connect_flags::ISO9141_K_LINE_ONLY
+    } else {
+        0
+    }
+}
+
 /// A real J2534 interface presented through the [`Device`] trait.
 ///
 /// Construct with [`J2534Device::unloaded`] and call [`Device::open`] to load
@@ -68,6 +94,8 @@ pub struct J2534Device {
     device_id: Option<u32>,
     channel_id: Option<u32>,
     protocol: Option<ProtocolId>,
+    baud_rate: u32,
+    kline_no_checksum: bool,
     read_timeout_ms: u32,
     tx_can_id: u32,
     rx_can_id: u32,
@@ -97,6 +125,8 @@ impl J2534Device {
             device_id: None,
             channel_id: None,
             protocol: None,
+            baud_rate: 500_000,
+            kline_no_checksum: false,
             read_timeout_ms: 1000,
             tx_can_id: 0x07E0,
             rx_can_id: 0x07E8,
@@ -204,16 +234,13 @@ impl Device for J2534Device {
         }
 
         let is_29bit = self.tx_can_id > 0x7FF || self.rx_can_id > 0x7FF;
-        let conn_flags = if is_29bit && (protocol.is_iso15765() || protocol == ProtocolId::Can) {
-            connect_flags::CAN_29BIT_ID
-        } else {
-            0
-        };
+        let conn_flags = j2534_connect_flags(protocol, is_29bit, self.kline_no_checksum);
         let channel = entry
             .connect(device_id, protocol.as_u32(), conn_flags, baud_rate)
             .map_err(map_ffi_error)?;
         self.channel_id = Some(channel);
         self.protocol = Some(protocol);
+        self.baud_rate = baud_rate;
 
         // SAE J2534 blocks all incoming RX frames until a channel filter is active:
         // ISO 15765-2 needs a flow-control filter; raw CAN and K-Line/VPW/PWM need
@@ -297,7 +324,17 @@ impl Device for J2534Device {
     fn send(&mut self, msg: &PassThruMsg) -> Result<(), DeviceError> {
         let entry = self.entry.as_ref().ok_or(DeviceError::NotOpen)?;
         let channel = self.channel_id.ok_or(DeviceError::NotConnected)?;
-        let abi = PassthruMsgAbi::try_from_msg(msg)?;
+        let proto = self.protocol.unwrap_or(msg.protocol_id);
+        let eff_flags = effective_j2534_tx_flags(proto, msg.tx_flags, &msg.data);
+        let normalized = PassThruMsg {
+            protocol_id: msg.protocol_id,
+            rx_status: msg.rx_status,
+            tx_flags: eff_flags,
+            timestamp: msg.timestamp,
+            data: msg.data.clone(),
+            extra_data_index: msg.extra_data_index,
+        };
+        let abi = PassthruMsgAbi::try_from_msg(&normalized)?;
         entry
             .write_msg(channel, &abi, 2000)
             .map(|_| ())
@@ -377,5 +414,24 @@ impl Device for J2534Device {
 
     fn is_mock(&self) -> bool {
         false
+    }
+
+    fn configure_can_ids(&mut self, tx_id: u32, rx_id: u32) -> Result<(), DeviceError> {
+        let changed = self.tx_can_id != tx_id || self.rx_can_id != rx_id;
+        self.tx_can_id = tx_id;
+        self.rx_can_id = rx_id;
+        if changed {
+            if let Some(proto) = self.protocol {
+                if proto.is_iso15765() || proto == ProtocolId::Can {
+                    let baud = self.baud_rate;
+                    self.connect(proto, baud)?;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn set_kline_no_checksum(&mut self, enabled: bool) {
+        self.kline_no_checksum = enabled;
     }
 }

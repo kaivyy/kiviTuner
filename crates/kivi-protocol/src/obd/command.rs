@@ -90,6 +90,18 @@ pub enum AdapterCommand {
     AdaptiveTimingAuto,
     /// Set protocol to ISO 15765-4 CAN (11 bit ID, 500 kbaud) ("ATSP6\r").
     SetProtocolCan11_500,
+    /// Set protocol to ISO 15765-4 CAN (29 bit ID, 500 kbaud) ("ATSP7\r").
+    SetProtocolCan29_500,
+    /// Set protocol to ISO 15765-4 CAN (11 bit ID, 250 kbaud) ("ATSP8\r").
+    SetProtocolCan11_250,
+    /// Set protocol to ISO 15765-4 CAN (29 bit ID, 250 kbaud) ("ATSP9\r").
+    SetProtocolCan29_250,
+    /// Set protocol to ISO 14230-4 KWP2000 Fast Init ("ATSP5\r").
+    SetProtocolKwpFastInit,
+    /// Set protocol to ISO 14230-4 KWP2000 5-Baud Init ("ATSP4\r").
+    SetProtocolKwp5BaudInit,
+    /// Set protocol to ISO 9141-2 5-Baud Init ("ATSP3\r").
+    SetProtocolIso9141,
     /// Set protocol to automatic search ("ATSP0\r").
     SetProtocolAuto,
     /// Read adapter input battery voltage ("ATRV\r").
@@ -151,6 +163,12 @@ impl ObdCommand {
                 AdapterCommand::HeadersOff => "ATH0\r",
                 AdapterCommand::AdaptiveTimingAuto => "ATAT1\r",
                 AdapterCommand::SetProtocolCan11_500 => "ATSP6\r",
+                AdapterCommand::SetProtocolCan29_500 => "ATSP7\r",
+                AdapterCommand::SetProtocolCan11_250 => "ATSP8\r",
+                AdapterCommand::SetProtocolCan29_250 => "ATSP9\r",
+                AdapterCommand::SetProtocolKwpFastInit => "ATSP5\r",
+                AdapterCommand::SetProtocolKwp5BaudInit => "ATSP4\r",
+                AdapterCommand::SetProtocolIso9141 => "ATSP3\r",
                 AdapterCommand::SetProtocolAuto => "ATSP0\r",
                 AdapterCommand::ReadVoltage => "ATRV\r",
                 AdapterCommand::ReadProtocol => "ATDPN\r",

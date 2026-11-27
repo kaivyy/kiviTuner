@@ -55,7 +55,41 @@ export interface AutoConnectOutcome {
   attempts: string[];
 }
 
-export type TransportChoice = 'j2534' | 'openport2' | 'serial' | 'doip' | 'socketcan';
+export type TransportChoice =
+  | 'j2534'
+  | 'openport2'
+  | 'serial'
+  | 'elm_wifi'
+  | 'kline_serial'
+  | 'doip'
+  | 'socketcan';
+
+export type ElmBusProfile =
+  | 'auto'
+  | 'can_11bit_500k'
+  | 'can_29bit_500k'
+  | 'can_11bit_250k'
+  | 'can_29bit_250k'
+  | 'kwp_fast_init'
+  | 'kwp_5baud_init'
+  | 'iso9141'
+  | 'j1850_pwm'
+  | 'j1850_vpw'
+  | 'kawasaki_kds'
+  | 'suzuki_sds'
+  | 'honda_kline_experimental';
+
+export interface ElmCapabilityReport {
+  adapter_banner: string;
+  chip_tier: string;
+  active_protocol: string;
+  supports_atsh: boolean;
+  supports_atcaf0: boolean;
+  supports_kline_atsp5: boolean;
+  supports_atbi: boolean;
+  supports_st_commands: boolean;
+  warnings: string[];
+}
 
 function normalizeTransportChoice(raw: string | null): TransportChoice | null {
   if (!raw) return null;
@@ -64,6 +98,8 @@ function normalizeTransportChoice(raw: string | null): TransportChoice | null {
     lowered === 'j2534' ||
     lowered === 'openport2' ||
     lowered === 'serial' ||
+    lowered === 'elm_wifi' ||
+    lowered === 'kline_serial' ||
     lowered === 'doip' ||
     lowered === 'socketcan'
   ) {
@@ -186,11 +222,76 @@ export async function bridgeAttachOpenPort2Transport(port: string): Promise<stri
 
 export async function bridgeAttachSerialTransport(
   port: string,
+  baudRate?: number,
+  busProfile?: ElmBusProfile
+): Promise<string | null> {
+  if (isDesktopApp()) {
+    try {
+      await invoke<number>('attach_serial_transport', {
+        port,
+        baudRate: baudRate ?? null,
+        busProfile: busProfile ?? null,
+      });
+      return null;
+    } catch (err) {
+      return String(err);
+    }
+  }
+  return 'No desktop backend available.';
+}
+
+export async function bridgeAttachElmWifiTransport(
+  hostPort: string,
+  busProfile?: ElmBusProfile
+): Promise<string | null> {
+  if (isDesktopApp()) {
+    try {
+      await invoke<void>('attach_elm_wifi_transport', {
+        hostPort,
+        busProfile: busProfile ?? null,
+      });
+      return null;
+    } catch (err) {
+      return String(err);
+    }
+  }
+  return 'No desktop backend available.';
+}
+
+export async function bridgeAttachKLineSerialTransport(
+  port: string,
   baudRate?: number
 ): Promise<string | null> {
   if (isDesktopApp()) {
     try {
-      await invoke<void>('attach_serial_transport', { port, baudRate: baudRate ?? null });
+      await invoke<void>('attach_kline_serial_transport', {
+        port,
+        baudRate: baudRate ?? null,
+      });
+      return null;
+    } catch (err) {
+      return String(err);
+    }
+  }
+  return 'No desktop backend available.';
+}
+
+export async function bridgeReconfigureTransportProtocol(
+  protocol: string,
+  baudRate: number,
+  txCanId?: number,
+  rxCanId?: number,
+  klineNoChecksum?: boolean
+): Promise<string | null> {
+  if (isDesktopApp()) {
+    try {
+      await invoke<void>('reconfigure_transport_protocol', {
+        protocol,
+        baudRate,
+        txCanId: txCanId ?? null,
+        rxCanId: rxCanId ?? null,
+        klineNoChecksum: klineNoChecksum ?? null,
+      });
       return null;
     } catch (err) {
       return String(err);
@@ -519,6 +620,16 @@ export async function bridgeDiagEcuReset(
         : null,
     notes: Array.isArray(raw.notes) ? raw.notes.map(String) : [],
   };
+}
+
+export async function bridgeDiagProbeElmCapabilities(): Promise<ElmCapabilityReport | null> {
+  if (!isDesktopApp()) return null;
+  return await invoke<ElmCapabilityReport>('diag_probe_elm_capabilities');
+}
+
+export async function bridgeDiagSendRawCommand(command: string): Promise<string | null> {
+  if (!isDesktopApp()) return null;
+  return await invoke<string>('diag_send_raw_command', { command });
 }
 
 export type HardwareVerificationTier =

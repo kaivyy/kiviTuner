@@ -31,6 +31,10 @@ pub enum DeviceKind {
     OpenPort2,
     /// A raw serial / USB-CDC adapter (ELM327, OBDX Pro, …).
     Serial,
+    /// Wireless ELM327 / STN adapter over TCP socket (e.g. `192.168.0.10:35000`).
+    ElmWifi,
+    /// Raw USB-UART K-Line cable (FTDI / CH340 KKL 409.1) with direct line-break wake-up.
+    KLineSerial,
     /// Diagnostics over IP (ISO 13400).
     DoIp,
     /// Native Linux SocketCAN interface (`can0`, `vcan0`, ...).
@@ -46,6 +50,8 @@ impl DeviceKind {
             DeviceKind::J2534 => "j2534",
             DeviceKind::OpenPort2 => "openport2",
             DeviceKind::Serial => "serial",
+            DeviceKind::ElmWifi => "elm_wifi",
+            DeviceKind::KLineSerial => "kline_serial",
             DeviceKind::DoIp => "doip",
             DeviceKind::SocketCan => "socketcan",
             #[cfg(any(test, feature = "test-doubles"))]
@@ -60,6 +66,7 @@ pub enum TransportKind {
     Usb,
     Serial,
     Ethernet,
+    Wifi,
     Bluetooth,
     Can,
     /// A test double with no physical link.
@@ -73,6 +80,7 @@ impl TransportKind {
             TransportKind::Usb => "Usb",
             TransportKind::Serial => "Serial",
             TransportKind::Ethernet => "Ethernet",
+            TransportKind::Wifi => "Wifi",
             TransportKind::Bluetooth => "Bluetooth",
             TransportKind::Can => "Can",
             #[cfg(any(test, feature = "test-doubles"))]
@@ -159,6 +167,28 @@ pub trait Device {
     /// Whether `Can` / `Iso15765` frames carry a 4-byte BE CAN arbitration ID prefix on TX and RX.
     fn uses_can_id_prefix(&self) -> bool {
         true
+    }
+    /// Whether this adapter can sustain ECU ROM flashing (ELM327 AT bridges return `false`).
+    fn supports_flashing(&self) -> bool {
+        true
+    }
+    /// Updates active ISO-TP / CAN TX and RX arbitration IDs (re-applying filters if connected).
+    fn configure_can_ids(&mut self, _tx_id: u32, _rx_id: u32) -> Result<(), DeviceError> {
+        Ok(())
+    }
+    /// Enables or disables `ISO9141_NO_CHECKSUM` framing for raw K-Line protocols (e.g. Honda bike).
+    fn set_kline_no_checksum(&mut self, _enabled: bool) {}
+    /// Issues a physical K-Line wake-up break pulse (`low_ms` LOW, then `high_ms` HIGH).
+    fn kline_wakeup_pulse(&mut self, _low_ms: u64, _high_ms: u64) -> Result<(), DeviceError> {
+        Err(DeviceError::Unsupported(
+            "K-Line wakeup pulse not supported",
+        ))
+    }
+    /// Sends a raw ASCII AT / command line on text-bridge adapters (ELM327 / STN).
+    fn send_raw_command(&mut self, _cmd: &str) -> Result<String, DeviceError> {
+        Err(DeviceError::Unsupported(
+            "raw text command not supported",
+        ))
     }
 }
 
@@ -398,5 +428,20 @@ impl<T: Device + ?Sized> Device for Box<T> {
 
     fn uses_can_id_prefix(&self) -> bool {
         (**self).uses_can_id_prefix()
+    }
+    fn supports_flashing(&self) -> bool {
+        (**self).supports_flashing()
+    }
+    fn configure_can_ids(&mut self, tx_id: u32, rx_id: u32) -> Result<(), DeviceError> {
+        (**self).configure_can_ids(tx_id, rx_id)
+    }
+    fn set_kline_no_checksum(&mut self, enabled: bool) {
+        (**self).set_kline_no_checksum(enabled)
+    }
+    fn kline_wakeup_pulse(&mut self, low_ms: u64, high_ms: u64) -> Result<(), DeviceError> {
+        (**self).kline_wakeup_pulse(low_ms, high_ms)
+    }
+    fn send_raw_command(&mut self, cmd: &str) -> Result<String, DeviceError> {
+        (**self).send_raw_command(cmd)
     }
 }

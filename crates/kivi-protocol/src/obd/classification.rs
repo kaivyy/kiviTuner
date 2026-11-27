@@ -28,6 +28,12 @@ pub fn classify_command(cmd: &ObdCommand) -> CommandClassification {
             | AdapterCommand::HeadersOff
             | AdapterCommand::AdaptiveTimingAuto
             | AdapterCommand::SetProtocolCan11_500
+            | AdapterCommand::SetProtocolCan29_500
+            | AdapterCommand::SetProtocolCan11_250
+            | AdapterCommand::SetProtocolCan29_250
+            | AdapterCommand::SetProtocolKwpFastInit
+            | AdapterCommand::SetProtocolKwp5BaudInit
+            | AdapterCommand::SetProtocolIso9141
             | AdapterCommand::SetProtocolAuto => CommandClassification::AdapterConfiguration,
             AdapterCommand::ReadVoltage
             | AdapterCommand::ReadProtocol

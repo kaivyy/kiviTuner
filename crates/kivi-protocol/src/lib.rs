@@ -43,8 +43,8 @@ pub use obd::{
     CommandClassification, DecodedMode01Value, Mode01Pid, Mode09Item, Obd2Driver,
     Obd2DriverConfig, ObdAdapterIdentity, ObdCodecError, ObdCommand, ObdSession, ObdSessionConfig,
     ObdSessionState, ObdTransport, PidBitmapCoordinates, ProtocolSelection, SerialBaudRate,
-    SerialObdTransport, SupportedPidsBitmap, WidebandO2Sample, DEFAULT_MAX_TEXT_RESPONSE_BYTES,
-    MAX_ISOTP_PAYLOAD_BYTES,
+    SerialObdTransport, SupportedPidsBitmap, WidebandO2Sample, WifiObdTransport,
+    DEFAULT_MAX_TEXT_RESPONSE_BYTES, DEFAULT_WIFI_OBD_ENDPOINT, MAX_ISOTP_PAYLOAD_BYTES,
 };
 #[cfg(any(test, feature = "test-doubles"))]
 pub use obd::MockObdTransport;

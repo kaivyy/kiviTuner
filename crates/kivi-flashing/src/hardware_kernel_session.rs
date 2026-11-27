@@ -92,6 +92,26 @@ impl Device for SharedDevice {
             .unwrap_or_else(|e| e.into_inner())
             .uses_can_id_prefix()
     }
+    fn supports_flashing(&self) -> bool {
+        self.0
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .supports_flashing()
+    }
+    fn configure_can_ids(&mut self, tx_id: u32, rx_id: u32) -> Result<(), DeviceError> {
+        self.lock_device()?.configure_can_ids(tx_id, rx_id)
+    }
+    fn set_kline_no_checksum(&mut self, enabled: bool) {
+        if let Ok(mut d) = self.lock_device() {
+            d.set_kline_no_checksum(enabled);
+        }
+    }
+    fn kline_wakeup_pulse(&mut self, low_ms: u64, high_ms: u64) -> Result<(), DeviceError> {
+        self.lock_device()?.kline_wakeup_pulse(low_ms, high_ms)
+    }
+    fn send_raw_command(&mut self, cmd: &str) -> Result<String, DeviceError> {
+        self.lock_device()?.send_raw_command(cmd)
+    }
 }
 
 pub struct UdsHardwareKernelSession {

@@ -111,8 +111,13 @@ impl ElmResponse {
     /// before hex decoding, so a `SEARCHING...` prefix does not corrupt the
     /// payload.
     pub fn parse(raw: &str) -> Self {
-        // Normalise line endings and drop the prompt.
-        let cleaned: String = raw
+        // Strip NUL bytes and non-printable serial/CH340 framing noise emitted during reset,
+        // normalise line endings, and drop the terminating prompt.
+        let sanitized: String = raw
+            .chars()
+            .filter(|&c| c == '\r' || c == '\n' || c == '\t' || (' '..='~').contains(&c))
+            .collect();
+        let cleaned: String = sanitized
             .replace(['\r', '\n'], "\n")
             .lines()
             .map(|l| l.trim())

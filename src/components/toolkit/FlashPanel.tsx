@@ -29,16 +29,20 @@ import {
 } from 'lucide-react';
 import {
   runAttachDoIp,
+  runAttachElmWifi,
   runAttachJ2534,
+  runAttachKLineSerial,
   runAttachOpenPort2,
-  runAttachSerial,
+  runAttachSerialConfigured,
   runAttachSocketCan,
   runAutoConnectTransport,
   runClearDtcs,
   runDetachTransport,
   runEcuReset,
+  runProbeElmCapabilities,
   runReadDtcs,
   runReadEcuInfo,
+  runReconfigureTransport,
   runSelectedTransport,
   summariseDtcRead,
   summariseEcuInfo,
@@ -57,6 +61,8 @@ import {
   type EcuIdentitySummary,
   type EcuResetMode,
   type EcuResetOutcome,
+  type ElmBusProfile,
+  type ElmCapabilityReport,
   type FlashDeviceView,
   type FlashState,
   type SerialPortView,
@@ -192,6 +198,13 @@ export const FlashPanel: React.FC<FlashPanelProps> = ({
 
   const [doipHost, setDoipHost] = useState('192.168.0.10:13400');
   const [canIface, setCanIface] = useState('can0');
+  const [elmBaudRate, setElmBaudRate] = useState<number | undefined>(undefined);
+  const [elmBusProfile, setElmBusProfile] = useState<ElmBusProfile>('auto');
+  const [elmWifiEndpoint, setElmWifiEndpoint] = useState('192.168.0.10:35000');
+  const [klineBaudRate, setKlineBaudRate] = useState<number>(10400);
+  const [elmCapabilities, setElmCapabilities] = useState<FlashState<ElmCapabilityReport> | null>(
+    null
+  );
   const [dumpState, setDumpState] = useState<FlashState<DumpResultPayload> | null>(null);
   const [udsDumpState, setUdsDumpState] = useState<FlashState<UdsDumpPayload> | null>(null);
   const [flashState, setFlashState] = useState<FlashState<FlashResultPayload> | null>(null);
@@ -395,12 +408,15 @@ export const FlashPanel: React.FC<FlashPanelProps> = ({
     async (overridePort?: string) => {
       const targetPort = overridePort ?? serialPort;
       if (overridePort) setSerialPort(overridePort);
-      const s = await runAttachSerial(targetPort);
+      setElmCapabilities(null);
+      const s = await runAttachSerialConfigured(targetPort, elmBaudRate, elmBusProfile);
       setTransport(s.choice);
       setTransportError(s.error);
       pushLog(
         s.error ? 'error' : 'ok',
-        s.error ? `Serial attach failed: ${s.error}` : `Attached ELM327 serial adapter on ${targetPort}.`
+        s.error
+          ? `Serial attach failed: ${s.error}`
+          : `Attached ELM327 serial adapter on ${targetPort} (profile: ${elmBusProfile}, baud: ${elmBaudRate ?? 'auto'}).`
       );
       if (!s.error && s.choice === 'serial') {
         setPanelTab('diagnostics');
@@ -408,7 +424,85 @@ export const FlashPanel: React.FC<FlashPanelProps> = ({
       }
       await refreshDevices();
     },
-    [serialPort, refreshDevices, pushLog]
+    [serialPort, elmBaudRate, elmBusProfile, refreshDevices, pushLog]
+  );
+
+  const attachElmWifi = useCallback(async () => {
+    setElmCapabilities(null);
+    const s = await runAttachElmWifi(elmWifiEndpoint, elmBusProfile);
+    setTransport(s.choice);
+    setTransportError(s.error);
+    pushLog(
+      s.error ? 'error' : 'ok',
+      s.error
+        ? `ELM327 Wi-Fi attach failed: ${s.error}`
+        : `Attached ELM327 Wi-Fi adapter at ${elmWifiEndpoint} (profile: ${elmBusProfile}).`
+    );
+    if (!s.error && s.choice === 'elm_wifi') {
+      setPanelTab('diagnostics');
+    }
+    await refreshDevices();
+  }, [elmWifiEndpoint, elmBusProfile, refreshDevices, pushLog]);
+
+  const attachKLineSerial = useCallback(
+    async (overridePort?: string) => {
+      const targetPort = overridePort ?? serialPort;
+      if (overridePort) setSerialPort(overridePort);
+      setElmCapabilities(null);
+      const s = await runAttachKLineSerial(targetPort, klineBaudRate);
+      setTransport(s.choice);
+      setTransportError(s.error);
+      pushLog(
+        s.error ? 'error' : 'ok',
+        s.error
+          ? `Raw K-Line attach failed: ${s.error}`
+          : `Attached Raw K-Line USB cable on ${targetPort} @ ${klineBaudRate} bps.`
+      );
+      await refreshDevices();
+    },
+    [serialPort, klineBaudRate, refreshDevices, pushLog]
+  );
+
+  const handleProbeElmCapabilities = useCallback(async () => {
+    const res = await runProbeElmCapabilities();
+    setElmCapabilities(res);
+    if (res.kind === 'ok') {
+      pushLog(
+        'info',
+        `ELM probe: ${res.data.adapter_banner} [${res.data.chip_tier}] (ATSH:${res.data.supports_atsh}, CAF0:${res.data.supports_atcaf0}, KWP5:${res.data.supports_kline_atsp5}).`
+      );
+    } else {
+      pushLog('warn', `ELM probe: ${res.message}`);
+    }
+  }, [pushLog]);
+
+  const handleReconfigureTransport = useCallback(
+    async (
+      protocol: string,
+      baudRate: number,
+      txCanIdHex: string,
+      rxCanIdHex: string,
+      klineNoChecksum: boolean
+    ) => {
+      const txId = parseHexOrDec(txCanIdHex);
+      const rxId = parseHexOrDec(rxCanIdHex);
+      const err = await runReconfigureTransport(
+        protocol,
+        baudRate,
+        txId ?? undefined,
+        rxId ?? undefined,
+        klineNoChecksum
+      );
+      setTransportError(err);
+      pushLog(
+        err ? 'error' : 'ok',
+        err
+          ? `Protocol override failed: ${err}`
+          : `Reconfigured channel to ${protocol} @ ${baudRate} bps.`
+      );
+      await refreshDevices();
+    },
+    [pushLog, refreshDevices]
   );
 
   const handleAutoConnect = useCallback(async () => {
@@ -859,6 +953,16 @@ export const FlashPanel: React.FC<FlashPanelProps> = ({
             serialPorts={serialPorts}
             serialPort={serialPort}
             onChangeSerialPort={setSerialPort}
+            elmBaudRate={elmBaudRate}
+            onChangeElmBaudRate={setElmBaudRate}
+            elmBusProfile={elmBusProfile}
+            onChangeElmBusProfile={setElmBusProfile}
+            elmWifiEndpoint={elmWifiEndpoint}
+            onChangeElmWifiEndpoint={setElmWifiEndpoint}
+            klineBaudRate={klineBaudRate}
+            onChangeKlineBaudRate={setKlineBaudRate}
+            elmCapabilities={elmCapabilities}
+            onProbeElmCapabilities={() => void handleProbeElmCapabilities()}
             doipHost={doipHost}
             onChangeDoipHost={setDoipHost}
             canIface={canIface}
@@ -868,6 +972,11 @@ export const FlashPanel: React.FC<FlashPanelProps> = ({
             onDetach={() => void detachTransport()}
             onAttachOpenPort2={(port) => void attachOpenPort2(port)}
             onAttachSerial={(port) => void attachSerial(port)}
+            onAttachElmWifi={() => void attachElmWifi()}
+            onAttachKLineSerial={(port) => void attachKLineSerial(port)}
+            onReconfigureTransport={(p, b, tx, rx, noCs) =>
+              void handleReconfigureTransport(p, b, tx, rx, noCs)
+            }
             onAttachJ2534={(path) => void attachJ2534(path)}
             onAttachDoIp={() => void attachDoIp()}
             onAttachSocketCan={() => void attachSocketCan()}

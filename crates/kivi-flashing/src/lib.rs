@@ -109,6 +109,7 @@ pub mod j2534_ffi;
 pub mod j2534_loader;
 pub mod j2534_types;
 pub mod kernel_session;
+pub mod kline_serial_device;
 pub mod lzss_container;
 pub mod module_registry;
 pub mod moto_ecu_db;

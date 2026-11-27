@@ -9,7 +9,7 @@
 
 use crate::bus_silencing::BusSilencingInterlock;
 use crate::device::{Device, DeviceError};
-use crate::j2534_types::{PassThruMsg, ProtocolId};
+use crate::j2534_types::{tx_flags, PassThruMsg, ProtocolId};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -116,22 +116,28 @@ fn protocol_label(proto: ProtocolId) -> String {
     format!("{proto:?}")
 }
 
-fn exchange_diag(
+fn exchange_diag_target(
     device: &mut dyn Device,
     proto: ProtocolId,
+    tx_can_id: u32,
     tx: &[u8],
 ) -> Result<Vec<u8>, QuickDiagError> {
     let use_can_prefix =
         device.uses_can_id_prefix() && matches!(proto, ProtocolId::Iso15765 | ProtocolId::Can);
     let wire = if use_can_prefix {
         let mut v = Vec::with_capacity(4 + tx.len());
-        v.extend_from_slice(&0x0000_07E0u32.to_be_bytes());
+        v.extend_from_slice(&tx_can_id.to_be_bytes());
         v.extend_from_slice(tx);
         v
     } else {
         tx.to_vec()
     };
-    device.send(&PassThruMsg::new(proto, wire))?;
+    let flags = if use_can_prefix {
+        tx_flags::ISO15765_FRAME_PAD | if tx_can_id > 0x7FF { tx_flags::CAN_29BIT_ID } else { 0 }
+    } else {
+        0
+    };
+    device.send(&PassThruMsg::with_flags(proto, flags, wire))?;
     for _ in 0..=MAX_PENDING_RETRIES {
         let reply = device.receive()?;
         let body = if use_can_prefix {
@@ -275,9 +281,35 @@ fn uds_status_label(mask: u8) -> String {
     }
 }
 
+fn derive_rx_can_id_for_diag(tx_id: u32) -> u32 {
+    if tx_id == 0x7DF {
+        0x7E8
+    } else if (tx_id >> 16) == 0x18DA {
+        (tx_id & 0xFFFF_0000) | ((tx_id & 0xFF) << 8) | ((tx_id >> 8) & 0xFF)
+    } else {
+        tx_id.wrapping_add(8)
+    }
+}
+
+fn prepare_diag_target(device: &mut dyn Device, proto: ProtocolId, tx_can_id: u32) -> Result<(), QuickDiagError> {
+    if tx_can_id != 0x0000_07E0 && matches!(proto, ProtocolId::Iso15765 | ProtocolId::Can) {
+        device.configure_can_ids(tx_can_id, derive_rx_can_id_for_diag(tx_can_id))?;
+    }
+    Ok(())
+}
+
 /// Reads battery voltage, VIN, Calibration ID, and CVN from the attached device.
 pub fn read_ecu_identity(device: &mut dyn Device) -> Result<EcuIdentitySummary, QuickDiagError> {
+    read_ecu_identity_for_can_id(device, 0x0000_07E0)
+}
+
+/// Reads battery voltage, VIN, Calibration ID, and CVN from a specific ECU TX CAN ID.
+pub fn read_ecu_identity_for_can_id(
+    device: &mut dyn Device,
+    tx_can_id: u32,
+) -> Result<EcuIdentitySummary, QuickDiagError> {
     let proto = ensure_connected(device)?;
+    prepare_diag_target(device, proto, tx_can_id)?;
     let mut notes = Vec::new();
 
     let battery_mv = match device.read_voltage_millivolts() {
@@ -289,7 +321,7 @@ pub fn read_ecu_identity(device: &mut dyn Device) -> Result<EcuIdentitySummary, 
     };
 
     let mut vin = None;
-    match exchange_diag(device, proto, &[0x22, 0xF1, 0x90]) {
+    match exchange_diag_target(device, proto, tx_can_id, &[0x22, 0xF1, 0x90]) {
         Ok(resp) if resp.len() >= 4 && resp[0] == 0x62 && resp[1] == 0xF1 && resp[2] == 0x90 => {
             vin = extract_ascii_payload(&resp[3..]);
         }
@@ -302,7 +334,7 @@ pub fn read_ecu_identity(device: &mut dyn Device) -> Result<EcuIdentitySummary, 
     }
 
     if vin.is_none() {
-        match exchange_diag(device, proto, &[0x09, 0x02]) {
+        match exchange_diag_target(device, proto, tx_can_id, &[0x09, 0x02]) {
             Ok(resp) => {
                 vin = parse_mode09_ascii(&resp, 0x02);
                 if vin.is_none() {
@@ -314,13 +346,13 @@ pub fn read_ecu_identity(device: &mut dyn Device) -> Result<EcuIdentitySummary, 
     }
 
     let mut cal_id = None;
-    match exchange_diag(device, proto, &[0x09, 0x04]) {
+    match exchange_diag_target(device, proto, tx_can_id, &[0x09, 0x04]) {
         Ok(resp) => cal_id = parse_mode09_ascii(&resp, 0x04),
         Err(err) => notes.push(format!("OBD Mode 09 Cal-ID failed: {err}")),
     }
 
     if cal_id.is_none() {
-        if let Ok(resp) = exchange_diag(device, proto, &[0x22, 0xF1, 0x81]) {
+        if let Ok(resp) = exchange_diag_target(device, proto, tx_can_id, &[0x22, 0xF1, 0x81]) {
             if resp.len() >= 4 && resp[0] == 0x62 && resp[1] == 0xF1 && resp[2] == 0x81 {
                 cal_id = extract_ascii_payload(&resp[3..]);
             }
@@ -328,7 +360,7 @@ pub fn read_ecu_identity(device: &mut dyn Device) -> Result<EcuIdentitySummary, 
     }
 
     let mut cvn = None;
-    match exchange_diag(device, proto, &[0x09, 0x06]) {
+    match exchange_diag_target(device, proto, tx_can_id, &[0x09, 0x06]) {
         Ok(resp) => cvn = parse_mode09_cvn(&resp),
         Err(err) => notes.push(format!("OBD Mode 09 CVN failed: {err}")),
     }
@@ -345,11 +377,20 @@ pub fn read_ecu_identity(device: &mut dyn Device) -> Result<EcuIdentitySummary, 
 
 /// Reads DTCs using UDS `0x19` first, falling back to OBD-II Mode `03`/`07`.
 pub fn read_dtcs(device: &mut dyn Device) -> Result<DtcReadOutcome, QuickDiagError> {
+    read_dtcs_for_can_id(device, 0x0000_07E0)
+}
+
+/// Reads DTCs from a specific ECU TX CAN ID using UDS `0x19` or OBD-II Mode `03`/`07`.
+pub fn read_dtcs_for_can_id(
+    device: &mut dyn Device,
+    tx_can_id: u32,
+) -> Result<DtcReadOutcome, QuickDiagError> {
     let proto = ensure_connected(device)?;
+    prepare_diag_target(device, proto, tx_can_id)?;
     let mut notes = Vec::new();
 
     let uds_req = BusSilencingInterlock::build_read_dtc_by_status_mask(0xFF);
-    match exchange_diag(device, proto, &uds_req) {
+    match exchange_diag_target(device, proto, tx_can_id, &uds_req) {
         Ok(resp) if resp.len() >= 2 && resp[0] == 0x59 && resp[1] == 0x02 => {
             let parsed = BusSilencingInterlock::parse_dtc_list_response(&resp)
                 .map_err(|_| QuickDiagError::UnexpectedResponse {
@@ -382,10 +423,10 @@ pub fn read_dtcs(device: &mut dyn Device) -> Result<DtcReadOutcome, QuickDiagErr
         Err(err) => notes.push(format!("UDS 0x19 failed ({err}); trying OBD Mode 03/07.")),
     }
 
-    let mode03_resp = exchange_diag(device, proto, &[0x03])?;
+    let mode03_resp = exchange_diag_target(device, proto, tx_can_id, &[0x03])?;
     let mut dtcs = parse_obd_dtc_response(&mode03_resp, 0x43, 0x08, "confirmed", "obd_mode03")?;
 
-    match exchange_diag(device, proto, &[0x07]) {
+    match exchange_diag_target(device, proto, tx_can_id, &[0x07]) {
         Ok(mode07_resp) => match parse_obd_dtc_response(
             &mode07_resp,
             0x47,
@@ -414,11 +455,20 @@ pub fn read_dtcs(device: &mut dyn Device) -> Result<DtcReadOutcome, QuickDiagErr
 
 /// Clears fault codes using UDS `0x14` first, falling back to OBD-II Mode `04`.
 pub fn clear_dtcs(device: &mut dyn Device) -> Result<DtcClearOutcome, QuickDiagError> {
+    clear_dtcs_for_can_id(device, 0x0000_07E0)
+}
+
+/// Clears fault codes on a specific ECU TX CAN ID using UDS `0x14` or OBD-II Mode `04`.
+pub fn clear_dtcs_for_can_id(
+    device: &mut dyn Device,
+    tx_can_id: u32,
+) -> Result<DtcClearOutcome, QuickDiagError> {
     let proto = ensure_connected(device)?;
+    prepare_diag_target(device, proto, tx_can_id)?;
     let mut notes = Vec::new();
 
     let uds_clear = BusSilencingInterlock::build_clear_all_dtcs();
-    match exchange_diag(device, proto, &uds_clear) {
+    match exchange_diag_target(device, proto, tx_can_id, &uds_clear) {
         Ok(resp) if resp.first().copied() == Some(0x54) => {
             return Ok(DtcClearOutcome {
                 cleared: true,
@@ -436,7 +486,7 @@ pub fn clear_dtcs(device: &mut dyn Device) -> Result<DtcClearOutcome, QuickDiagE
         Err(err) => notes.push(format!("UDS 0x14 failed ({err}); trying OBD Mode 04.")),
     }
 
-    let mode04_resp = exchange_diag(device, proto, &[0x04])?;
+    let mode04_resp = exchange_diag_target(device, proto, tx_can_id, &[0x04])?;
     check_negative_response(&mode04_resp)?;
     if mode04_resp.first().copied() != Some(0x44) {
         return Err(QuickDiagError::UnexpectedResponse {
@@ -454,8 +504,18 @@ pub fn clear_dtcs(device: &mut dyn Device) -> Result<DtcClearOutcome, QuickDiagE
 
 /// Requests an ECU reset (`Hard`, `KeyOffOn`, or `Soft`) via UDS service `0x11`.
 pub fn ecu_reset(device: &mut dyn Device, mode: EcuResetMode) -> Result<EcuResetOutcome, QuickDiagError> {
+    ecu_reset_for_can_id(device, 0x0000_07E0, mode)
+}
+
+/// Requests a UDS service `0x11` ECU reset against a specific ECU TX CAN ID.
+pub fn ecu_reset_for_can_id(
+    device: &mut dyn Device,
+    tx_can_id: u32,
+    mode: EcuResetMode,
+) -> Result<EcuResetOutcome, QuickDiagError> {
     let proto = ensure_connected(device)?;
-    let resp = exchange_diag(device, proto, &[0x11, mode.subfunction()])?;
+    prepare_diag_target(device, proto, tx_can_id)?;
+    let resp = exchange_diag_target(device, proto, tx_can_id, &[0x11, mode.subfunction()])?;
     check_negative_response(&resp)?;
 
     if resp.len() < 2 || resp[0] != 0x51 {

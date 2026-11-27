@@ -110,3 +110,27 @@ test('auto-connecting flash transport returns null in a browser (no backend)', a
   const { bridgeAutoConnectFlashTransport } = await import('./flashBridge.ts');
   assert.equal(await bridgeAutoConnectFlashTransport(), null);
 });
+
+test('new Phase 1 ELM Wi-Fi, raw K-Line, and protocol override bridges behave cleanly in browser', async () => {
+  const {
+    bridgeAttachElmWifiTransport,
+    bridgeAttachKLineSerialTransport,
+    bridgeReconfigureTransportProtocol,
+    bridgeDiagProbeElmCapabilities,
+    bridgeDiagSendRawCommand,
+  } = await import('./flashBridge.ts');
+  assert.match(
+    (await bridgeAttachElmWifiTransport('192.168.0.10:35000', 'auto')) as string,
+    /no desktop backend/i
+  );
+  assert.match(
+    (await bridgeAttachKLineSerialTransport('/dev/ttyUSB0', 10400)) as string,
+    /no desktop backend/i
+  );
+  assert.match(
+    (await bridgeReconfigureTransportProtocol('iso14230', 10400, undefined, undefined, true)) as string,
+    /no desktop backend/i
+  );
+  assert.equal(await bridgeDiagProbeElmCapabilities(), null);
+  assert.equal(await bridgeDiagSendRawCommand('ATI'), null);
+});

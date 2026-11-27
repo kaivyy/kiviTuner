@@ -230,6 +230,9 @@ fn classify_usb_serial(vid: u16, pid: u16, desc_lower: &str) -> (bool, &'static 
     {
         return (false, "elm327_candidate");
     }
+    if desc_lower.contains("bluetooth") || desc_lower.contains("rfcomm") {
+        return (false, "bluetooth_spp");
+    }
     let is_clone_usb_bridge = matches!(
         (vid, pid),
         (0x0483, 0x5740)
@@ -271,14 +274,25 @@ pub fn list_serial_ports() -> Vec<SerialPortDescriptor> {
                 ("PCI Serial".to_string(), None, None, false, "serial".to_string())
             }
             serialport::SerialPortType::BluetoothPort => (
-                "Bluetooth SPP".to_string(),
+                "Bluetooth SPP (ELM327/OBD candidate)".to_string(),
                 None,
                 None,
                 false,
-                "serial".to_string(),
+                "bluetooth_spp".to_string(),
             ),
             serialport::SerialPortType::Unknown => {
-                ("Serial Port".to_string(), None, None, false, "serial".to_string())
+                let lower = p.port_name.to_ascii_lowercase();
+                if lower.contains("rfcomm") {
+                    (
+                        "Bluetooth RFCOMM Serial".to_string(),
+                        None,
+                        None,
+                        false,
+                        "bluetooth_spp".to_string(),
+                    )
+                } else {
+                    ("Serial Port".to_string(), None, None, false, "serial".to_string())
+                }
             }
         };
         out.push(SerialPortDescriptor {

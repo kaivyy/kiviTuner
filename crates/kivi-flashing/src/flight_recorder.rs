@@ -432,6 +432,100 @@ impl Device for RecordingDevice {
     fn uses_can_id_prefix(&self) -> bool {
         self.inner.uses_can_id_prefix()
     }
+
+    fn supports_flashing(&self) -> bool {
+        self.inner.supports_flashing()
+    }
+
+    fn configure_can_ids(&mut self, tx_id: u32, rx_id: u32) -> Result<(), DeviceError> {
+        let label = self.current_proto_label();
+        match self.inner.configure_can_ids(tx_id, rx_id) {
+            Ok(()) => {
+                self.recorder.record(
+                    label,
+                    self.baud_rate,
+                    BusDirection::Control,
+                    &[],
+                    Some(format!("configure_can_ids: tx=0x{tx_id:X}, rx=0x{rx_id:X}")),
+                );
+                Ok(())
+            }
+            Err(e) => {
+                self.recorder.record(
+                    label,
+                    self.baud_rate,
+                    BusDirection::Error,
+                    &[],
+                    Some(format!("configure_can_ids failed: {e}")),
+                );
+                Err(e)
+            }
+        }
+    }
+
+    fn set_kline_no_checksum(&mut self, enabled: bool) {
+        self.inner.set_kline_no_checksum(enabled);
+    }
+
+    fn kline_wakeup_pulse(&mut self, low_ms: u64, high_ms: u64) -> Result<(), DeviceError> {
+        let label = self.current_proto_label();
+        match self.inner.kline_wakeup_pulse(low_ms, high_ms) {
+            Ok(()) => {
+                self.recorder.record(
+                    label,
+                    self.baud_rate,
+                    BusDirection::Control,
+                    &[],
+                    Some(format!("kline_wakeup_pulse: low={low_ms}ms high={high_ms}ms")),
+                );
+                Ok(())
+            }
+            Err(e) => {
+                self.recorder.record(
+                    label,
+                    self.baud_rate,
+                    BusDirection::Error,
+                    &[],
+                    Some(format!("kline_wakeup_pulse failed: {e}")),
+                );
+                Err(e)
+            }
+        }
+    }
+
+    fn send_raw_command(&mut self, cmd: &str) -> Result<String, DeviceError> {
+        let label = self.current_proto_label();
+        let trimmed = cmd.trim();
+        self.recorder.record(
+            label,
+            self.baud_rate,
+            BusDirection::Tx,
+            trimmed.as_bytes(),
+            Some(format!("raw: {trimmed}")),
+        );
+        match self.inner.send_raw_command(cmd) {
+            Ok(reply) => {
+                self.recorder.record(
+                    label,
+                    self.baud_rate,
+                    BusDirection::Rx,
+                    reply.as_bytes(),
+                    Some(format!("raw_reply: {}", reply.replace(['\r', '\n'], " ").trim())),
+                );
+                Ok(reply)
+            }
+            Err(e) => {
+                self.recorder.record(
+                    label,
+                    self.baud_rate,
+                    BusDirection::Error,
+                    &[],
+                    Some(format!("raw failed ({trimmed}): {e}")),
+                );
+                Err(e)
+            }
+        }
+    }
 }
 
 #[cfg(test)]
