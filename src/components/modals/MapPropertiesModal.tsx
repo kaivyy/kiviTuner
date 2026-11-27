@@ -219,7 +219,7 @@ export const MapPropertiesModal: React.FC<MapPropertiesModalProps> = ({
               id="mp-name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full rounded border border-kiviBorderStrong bg-kiviBg px-2.5 py-1.5 text-xs text-kiviInk focus-visible:outline-2 focus-visible:outline-kiviAccent"
+              className="w-full rounded border border-kiviBorder/70 bg-kiviBg px-2.5 py-1.5 text-xs text-kiviInk focus-visible:outline-2 focus-visible:outline-kiviAccent"
             />
           </div>
 
@@ -231,7 +231,7 @@ export const MapPropertiesModal: React.FC<MapPropertiesModalProps> = ({
               id="mp-cat"
               value={category}
               onChange={(e) => setCategory(e.target.value)}
-              className="w-full rounded border border-kiviBorderStrong bg-kiviBg px-2.5 py-1.5 text-xs text-kiviInk focus-visible:outline-2 focus-visible:outline-kiviAccent"
+              className="w-full rounded border border-kiviBorder/70 bg-kiviBg px-2.5 py-1.5 text-xs text-kiviInk focus-visible:outline-2 focus-visible:outline-kiviAccent"
             />
           </div>
 
@@ -243,7 +243,7 @@ export const MapPropertiesModal: React.FC<MapPropertiesModalProps> = ({
               id="mp-addr"
               value={addressHex}
               onChange={(e) => setAddressHex(e.target.value)}
-              className="w-full rounded border border-kiviBorderStrong bg-kiviBg px-2.5 py-1.5 font-mono text-xs text-kiviInk tabular-nums focus-visible:outline-2 focus-visible:outline-kiviAccent"
+              className="w-full rounded border border-kiviBorder/70 bg-kiviBg px-2.5 py-1.5 font-mono text-xs text-kiviInk tabular-nums focus-visible:outline-2 focus-visible:outline-kiviAccent"
             />
           </div>
 
@@ -259,7 +259,7 @@ export const MapPropertiesModal: React.FC<MapPropertiesModalProps> = ({
                 max={256}
                 value={rows}
                 onChange={(e) => setRows(e.target.value)}
-                className="w-full rounded border border-kiviBorderStrong bg-kiviBg px-2 py-1.5 font-mono text-xs text-kiviInk tabular-nums"
+                className="w-full rounded border border-kiviBorder/70 bg-kiviBg px-2 py-1.5 font-mono text-xs text-kiviInk tabular-nums"
               />
             </div>
             <div>
@@ -273,7 +273,7 @@ export const MapPropertiesModal: React.FC<MapPropertiesModalProps> = ({
                 max={256}
                 value={cols}
                 onChange={(e) => setCols(e.target.value)}
-                className="w-full rounded border border-kiviBorderStrong bg-kiviBg px-2 py-1.5 font-mono text-xs text-kiviInk tabular-nums"
+                className="w-full rounded border border-kiviBorder/70 bg-kiviBg px-2 py-1.5 font-mono text-xs text-kiviInk tabular-nums"
               />
             </div>
           </div>
@@ -286,7 +286,7 @@ export const MapPropertiesModal: React.FC<MapPropertiesModalProps> = ({
               id="mp-dtype"
               value={dtype}
               onChange={(e) => setDtype(e.target.value as DType)}
-              className="w-full rounded border border-kiviBorderStrong bg-kiviBg px-2 py-1.5 font-mono text-xs text-kiviInk"
+              className="w-full rounded border border-kiviBorder/70 bg-kiviBg px-2 py-1.5 font-mono text-xs text-kiviInk"
             >
               {DTYPES.map((d) => (
                 <option key={d} value={d}>
@@ -305,7 +305,7 @@ export const MapPropertiesModal: React.FC<MapPropertiesModalProps> = ({
                 id="mp-endian"
                 value={endian}
                 onChange={(e) => setEndian(e.target.value as Endian)}
-                className="w-full rounded border border-kiviBorderStrong bg-kiviBg px-2 py-1.5 text-xs text-kiviInk"
+                className="w-full rounded border border-kiviBorder/70 bg-kiviBg px-2 py-1.5 text-xs text-kiviInk"
               >
                 <option value="big">Big Endian (BE)</option>
                 <option value="little">Little Endian (LE)</option>
@@ -332,7 +332,7 @@ export const MapPropertiesModal: React.FC<MapPropertiesModalProps> = ({
                 min={0}
                 value={majorStrideBits}
                 onChange={(e) => setMajorStrideBits(e.target.value)}
-                className="w-full rounded border border-kiviBorderStrong bg-kiviBg px-2 py-1.5 font-mono text-xs text-kiviInk tabular-nums"
+                className="w-full rounded border border-kiviBorder/70 bg-kiviBg px-2 py-1.5 font-mono text-xs text-kiviInk tabular-nums"
               />
             </div>
             <div>
@@ -345,7 +345,7 @@ export const MapPropertiesModal: React.FC<MapPropertiesModalProps> = ({
                 min={0}
                 value={minorStrideBits}
                 onChange={(e) => setMinorStrideBits(e.target.value)}
-                className="w-full rounded border border-kiviBorderStrong bg-kiviBg px-2 py-1.5 font-mono text-xs text-kiviInk tabular-nums"
+                className="w-full rounded border border-kiviBorder/70 bg-kiviBg px-2 py-1.5 font-mono text-xs text-kiviInk tabular-nums"
               />
             </div>
           </div>
@@ -359,7 +359,7 @@ export const MapPropertiesModal: React.FC<MapPropertiesModalProps> = ({
                 id="mp-eq"
                 value={equation}
                 onChange={(e) => setEquation(e.target.value)}
-                className="w-full rounded border border-kiviBorderStrong bg-kiviBg px-2 py-1.5 font-mono text-xs text-kiviInk"
+                className="w-full rounded border border-kiviBorder/70 bg-kiviBg px-2 py-1.5 font-mono text-xs text-kiviInk"
               />
             </div>
             <div>
@@ -373,7 +373,7 @@ export const MapPropertiesModal: React.FC<MapPropertiesModalProps> = ({
                 max={6}
                 value={decimals}
                 onChange={(e) => setDecimals(e.target.value)}
-                className="w-full rounded border border-kiviBorderStrong bg-kiviBg px-2 py-1.5 font-mono text-xs text-kiviInk tabular-nums"
+                className="w-full rounded border border-kiviBorder/70 bg-kiviBg px-2 py-1.5 font-mono text-xs text-kiviInk tabular-nums"
               />
             </div>
           </div>
@@ -386,7 +386,7 @@ export const MapPropertiesModal: React.FC<MapPropertiesModalProps> = ({
               id="mp-unit"
               value={unit}
               onChange={(e) => setUnit(e.target.value)}
-              className="w-full rounded border border-kiviBorderStrong bg-kiviBg px-2.5 py-1.5 text-xs text-kiviInk"
+              className="w-full rounded border border-kiviBorder/70 bg-kiviBg px-2.5 py-1.5 text-xs text-kiviInk"
             />
           </div>
 
@@ -399,7 +399,7 @@ export const MapPropertiesModal: React.FC<MapPropertiesModalProps> = ({
               placeholder="e.g. 0, 10, 20, 40, 60, 80, 100"
               value={xValuesCsv}
               onChange={(e) => setXValuesCsv(e.target.value)}
-              className="w-full rounded border border-kiviBorderStrong bg-kiviBg px-2.5 py-1.5 font-mono text-xs text-kiviInk"
+              className="w-full rounded border border-kiviBorder/70 bg-kiviBg px-2.5 py-1.5 font-mono text-xs text-kiviInk"
             />
           </div>
 
@@ -412,7 +412,7 @@ export const MapPropertiesModal: React.FC<MapPropertiesModalProps> = ({
               placeholder="e.g. 1000, 2000, 3000, 4000, 5000"
               value={yValuesCsv}
               onChange={(e) => setYValuesCsv(e.target.value)}
-              className="w-full rounded border border-kiviBorderStrong bg-kiviBg px-2.5 py-1.5 font-mono text-xs text-kiviInk"
+              className="w-full rounded border border-kiviBorder/70 bg-kiviBg px-2.5 py-1.5 font-mono text-xs text-kiviInk"
             />
           </div>
 
@@ -439,7 +439,7 @@ export const MapPropertiesModal: React.FC<MapPropertiesModalProps> = ({
           <button
             type="submit"
             disabled={saving}
-            className="rounded border border-kiviAccent bg-kiviAccent px-4 py-1.5 text-xs font-semibold text-kiviAccentFg hover:opacity-90 disabled:opacity-50"
+            className="min-w-[122px] shrink-0 whitespace-nowrap rounded border border-kiviAccent bg-kiviAccent px-4 py-1.5 text-center text-xs font-semibold text-kiviAccentFg hover:opacity-90 disabled:opacity-50"
           >
             {saving ? 'Saving...' : mode === 'edit' ? 'Apply Changes' : 'Add Parameter'}
           </button>

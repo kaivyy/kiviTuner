@@ -1,6 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
-  ChevronDown,
   ChevronRight,
   ChevronsDownUp,
   ChevronsUpDown,
@@ -44,6 +43,7 @@ interface MapTreeSidebarProps {
   onInspectPotentialInHex?: (address: number) => void;
   onPromotePotentialMap?: (candidate: DetectedMapCandidate) => void;
   onClose?: () => void;
+  animState?: 'open' | 'closing';
 }
 
 interface FolderBranchProps {
@@ -82,11 +82,11 @@ const FolderBranch: React.FC<FolderBranchProps> = ({
         className="flex w-full items-center justify-between gap-1.5 rounded px-1.5 py-1 text-left text-[11px] font-medium text-kiviInk transition-colors hover:bg-kiviElevated"
       >
         <span className="flex min-w-0 items-center gap-1.5">
-          {isOpen ? (
-            <ChevronDown className="h-3 w-3 shrink-0 text-kiviMuted" />
-          ) : (
-            <ChevronRight className="h-3 w-3 shrink-0 text-kiviMuted" />
-          )}
+          <ChevronRight
+            className={`h-3 w-3 shrink-0 text-kiviMuted transition-transform duration-150 ${
+              isOpen ? 'rotate-90' : ''
+            }`}
+          />
           {isOpen ? (
             <FolderOpen className="h-3.5 w-3.5 shrink-0 text-kiviAccent" />
           ) : (
@@ -100,7 +100,7 @@ const FolderBranch: React.FC<FolderBranchProps> = ({
       </button>
 
       {isOpen && (
-        <div className="mt-0.5 space-y-0.5">
+        <div className="kivi-anim-reveal mt-0.5 space-y-0.5">
           {node.folders.map((sub) => (
             <FolderBranch
               key={sub.id}
@@ -201,6 +201,7 @@ export const MapTreeSidebar: React.FC<MapTreeSidebarProps> = React.memo(({
   onInspectPotentialInHex,
   onPromotePotentialMap,
   onClose,
+  animState = 'open',
 }) => {
   const [paramTypeFilter, setParamTypeFilter] = useState<MapParamTypeFilter>('all');
   const [potentialOpen, setPotentialOpen] = useState<boolean>(false);
@@ -273,10 +274,17 @@ export const MapTreeSidebar: React.FC<MapTreeSidebarProps> = React.memo(({
   const forceExpandAll = mapFilter.trim().length > 0;
 
   return (
-    <aside className="fixed inset-y-0 left-0 md:left-11 z-40 flex w-[min(85vw,16.5rem)] flex-col border-r border-kiviBorder bg-kiviSurface shadow-2xl lg:static lg:left-auto lg:z-auto lg:w-64 lg:shrink-0 lg:shadow-none xl:w-72">
-      <div className="flex items-center justify-between border-b border-kiviBorder px-3 py-2 text-xs font-semibold uppercase tracking-wider text-kiviSecondary">
-        <span className="whitespace-nowrap">Map Explorer</span>
-        <div className="flex items-center gap-1">
+    <aside
+      className={`absolute inset-y-0 left-0 md:left-11 z-40 flex w-[min(85vw,16.5rem)] flex-col overflow-hidden rounded-none kivi-panel-surface bg-kiviSurface lg:static lg:inset-y-auto lg:left-auto lg:z-auto lg:w-64 lg:shrink-0 lg:shadow-none lg:border-r lg:border-kiviBorder/60 xl:w-72 ${
+        animState === 'closing' ? 'kivi-anim-slide-left-out' : 'kivi-anim-slide-left-in'
+      }`}
+    >
+      <div
+        data-testid="panel-titlebar-map-explorer"
+        className="flex h-9 shrink-0 items-center justify-between gap-2 bg-kiviSurface px-3 text-xs font-semibold uppercase tracking-wider text-kiviSecondary"
+      >
+        <span className="min-w-0 truncate whitespace-nowrap">Map Explorer</span>
+        <div className="flex shrink-0 items-center gap-1">
           <span className="mr-0.5 font-mono text-[11px] font-normal text-kiviMuted tabular-nums">
             {totalMaps}
           </span>
@@ -287,7 +295,7 @@ export const MapTreeSidebar: React.FC<MapTreeSidebarProps> = React.memo(({
                 onClick={handleExpandAll}
                 aria-label="Expand all folders"
                 title="Expand all folders"
-                className="flex h-6 w-6 items-center justify-center rounded border border-kiviBorder bg-kiviBg text-kiviMuted transition-colors hover:text-kiviInk"
+                className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-kiviBg/70 text-kiviMuted transition-colors hover:bg-kiviElevated hover:text-kiviInk"
               >
                 <ChevronsUpDown className="h-3 w-3" />
               </button>
@@ -296,7 +304,7 @@ export const MapTreeSidebar: React.FC<MapTreeSidebarProps> = React.memo(({
                 onClick={handleCollapseAll}
                 aria-label="Collapse all folders"
                 title="Collapse all folders"
-                className="flex h-6 w-6 items-center justify-center rounded border border-kiviBorder bg-kiviBg text-kiviMuted transition-colors hover:text-kiviInk"
+                className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-kiviBg/70 text-kiviMuted transition-colors hover:bg-kiviElevated hover:text-kiviInk"
               >
                 <ChevronsDownUp className="h-3 w-3" />
               </button>
@@ -308,7 +316,7 @@ export const MapTreeSidebar: React.FC<MapTreeSidebarProps> = React.memo(({
               onClick={onCreateMap}
               aria-label="Create new map definition"
               title="Create new map definition"
-              className="flex h-6 w-6 items-center justify-center rounded border border-kiviBorder bg-kiviBg text-kiviSecondary transition-colors hover:border-kiviAccent/60 hover:text-kiviAccent"
+              className="flex h-6 w-6 shrink-0 items-center justify-center rounded bg-kiviBg/70 text-kiviSecondary transition-colors hover:bg-kiviElevated hover:text-kiviAccent"
             >
               <Plus className="h-3.5 w-3.5" />
             </button>
@@ -318,22 +326,22 @@ export const MapTreeSidebar: React.FC<MapTreeSidebarProps> = React.memo(({
               type="button"
               aria-label="Close map explorer"
               onClick={onClose}
-              className="flex min-h-[36px] min-w-[36px] items-center justify-center rounded text-kiviMuted hover:bg-kiviElevated hover:text-kiviInk lg:hidden"
+              className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-kiviMuted transition-colors hover:bg-kiviElevated hover:text-kiviInk lg:hidden"
             >
-              <X className="h-4 w-4" />
+              <X className="h-3.5 w-3.5" />
             </button>
           )}
         </div>
       </div>
 
-      <div className="space-y-1.5 border-b border-kiviBorder px-2 py-1.5">
+      <div className="space-y-1.5 border-b border-kiviBorder/50 px-2.5 pb-2 pt-1">
         <input
           type="text"
           aria-label="Filter maps"
           placeholder="Filter maps..."
           value={mapFilter}
           onChange={(e) => onChangeMapFilter(e.target.value)}
-          className="w-full rounded border border-kiviBorderStrong bg-kiviBg px-2 py-1 text-[11px] text-kiviInk placeholder:text-kiviMuted focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-kiviAccent"
+          className="w-full rounded border border-kiviBorder/70 bg-kiviBg px-2 py-1 text-[11px] text-kiviInk placeholder:text-kiviMuted focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-kiviAccent"
         />
         <div
           role="group"
@@ -372,11 +380,11 @@ export const MapTreeSidebar: React.FC<MapTreeSidebarProps> = React.memo(({
               className="flex w-full items-center justify-between px-1 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-kiviWarn"
             >
               <span className="flex items-center gap-1">
-                {potentialOpen ? (
-                  <ChevronDown className="h-3 w-3 shrink-0" />
-                ) : (
-                  <ChevronRight className="h-3 w-3 shrink-0" />
-                )}
+                <ChevronRight
+                  className={`h-3 w-3 shrink-0 transition-transform duration-150 ${
+                    potentialOpen ? 'rotate-90' : ''
+                  }`}
+                />
                 <Radar className="h-3 w-3 shrink-0" />
                 <span>Candidate Regions</span>
               </span>
@@ -384,7 +392,7 @@ export const MapTreeSidebar: React.FC<MapTreeSidebarProps> = React.memo(({
             </button>
 
             {potentialOpen && (
-              <ul className="mt-1 max-h-40 space-y-0.5 overflow-y-auto">
+              <ul className="kivi-anim-reveal mt-1 max-h-40 space-y-0.5 overflow-y-auto">
                 {potentialMaps.slice(0, 30).map((cand, idx) => (
                   <li
                     key={`${cand.id}-${cand.start_addr}-${idx}`}

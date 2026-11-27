@@ -105,7 +105,7 @@ export const ShortcutsModal: React.FC<ShortcutsModalProps> = ({
       footer={
         <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-t border-kiviBorder bg-kiviBg px-6 py-2.5 text-xs text-kiviMuted">
           <div className="flex items-center gap-2">
-            <span className="inline-flex items-center justify-center rounded border border-kiviBorderStrong bg-kiviElevated px-1.5 py-0.5 font-mono text-[10px] text-kiviSecondary">
+            <span className="inline-flex items-center justify-center rounded border border-kiviBorder/70 bg-kiviElevated px-1.5 py-0.5 font-mono text-[10px] text-kiviSecondary">
               Esc
             </span>
             <span>Closes active window</span>
@@ -127,7 +127,7 @@ export const ShortcutsModal: React.FC<ShortcutsModalProps> = ({
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search shortcuts by key or action (e.g. Ctrl, Smooth, Interpolate, Zoom)..."
-              className="w-full rounded-md border border-kiviBorderStrong bg-kiviBg py-2 pl-9 pr-8 text-xs text-kiviInk placeholder:text-kiviMuted focus:border-kiviAccent/40 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-kiviAccent focus:ring-1 focus:ring-kiviAccent transition-colors"
+              className="w-full rounded-md border border-kiviBorder/70 bg-kiviBg py-2 pl-9 pr-8 text-xs text-kiviInk placeholder:text-kiviMuted focus:border-kiviAccent/40 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-kiviAccent focus:ring-1 focus:ring-kiviAccent transition-colors"
             />
             {searchQuery && (
               <button
@@ -227,7 +227,7 @@ interface ShortcutCardProps {
 
 const ShortcutCard: React.FC<ShortcutCardProps> = ({ item }) => {
   return (
-    <div className="flex items-center justify-between rounded-lg border border-kiviBorder bg-kiviBg p-2.5 hover:border-kiviBorderStrong hover:bg-kiviBg transition-colors">
+    <div className="flex items-center justify-between rounded-lg border border-kiviBorder bg-kiviBg p-2.5 hover:border-kiviBorder/70 hover:bg-kiviBg transition-colors">
       <div className="flex flex-col pr-3">
         <span className="text-xs font-medium text-kiviInk">{item.action}</span>
         <span className="text-[11px] text-kiviMuted leading-tight">{item.description}</span>
@@ -236,7 +236,7 @@ const ShortcutCard: React.FC<ShortcutCardProps> = ({ item }) => {
       <div className="flex items-center gap-1 shrink-0">
         {item.keys.map((key, idx) => (
           <React.Fragment key={idx}>
-            <kbd className="inline-block rounded border border-kiviBorderStrong bg-kiviElevated px-2 py-0.5 font-mono text-[11px] font-semibold text-kiviAccent shadow-xs">
+            <kbd className="inline-block rounded border border-kiviBorder/70 bg-kiviElevated px-2 py-0.5 font-mono text-[11px] font-semibold text-kiviAccent">
               {key}
             </kbd>
             {idx < item.keys.length - 1 && <span className="text-[10px] text-kiviMuted">+</span>}

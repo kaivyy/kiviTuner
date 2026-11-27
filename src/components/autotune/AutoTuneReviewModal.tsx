@@ -206,7 +206,7 @@ export const AutoTuneReviewModal: React.FC<AutoTuneReviewModalProps> = ({
           type="button"
           onClick={handleRefreshRecommendations}
           disabled={isRefreshing || autoTuneStatus === 'loading'}
-          className="px-2 py-1 rounded bg-kiviElevated hover:bg-kiviBorderStrong text-kiviSecondary hover:text-kiviInk border border-kiviBorderStrong text-[10px] flex items-center gap-1 transition-colors disabled:opacity-50"
+          className="inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded bg-kiviElevated/70 px-2 text-[10px] text-kiviSecondary transition-colors hover:bg-kiviElevated hover:text-kiviInk disabled:opacity-50"
           title="Re-compute Auto-Tune analysis"
         >
           <RefreshCw className={`h-3 w-3 ${isRefreshing ? 'animate-spin' : ''}`} />
@@ -238,7 +238,7 @@ export const AutoTuneReviewModal: React.FC<AutoTuneReviewModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="px-3 py-1.5 rounded-lg bg-kiviElevated hover:bg-kiviBorderStrong text-kiviSecondary hover:text-kiviInk border border-kiviBorderStrong font-medium transition-colors"
+              className="px-3 py-1.5 rounded-lg bg-kiviElevated hover:bg-kiviBorder/40 text-kiviSecondary hover:text-kiviInk border border-kiviBorder/70 font-medium transition-colors"
             >
               Close
             </button>
@@ -289,19 +289,19 @@ export const AutoTuneReviewModal: React.FC<AutoTuneReviewModalProps> = ({
           {activeReport && (
             <div className="flex flex-wrap items-center gap-2 text-[11px] text-kiviMuted">
               <span className="font-semibold text-kiviSecondary">Filter Rejections:</span>
-              <span className="px-2 py-0.5 rounded bg-kiviElevated border border-kiviBorderStrong">
+              <span className="px-2 py-0.5 rounded bg-kiviElevated border border-kiviBorder/70">
                 Cold Engine: <strong className="text-kiviInk">{activeReport.rejections.rejected_cold_engine}</strong>
               </span>
-              <span className="px-2 py-0.5 rounded bg-kiviElevated border border-kiviBorderStrong">
+              <span className="px-2 py-0.5 rounded bg-kiviElevated border border-kiviBorder/70">
                 Transient dTPS: <strong className="text-kiviInk">{activeReport.rejections.rejected_transient_throttle}</strong>
               </span>
-              <span className="px-2 py-0.5 rounded bg-kiviElevated border border-kiviBorderStrong">
+              <span className="px-2 py-0.5 rounded bg-kiviElevated border border-kiviBorder/70">
                 Fuel Cut: <strong className="text-kiviInk">{activeReport.rejections.rejected_fuel_cut}</strong>
               </span>
-              <span className="px-2 py-0.5 rounded bg-kiviElevated border border-kiviBorderStrong">
+              <span className="px-2 py-0.5 rounded bg-kiviElevated border border-kiviBorder/70">
                 Out of Bounds: <strong className="text-kiviInk">{activeReport.rejections.rejected_out_of_bounds}</strong>
               </span>
-              <span className="px-2 py-0.5 rounded bg-kiviElevated border border-kiviBorderStrong">
+              <span className="px-2 py-0.5 rounded bg-kiviElevated border border-kiviBorder/70">
                 Stale/Fault: <strong className="text-kiviInk">{activeReport.rejections.rejected_stale + activeReport.rejections.rejected_fault}</strong>
               </span>
             </div>
@@ -321,7 +321,7 @@ export const AutoTuneReviewModal: React.FC<AutoTuneReviewModalProps> = ({
                 className={`px-2.5 py-1 rounded text-xs transition-colors capitalize ${
                   filterMode === mode
                     ? 'bg-kiviAccent text-kiviAccentFg font-medium'
-                    : 'bg-kiviElevated text-kiviSecondary hover:bg-kiviBorderStrong'
+                    : 'bg-kiviElevated text-kiviSecondary hover:bg-kiviBorder/40'
                 }`}
               >
                 {mode === 'all'
@@ -341,7 +341,7 @@ export const AutoTuneReviewModal: React.FC<AutoTuneReviewModalProps> = ({
             <button
               onClick={handleSelectAllEligible}
               disabled={!mapEligibility.isEligible || stats.eligibleCount === 0}
-              className="px-2.5 py-1 rounded bg-kiviElevated hover:bg-kiviBorderStrong text-kiviSecondary hover:text-kiviInk border border-kiviBorderStrong flex items-center gap-1.5 transition-colors disabled:opacity-40"
+              className="px-2.5 py-1 rounded bg-kiviElevated hover:bg-kiviBorder/40 text-kiviSecondary hover:text-kiviInk border border-kiviBorder/70 flex items-center gap-1.5 transition-colors disabled:opacity-40"
             >
               <CheckSquare className="h-3.5 w-3.5 text-kiviGreen" />
               <span>Select All Eligible</span>
@@ -349,7 +349,7 @@ export const AutoTuneReviewModal: React.FC<AutoTuneReviewModalProps> = ({
             <button
               onClick={handleDeselectAll}
               disabled={selectedCoords.length === 0}
-              className="px-2.5 py-1 rounded bg-kiviElevated hover:bg-kiviBorderStrong text-kiviSecondary hover:text-kiviInk border border-kiviBorderStrong flex items-center gap-1.5 transition-colors disabled:opacity-40"
+              className="px-2.5 py-1 rounded bg-kiviElevated hover:bg-kiviBorder/40 text-kiviSecondary hover:text-kiviInk border border-kiviBorder/70 flex items-center gap-1.5 transition-colors disabled:opacity-40"
             >
               <Square className="h-3.5 w-3.5 text-kiviMuted" />
               <span>Deselect All</span>
@@ -399,7 +399,7 @@ export const AutoTuneReviewModal: React.FC<AutoTuneReviewModalProps> = ({
                           checked={isChecked}
                           disabled={!row.canSelect}
                           onChange={() => handleToggleCell(row.row, row.col)}
-                          className="h-4 w-4 cursor-pointer rounded border-kiviBorderStrong bg-kiviBg accent-kiviWarn focus-visible:ring-2 focus-visible:ring-kiviWarn/30 disabled:cursor-not-allowed disabled:opacity-30"
+                          className="h-4 w-4 cursor-pointer rounded border-kiviBorder/70 bg-kiviBg accent-kiviWarn focus-visible:ring-2 focus-visible:ring-kiviWarn/30 disabled:cursor-not-allowed disabled:opacity-30"
                           aria-label={`Select recommendation for ${row.coordinateLabel}`}
                         />
                       </td>

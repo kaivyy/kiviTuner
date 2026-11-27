@@ -97,7 +97,7 @@ export const StatusBar: React.FC<StatusBarProps> = React.memo(({
                 type="button"
                 onClick={() => requestRestoreFloatingWindow(win.id)}
                 title={`Restore ${win.title}`}
-                className="inline-flex h-5 max-w-[140px] shrink-0 items-center gap-1 rounded border border-kiviAccent/50 bg-kiviAccent/15 px-1.5 text-[10px] font-medium text-kiviAccent transition-colors hover:bg-kiviAccent/25"
+                className="kivi-anim-pop-in inline-flex h-5 max-w-[140px] shrink-0 items-center gap-1 rounded border border-kiviAccent/50 bg-kiviAccent/15 px-1.5 text-[10px] font-medium text-kiviAccent transition-colors hover:bg-kiviAccent/25"
               >
                 <Layers className="h-2.5 w-2.5 shrink-0" />
                 <span className="truncate">{win.title}</span>

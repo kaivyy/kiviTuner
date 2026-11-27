@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { Suspense, lazy, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useMapStore } from './stores/useMapStore';
 import { useTelemetryStore } from './stores/useTelemetryStore';
 import { useCorrelationStore } from './stores/useCorrelationStore';
@@ -14,22 +14,8 @@ import {
   type TablePalette,
   type HeatmapTableHandle,
 } from './components/editor';
-import { KiviMenuBar } from './components/layout';
+import { KiviMenuBar, type MenuBarCallbacks } from './components/layout';
 import { openToolOrFloating } from './components/layout/toolWindowRegistry';
-import { EngineeringToolkit } from './components/toolkit/EngineeringToolkit';
-import { FlashPanel } from './components/toolkit/FlashPanel';
-import { CataloguePanel } from './components/toolkit/CataloguePanel';
-import {
-  ShortcutsModal,
-  HowToUseModal,
-  BinDiffModal,
-  CalibrationWorkbenchModal,
-  AboutModal,
-  MapPropertiesModal,
-  UpdateModal,
-} from './components/modals';
-import { AutoTuneReviewModal } from './components/autotune';
-import { TelemetryDevPanel } from './components/telemetry/TelemetryDevPanel';
 import { generateAxisLabels, resolveDisplayAxisLabels } from './lib/matrixRom';
 import {
   buildCalibrationReportMarkdown,
@@ -57,6 +43,12 @@ import {
 } from './lib/tauriBridge';
 import type { MapDef } from './types/kivi';
 import { useGlobalShortcuts } from './hooks/useGlobalShortcuts';
+import { useAnimatedPresence } from './hooks/useAnimatedPresence';
+import { subscribeNativeMenuEvents } from './lib/nativeMenuBridge';
+import {
+  resolveActiveRailItem,
+  type ActivityRailItemId,
+} from './components/workspace/activityRailModel';
 import { MapTreeSidebar } from './components/workspace/MapTreeSidebar';
 import { WorkspaceViewport } from './components/workspace/WorkspaceViewport';
 import { ScannerDrawer } from './components/workspace/ScannerDrawer';
@@ -66,6 +58,53 @@ import { WorkspaceTabBar } from './components/workspace/WorkspaceTabBar';
 import { ActivityRail, MobileBottomNav } from './components/workspace/ActivityRail';
 import { CommandPalette, type CommandPaletteAction } from './components/workspace/CommandPalette';
 import { buildCommandPaletteActions } from './lib/workspaceActions';
+
+const EngineeringToolkit = lazy(() =>
+  import('./components/toolkit/EngineeringToolkit').then((m) => ({
+    default: m.EngineeringToolkit,
+  }))
+);
+const FlashPanel = lazy(() =>
+  import('./components/toolkit/FlashPanel').then((m) => ({ default: m.FlashPanel }))
+);
+const CataloguePanel = lazy(() =>
+  import('./components/toolkit/CataloguePanel').then((m) => ({ default: m.CataloguePanel }))
+);
+const ShortcutsModal = lazy(() =>
+  import('./components/modals/ShortcutsModal').then((m) => ({ default: m.ShortcutsModal }))
+);
+const HowToUseModal = lazy(() =>
+  import('./components/modals/HowToUseModal').then((m) => ({ default: m.HowToUseModal }))
+);
+const BinDiffModal = lazy(() =>
+  import('./components/modals/BinDiffModal').then((m) => ({ default: m.BinDiffModal }))
+);
+const CalibrationWorkbenchModal = lazy(() =>
+  import('./components/modals/CalibrationWorkbenchModal').then((m) => ({
+    default: m.CalibrationWorkbenchModal,
+  }))
+);
+const AboutModal = lazy(() =>
+  import('./components/modals/AboutModal').then((m) => ({ default: m.AboutModal }))
+);
+const MapPropertiesModal = lazy(() =>
+  import('./components/modals/MapPropertiesModal').then((m) => ({
+    default: m.MapPropertiesModal,
+  }))
+);
+const UpdateModal = lazy(() =>
+  import('./components/modals/UpdateModal').then((m) => ({ default: m.UpdateModal }))
+);
+const AutoTuneReviewModal = lazy(() =>
+  import('./components/autotune/AutoTuneReviewModal').then((m) => ({
+    default: m.AutoTuneReviewModal,
+  }))
+);
+const TelemetryDevPanel = lazy(() =>
+  import('./components/telemetry/TelemetryDevPanel').then((m) => ({
+    default: m.TelemetryDevPanel,
+  }))
+);
 
 export type LayoutPreset =
   | 'standard'
@@ -142,6 +181,7 @@ export const App: React.FC = () => {
   } = useWorkspaceTabsStore();
 
   const updateStatus = useUpdateStore((s) => s.status);
+  const isUpdateModalOpen = useUpdateStore((s) => s.isModalOpen);
   const updateInfo = useUpdateStore((s) => s.info);
   const updateBannerDismissed = useUpdateStore((s) => s.bannerDismissed);
   const checkForUpdates = useUpdateStore((s) => s.checkForUpdates);
@@ -181,6 +221,7 @@ export const App: React.FC = () => {
   const [showInspector, setShowInspector] = useState<boolean>(() =>
     typeof window !== 'undefined' ? window.innerWidth >= 1400 : false
   );
+  const [focusedRailItem, setFocusedRailItem] = useState<ActivityRailItemId | null>(null);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -258,6 +299,12 @@ export const App: React.FC = () => {
   const totalMaps = useMemo(() => countMaps(groupedMaps), [groupedMaps]);
 
   const [isScannerDrawerOpen, setIsScannerDrawerOpen] = useState<boolean>(false);
+  const mapTreePresence = useAnimatedPresence(showMapTree, 120);
+  const inspectorPresence = useAnimatedPresence(showInspector, 120);
+  const drawerBackdropPresence = useAnimatedPresence(
+    showMapTree || showInspector || isScannerDrawerOpen,
+    120
+  );
   const [isScanning, setIsScanning] = useState<boolean>(false);
   const [scanProgress, setScanProgress] = useState<ScanProgressEvent | null>(null);
   const [scannerSensitivity, setScannerSensitivity] = useState<
@@ -355,9 +402,66 @@ export const App: React.FC = () => {
     }
   }, [ecuConnectionState.state]);
 
+  const closeOverlayDrawersIfCompact = useCallback(() => {
+    if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+      setShowMapTree(false);
+      setIsScannerDrawerOpen(false);
+      setShowInspector(false);
+    }
+  }, []);
+
+  const handleToggleMapTree = useCallback(() => {
+    setShowMapTree((prev) => {
+      const next = !prev;
+      if (next) {
+        if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+          setIsScannerDrawerOpen(false);
+          setShowInspector(false);
+        }
+        setFocusedRailItem('maps');
+      } else {
+        setFocusedRailItem((cur) => (cur === 'maps' ? null : cur));
+      }
+      return next;
+    });
+  }, []);
+
+  const handleToggleScanner = useCallback(() => {
+    setIsScannerDrawerOpen((prev) => {
+      const next = !prev;
+      if (next) {
+        setShowInspector(false);
+        if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+          setShowMapTree(false);
+        }
+        setFocusedRailItem('scanner');
+      } else {
+        setFocusedRailItem((cur) => (cur === 'scanner' ? null : cur));
+      }
+      return next;
+    });
+  }, []);
+
+  const handleToggleInspector = useCallback(() => {
+    setShowInspector((prev) => {
+      const next = !prev;
+      if (next) {
+        setIsScannerDrawerOpen(false);
+        if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+          setShowMapTree(false);
+        }
+        setFocusedRailItem('inspector');
+      } else {
+        setFocusedRailItem((cur) => (cur === 'inspector' ? null : cur));
+      }
+      return next;
+    });
+  }, []);
+
   const handleSelectMap = useCallback(
     (id: string) => {
       selectMap(id);
+      setFocusedRailItem((cur) => (cur === 'hex' || cur === 'waveform' ? null : cur));
       const mapDef = maps.find((m) => m.id === id);
       if (mapDef) {
         syncMapTab(
@@ -395,6 +499,7 @@ export const App: React.FC = () => {
       activateTab(id);
       const tab = tabs.find((t) => t.id === id);
       if (tab?.kind === 'map-table' || tab?.kind === 'map-3d' || tab?.kind === 'map-split') {
+        setFocusedRailItem((cur) => (cur === 'hex' || cur === 'waveform' ? null : cur));
         setLayoutPreset(
           tab.kind === 'map-3d'
             ? 'full_3d'
@@ -403,7 +508,10 @@ export const App: React.FC = () => {
               : 'standard'
         );
       } else if (tab?.kind === 'waveform') {
+        setFocusedRailItem('waveform');
         setLayoutPreset('full_waveform');
+      } else if (tab?.kind === 'hex') {
+        setFocusedRailItem('hex');
       }
       if (tab?.mapId && tab.mapId !== selectedMapId) {
         selectMap(tab.mapId);
@@ -412,14 +520,16 @@ export const App: React.FC = () => {
     [activateTab, tabs, selectedMapId, selectMap]
   );
 
-  const handleOpenWorkbench = useCallback(
-    () => void openToolOrFloating('workbench', () => setIsWorkbenchOpen(true)),
-    []
-  );
-  const handleOpenDiff = useCallback(
-    () => void openToolOrFloating('diff', () => setIsDiffModalOpen(true)),
-    []
-  );
+  const handleOpenWorkbench = useCallback(() => {
+    setFocusedRailItem('workbench');
+    closeOverlayDrawersIfCompact();
+    void openToolOrFloating('workbench', () => setIsWorkbenchOpen(true));
+  }, [closeOverlayDrawersIfCompact]);
+  const handleOpenDiff = useCallback(() => {
+    setFocusedRailItem('diff');
+    closeOverlayDrawersIfCompact();
+    void openToolOrFloating('diff', () => setIsDiffModalOpen(true));
+  }, [closeOverlayDrawersIfCompact]);
   const handleOpenShortcuts = useCallback(
     () => void openToolOrFloating('shortcuts', () => setIsShortcutsOpen(true)),
     []
@@ -431,11 +541,16 @@ export const App: React.FC = () => {
 
   const handleOpenHexTab = useCallback(() => {
     openTab({ id: 'tool:hex', kind: 'hex', title: 'Hex Viewer' });
-  }, [openTab]);
+    setFocusedRailItem('hex');
+    closeOverlayDrawersIfCompact();
+  }, [openTab, closeOverlayDrawersIfCompact]);
 
   const handleOpenWaveformTab = useCallback(() => {
     openTab({ id: 'tool:waveform', kind: 'waveform', title: '2D Waveform' });
-  }, [openTab]);
+    setLayoutPreset('full_waveform');
+    setFocusedRailItem('waveform');
+    closeOverlayDrawersIfCompact();
+  }, [openTab, closeOverlayDrawersIfCompact]);
 
   const handleToggleSplitView = useCallback(() => {
     toggleSplitView({ id: 'tool:hex', kind: 'hex', title: 'Hex Viewer' });
@@ -804,7 +919,10 @@ export const App: React.FC = () => {
     if (!hasRom) return;
     setIsScanning(true);
     setScanProgress({ stage: 'starting', percent: 5, message: 'Scanning ROM heuristics' });
+    setShowInspector(false);
+    closeOverlayDrawersIfCompact();
     setIsScannerDrawerOpen(true);
+    setFocusedRailItem('scanner');
     try {
       const minConfidence =
         scannerSensitivity === 'strict' ? 85 : scannerSensitivity === 'aggressive' ? 50 : 70;
@@ -897,18 +1015,22 @@ export const App: React.FC = () => {
         }
       }
       if (l === 'table' || l === 'standard') {
+        setFocusedRailItem((cur) => (cur === 'hex' || cur === 'waveform' ? null : cur));
         setLayoutPreset('standard');
         if (activeTab?.kind.startsWith('map-')) setTabKind(activeTab.id, 'map-table');
         if (selectedMap) syncMapTab(selectedMap, 'map-table', true);
       } else if (l === 'split' || l === 'split_3d') {
+        setFocusedRailItem((cur) => (cur === 'hex' || cur === 'waveform' ? null : cur));
         setLayoutPreset('split_3d');
         if (activeTab?.kind.startsWith('map-')) setTabKind(activeTab.id, 'map-split');
         if (selectedMap) syncMapTab(selectedMap, 'map-split', true);
       } else if (l === 'split_waveform') {
+        setFocusedRailItem((cur) => (cur === 'hex' || cur === 'waveform' ? null : cur));
         setLayoutPreset('split_waveform');
         if (activeTab?.kind.startsWith('map-')) setTabKind(activeTab.id, 'map-table');
         if (selectedMap) syncMapTab(selectedMap, 'map-table', true);
       } else if (l === 'surface3d' || l === 'full_3d') {
+        setFocusedRailItem((cur) => (cur === 'hex' || cur === 'waveform' ? null : cur));
         setLayoutPreset('full_3d');
         if (activeTab?.kind.startsWith('map-')) setTabKind(activeTab.id, 'map-3d');
         if (selectedMap) syncMapTab(selectedMap, 'map-3d', true);
@@ -1011,7 +1133,15 @@ export const App: React.FC = () => {
     onRunScanner: handleRunScanner,
     onSaveRom: () => void handleSaveRom(false),
     onSaveAsRom: () => void handleSaveRom(true),
-    onOpenCommandPalette: () => setIsCommandPaletteOpen((v) => !v),
+    onOpenCommandPalette: () =>
+      setIsCommandPaletteOpen((v) => {
+        const next = !v;
+        if (next) {
+          setFocusedRailItem('palette');
+          closeOverlayDrawersIfCompact();
+        }
+        return next;
+      }),
     onUndo: () => {
       void undoEdit();
     },
@@ -1084,6 +1214,149 @@ export const App: React.FC = () => {
     [diffRegions]
   );
 
+  const menuCallbacks: MenuBarCallbacks = {
+    onOpenRom: () => binFileInputRef.current?.click(),
+    onOpenRecent: (id) => void handleOpenRecentRom(id),
+    onClearRecentRoms: () => {
+      clearRecentRoms();
+      notify('Cleared recent ROM list');
+    },
+    onReferenceSlot: handleOpenDiff,
+    onClearReferences: () => {
+      setDiffRegions([]);
+      notify('Cleared diff comparison regions');
+    },
+    onSaveRom: () => void handleSaveRom(false),
+    onSaveAsRom: () => void handleSaveRom(true),
+    onExportCsv: handleExportCsv,
+    onExportReport: handleExportReport,
+    onCloseRom: () => void closeActiveRom(),
+    onLoadXdf: () => xdfFileInputRef.current?.click(),
+    onSaveKiviJson: () => void handleExportDef('json'),
+    onExportDef: (fmt) => {
+      void handleExportDef(fmt);
+    },
+    onImportDef: () => importDefInputRef.current?.click(),
+    onCreateParameter: (preset) =>
+      setMapPropsModal({ open: true, mode: 'create', map: null, preset }),
+    onXdfHeader: () => {
+      if (selectedMap) {
+        setMapPropsModal({ open: true, mode: 'edit', map: selectedMap });
+      } else {
+        handleOpenWorkbench();
+      }
+    },
+    onUndo: () => void undoEdit(),
+    onRedo: () => void redoEdit(),
+    onCommitProject: () => {
+      void verifyChecksum().then((ok) =>
+        notify(ok ? 'Checksum verified cleanly' : 'Snapshot noted (checksum unverified)')
+      );
+    },
+    onRollbackProject: () => void handleRevertToOriginal(null),
+    onViewLedger: () => {
+      setIsScannerDrawerOpen(false);
+      closeOverlayDrawersIfCompact();
+      setShowInspector(true);
+      setFocusedRailItem('inspector');
+    },
+    onCopy: () => runTableAction((h) => h.copySelection()),
+    onPaste: () => runTableAction((h) => h.pasteSelection()),
+    onPasteSpecial: (mode) => runTableAction((h) => h.pasteSpecial(mode)),
+    onSelectAll: () => runTableAction((h) => h.selectAll()),
+    onInvertSelection: () => runTableAction((h) => h.invertSelection()),
+    onClearSelection: () => runTableAction((h) => h.clearSelection()),
+    onCellMath: () => runTableAction((h) => h.openMathDialog()),
+    onSmooth3x3: () => runTableAction((h) => h.applySmooth3x3()),
+    onInterpolate: (mode) => runTableAction((h) => h.applyInterpolate(mode)),
+    onLayoutChange: handleLayoutChange,
+    onDisplayModeChange: handleDisplayModeChange,
+    onPaletteChange: handlePaletteChange,
+    onToggleSplitView: handleToggleSplitView,
+    onOpenCommandPalette: () => {
+      closeOverlayDrawersIfCompact();
+      setFocusedRailItem('palette');
+      setIsCommandPaletteOpen(true);
+    },
+    onToggleTheme: () => toggleTheme(),
+    onResetLayout: () => {
+      handleLayoutChange('standard');
+      closeSplit();
+    },
+    onExtractWaveformMap: handleExtractMap,
+    onRunScanner: handleRunScanner,
+    onScannerSensitivityChange: (s) => setScannerSensitivity(s),
+    onClearScanner: () => setDetectedCandidates([]),
+    onOpenDiffModal: handleOpenDiff,
+    onQuickDiff: handleQuickDiff,
+    onExtractDiffs: () =>
+      handleExtractAllDiffTables(diffRegions.filter((d) => d.classification.type === 'Table2D')),
+    onVerifyChecksum: () => verifyChecksum(),
+    onFixChecksum: () => fixChecksum(),
+    onOpenHowToUse: () => void openToolOrFloating('guide', () => setIsHowToUseOpen(true)),
+    onOpenShortcuts: handleOpenShortcuts,
+    onResetSettings: () => {
+      handleLayoutChange('standard');
+      setDisplayMode('engineering');
+      setPalette('classic');
+      setScannerSensitivity('balanced');
+      setCrosshairSync(true);
+      closeSplit();
+      clearRecentRoms();
+      notify('Reset workspace view and settings');
+    },
+    onCheckForUpdates: () => void checkForUpdates(false),
+    onAbout: () => void openToolOrFloating('about', () => setIsAboutOpen(true)),
+    onDriverChange: (driver) => selectEcuDriver(driver),
+    onConnectEcu: () => connectEcu(),
+    onDisconnectEcu: () => disconnectEcu(),
+    onToggleTelemetry: () => void openToolOrFloating('telemetry', () => toggleTelemetryPanel()),
+    onToggleCrosshairSync: () => {
+      setCrosshairSync((v) => {
+        notify(!v ? 'Synchronized crosshair enabled' : 'Synchronized crosshair paused');
+        return !v;
+      });
+    },
+    onAfrAutoTune: handleOpenAutoTune,
+    onStartLogging: () => startRecording(),
+    onStopLogging: () => stopRecording(),
+    onExportLogCsv: handleExportLogCsv,
+    onReadEcuId: () => {
+      setFocusedRailItem('flash');
+      closeOverlayDrawersIfCompact();
+      void openToolOrFloating('flash', () => setIsFlashPanelOpen(true));
+    },
+    onReadFlash: () => {
+      setFocusedRailItem('flash');
+      closeOverlayDrawersIfCompact();
+      void openToolOrFloating('flash', () => setIsFlashPanelOpen(true));
+    },
+    onWriteFlash: () => {
+      setFocusedRailItem('flash');
+      closeOverlayDrawersIfCompact();
+      void openToolOrFloating('flash', () => setIsFlashPanelOpen(true));
+    },
+    onOpenCatalogue: () => void openToolOrFloating('catalogue', () => setIsCatalogueOpen(true)),
+    onOpenWorkbench: handleOpenWorkbench,
+  };
+
+  const activeRailItem = resolveActiveRailItem({
+    focusedItem: focusedRailItem,
+    showMapTree,
+    isScannerOpen: isScannerDrawerOpen,
+    showInspector,
+    activeTabKind: activeTab?.kind ?? null,
+    isWorkbenchOpen,
+    isFlashPanelOpen,
+    isDiffModalOpen,
+    isCommandPaletteOpen,
+  });
+
+  const menuCallbacksRef = useRef<MenuBarCallbacks>(menuCallbacks);
+  menuCallbacksRef.current = menuCallbacks;
+
+  useEffect(() => subscribeNativeMenuEvents(() => menuCallbacksRef.current), []);
+
   return (
     <div className="flex h-screen w-screen flex-col bg-kiviBg text-kiviInk select-none">
       <input
@@ -1138,110 +1411,7 @@ export const App: React.FC = () => {
         romName={hasRom ? activeDocLabel : undefined}
         romSizeBytes={romSize}
         onOpenShortcuts={handleOpenShortcuts}
-        callbacks={{
-          onOpenRom: () => binFileInputRef.current?.click(),
-          onOpenRecent: (id) => void handleOpenRecentRom(id),
-          onClearRecentRoms: () => {
-            clearRecentRoms();
-            notify('Cleared recent ROM list');
-          },
-          onReferenceSlot: handleOpenDiff,
-          onClearReferences: () => {
-            setDiffRegions([]);
-            notify('Cleared diff comparison regions');
-          },
-          onSaveRom: () => void handleSaveRom(false),
-          onSaveAsRom: () => void handleSaveRom(true),
-          onExportCsv: handleExportCsv,
-          onExportReport: handleExportReport,
-          onCloseRom: () => void closeActiveRom(),
-          onLoadXdf: () => xdfFileInputRef.current?.click(),
-          onSaveKiviJson: () => void handleExportDef('json'),
-          onExportDef: (fmt) => {
-            void handleExportDef(fmt);
-          },
-          onImportDef: () => importDefInputRef.current?.click(),
-          onCreateParameter: (preset) =>
-            setMapPropsModal({ open: true, mode: 'create', map: null, preset }),
-          onXdfHeader: () => {
-            if (selectedMap) {
-              setMapPropsModal({ open: true, mode: 'edit', map: selectedMap });
-            } else {
-              handleOpenWorkbench();
-            }
-          },
-          onUndo: () => void undoEdit(),
-          onRedo: () => void redoEdit(),
-          onCommitProject: () => {
-            void verifyChecksum().then((ok) =>
-              notify(ok ? 'Checksum verified cleanly' : 'Snapshot noted (checksum unverified)')
-            );
-          },
-          onRollbackProject: () => void handleRevertToOriginal(null),
-          onViewLedger: () => setShowInspector(true),
-          onCopy: () => runTableAction((h) => h.copySelection()),
-          onPaste: () => runTableAction((h) => h.pasteSelection()),
-          onPasteSpecial: (mode) => runTableAction((h) => h.pasteSpecial(mode)),
-          onSelectAll: () => runTableAction((h) => h.selectAll()),
-          onInvertSelection: () => runTableAction((h) => h.invertSelection()),
-          onClearSelection: () => runTableAction((h) => h.clearSelection()),
-          onCellMath: () => runTableAction((h) => h.openMathDialog()),
-          onSmooth3x3: () => runTableAction((h) => h.applySmooth3x3()),
-          onInterpolate: (mode) => runTableAction((h) => h.applyInterpolate(mode)),
-          onLayoutChange: handleLayoutChange,
-          onDisplayModeChange: handleDisplayModeChange,
-          onPaletteChange: handlePaletteChange,
-          onToggleSplitView: handleToggleSplitView,
-          onOpenCommandPalette: () => setIsCommandPaletteOpen(true),
-          onToggleTheme: () => toggleTheme(),
-          onResetLayout: () => {
-            handleLayoutChange('standard');
-            closeSplit();
-          },
-          onExtractWaveformMap: handleExtractMap,
-          onRunScanner: handleRunScanner,
-          onScannerSensitivityChange: (s) => setScannerSensitivity(s),
-          onClearScanner: () => setDetectedCandidates([]),
-          onOpenDiffModal: handleOpenDiff,
-          onQuickDiff: handleQuickDiff,
-          onExtractDiffs: () =>
-            handleExtractAllDiffTables(diffRegions.filter((d) => d.classification.type === 'Table2D')),
-          onVerifyChecksum: () => verifyChecksum(),
-          onFixChecksum: () => fixChecksum(),
-          onOpenHowToUse: () => void openToolOrFloating('guide', () => setIsHowToUseOpen(true)),
-          onOpenShortcuts: handleOpenShortcuts,
-          onResetSettings: () => {
-            handleLayoutChange('standard');
-            setDisplayMode('engineering');
-            setPalette('classic');
-            setScannerSensitivity('balanced');
-            setCrosshairSync(true);
-            closeSplit();
-            clearRecentRoms();
-            notify('Reset workspace view and settings');
-          },
-          onCheckForUpdates: () => void checkForUpdates(false),
-          onAbout: () => void openToolOrFloating('about', () => setIsAboutOpen(true)),
-          onDriverChange: (driver) => selectEcuDriver(driver),
-          onConnectEcu: () => connectEcu(),
-          onDisconnectEcu: () => disconnectEcu(),
-          onToggleTelemetry: () => void openToolOrFloating('telemetry', () => toggleTelemetryPanel()),
-          onToggleCrosshairSync: () => {
-            setCrosshairSync((v) => {
-              notify(!v ? 'Synchronized crosshair enabled' : 'Synchronized crosshair paused');
-              return !v;
-            });
-          },
-          onAfrAutoTune: handleOpenAutoTune,
-          onStartLogging: () => startRecording(),
-          onStopLogging: () => stopRecording(),
-          onExportLogCsv: handleExportLogCsv,
-          onReadEcuId: () => void openToolOrFloating('flash', () => setIsFlashPanelOpen(true)),
-          onReadFlash: () => void openToolOrFloating('flash', () => setIsFlashPanelOpen(true)),
-          onWriteFlash: () => void openToolOrFloating('flash', () => setIsFlashPanelOpen(true)),
-          onOpenCatalogue: () => void openToolOrFloating('catalogue', () => setIsCatalogueOpen(true)),
-          onOpenWorkbench: handleOpenWorkbench,
-        }}
+        callbacks={menuCallbacks}
         state={{
           romLoaded: hasRom,
           canUndo: undoStatus.can_undo,
@@ -1302,7 +1472,7 @@ export const App: React.FC = () => {
           <div
             role="status"
             aria-live="polite"
-            className="flex flex-wrap items-center justify-between gap-2 border-b border-kiviAccent/30 bg-kiviAccent/10 px-4 py-1 text-xs text-kiviInk"
+            className="kivi-anim-reveal flex flex-wrap items-center justify-between gap-2 border-b border-kiviAccent/30 bg-kiviAccent/10 px-4 py-1 text-xs text-kiviInk"
           >
             <span>
               {updateStatus === 'ready-to-restart'
@@ -1325,7 +1495,7 @@ export const App: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => void restartToApplyUpdate()}
-                  className="rounded bg-kiviGreen px-2.5 py-0.5 text-[11px] font-semibold text-white hover:opacity-90"
+                  className="rounded bg-emerald-600 px-2.5 py-0.5 text-[11px] font-semibold text-white hover:opacity-90"
                 >
                   Restart Now
                 </button>
@@ -1352,7 +1522,7 @@ export const App: React.FC = () => {
         <div
           role="status"
           aria-live="polite"
-          className="flex items-center justify-between border-b border-kiviAccent/30 bg-kiviAccent/10 px-4 py-1 text-xs text-kiviAccent"
+          className="kivi-anim-reveal flex items-center justify-between border-b border-kiviAccent/30 bg-kiviAccent/10 px-4 py-1 text-xs text-kiviAccent"
         >
           <span>{appNotice}</span>
           <button
@@ -1365,8 +1535,8 @@ export const App: React.FC = () => {
         </div>
       )}
 
-      <div className="relative flex min-h-0 flex-1 overflow-hidden">
-        {(showMapTree || showInspector || isScannerDrawerOpen) && (
+      <div className="relative flex min-h-0 flex-1 overflow-hidden bg-kiviBg">
+        {drawerBackdropPresence.mounted && (
           <div
             aria-hidden="true"
             onClick={() => {
@@ -1374,30 +1544,59 @@ export const App: React.FC = () => {
               setShowInspector(false);
               setIsScannerDrawerOpen(false);
             }}
-            className="fixed inset-0 z-30 bg-black/50 lg:hidden"
+            className={`absolute inset-0 md:left-11 z-30 bg-slate-950/35 lg:hidden ${
+              drawerBackdropPresence.state === 'closing'
+                ? 'kivi-anim-backdrop-out'
+                : 'kivi-anim-backdrop-in'
+            }`}
           />
         )}
 
         <ActivityRail
           showMapTree={showMapTree}
-          onToggleMapTree={() => setShowMapTree((v) => !v)}
+          onToggleMapTree={handleToggleMapTree}
           showInspector={showInspector}
-          onToggleInspector={() => setShowInspector((v) => !v)}
+          onToggleInspector={handleToggleInspector}
           isScannerOpen={isScannerDrawerOpen}
-          onToggleScanner={() => setIsScannerDrawerOpen((v) => !v)}
+          onToggleScanner={handleToggleScanner}
           activeTabKind={activeTab?.kind ?? null}
+          activeRailItem={activeRailItem}
+          isWorkbenchOpen={isWorkbenchOpen}
+          isFlashPanelOpen={isFlashPanelOpen}
+          isDiffModalOpen={isDiffModalOpen}
+          isCommandPaletteOpen={isCommandPaletteOpen}
           onOpenHex={handleOpenHexTab}
           onOpenWaveform={handleOpenWaveformTab}
-          onOpenWorkbench={handleOpenWorkbench}
-          onOpenFlash={() => void openToolOrFloating('flash', () => setIsFlashPanelOpen(true))}
-          onOpenDiff={handleOpenDiff}
-          onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
+          onOpenWorkbench={() =>
+            isWorkbenchOpen ? setIsWorkbenchOpen(false) : handleOpenWorkbench()
+          }
+          onOpenFlash={() => {
+            if (isFlashPanelOpen) {
+              setIsFlashPanelOpen(false);
+            } else {
+              setFocusedRailItem('flash');
+              closeOverlayDrawersIfCompact();
+              void openToolOrFloating('flash', () => setIsFlashPanelOpen(true));
+            }
+          }}
+          onOpenDiff={() => (isDiffModalOpen ? setIsDiffModalOpen(false) : handleOpenDiff())}
+          onOpenCommandPalette={() =>
+            setIsCommandPaletteOpen((prev) => {
+              const next = !prev;
+              if (next) {
+                setFocusedRailItem('palette');
+                closeOverlayDrawersIfCompact();
+              }
+              return next;
+            })
+          }
           theme={theme}
           onToggleTheme={() => toggleTheme()}
         />
 
-        {showMapTree && (
+        {mapTreePresence.mounted && (
           <MapTreeSidebar
+            animState={mapTreePresence.state}
             totalMaps={totalMaps}
             mapsCount={maps.length}
             mapFilter={mapFilter}
@@ -1496,8 +1695,9 @@ export const App: React.FC = () => {
           onJumpToWaveform={handleJumpToWaveform}
         />
 
-        {showInspector && (
+        {inspectorPresence.mounted && (
           <InspectorSidebar
+            animState={inspectorPresence.state}
             selectedRange={selectedRange}
             waveformPitch={waveformPitch}
             onExtractMap={handleExtractMap}
@@ -1523,9 +1723,9 @@ export const App: React.FC = () => {
 
       <MobileBottomNav
         showMapTree={showMapTree}
-        onToggleMapTree={() => setShowMapTree((v) => !v)}
+        onToggleMapTree={handleToggleMapTree}
         showInspector={showInspector}
-        onToggleInspector={() => setShowInspector((v) => !v)}
+        onToggleInspector={handleToggleInspector}
         activeTabKind={activeTab?.kind ?? null}
         onOpenHex={handleOpenHexTab}
         onOpenWaveform={handleOpenWaveformTab}
@@ -1558,116 +1758,138 @@ export const App: React.FC = () => {
         actions={paletteActions}
       />
 
-      <EngineeringToolkit isOpen={isToolkitOpen} onClose={() => setIsToolkitOpen(false)} />
-      <CataloguePanel isOpen={isCatalogueOpen} onClose={() => setIsCatalogueOpen(false)} />
-      <FlashPanel
-        isOpen={isFlashPanelOpen}
-        onClose={() => setIsFlashPanelOpen(false)}
-        rom={romData}
-        onDumped={async (bytes, baseAddress) => {
-          await loadRomBuffer(bytes, undefined, {
-            label: `ECU Dump @ 0x${baseAddress.toString(16).toUpperCase()}`,
-          });
-          useMapStore.getState().setRomBaseAddress(baseAddress);
-        }}
-      />
-      <BinDiffModal
-        isOpen={isDiffModalOpen}
-        onClose={() => setIsDiffModalOpen(false)}
-        baseRom={romData}
-        currentDiffs={diffRegions}
-        onDiffsChange={setDiffRegions}
-        onJumpToWaveform={handleJumpToWaveform}
-        onExtractMap={handleExtractDiffRegion}
-        onExtractAllTables={handleExtractAllDiffTables}
-        onVbfLoadRom={handleVbfLoadRom}
-      />
-      <CalibrationWorkbenchModal
-        isOpen={isWorkbenchOpen}
-        onClose={() => setIsWorkbenchOpen(false)}
-        rom={romData}
-        romLoaded={hasRom}
-        romSize={romSize}
-        maps={maps}
-        selectedMap={selectedMap ?? null}
-        activeMatrix={activeMatrix}
-        selection={tableSelection}
-        onAddMaps={(newMaps, selectFirst) => {
-          addMaps(newMaps);
-          if (selectFirst && newMaps.length > 0) {
-            handleSelectMap(newMaps[0].id);
-          }
-        }}
-        onSelectMap={(mapId) => handleSelectMap(mapId)}
-        onRomUpdated={async (nextRom, checksumOk) => {
-          if (isDesktopApp() && hasRom && nextRom.length === romSize) {
-            await refreshRomSession();
-          } else if (!hasRom || nextRom.length !== romSize) {
-            await loadRomBuffer(nextRom, undefined, { label: activeDocLabel });
-          } else if (romData) {
-            const writes: Array<{ offset: number; bytes: number[] }> = [];
-            for (let i = 0; i < nextRom.length; i++) {
-              if (nextRom[i] !== romData[i]) {
-                writes.push({ offset: i, bytes: [nextRom[i]] });
+      <Suspense fallback={null}>
+        {isToolkitOpen && (
+          <EngineeringToolkit isOpen={isToolkitOpen} onClose={() => setIsToolkitOpen(false)} />
+        )}
+        {isCatalogueOpen && (
+          <CataloguePanel isOpen={isCatalogueOpen} onClose={() => setIsCatalogueOpen(false)} />
+        )}
+        {isFlashPanelOpen && (
+          <FlashPanel
+            isOpen={isFlashPanelOpen}
+            onClose={() => setIsFlashPanelOpen(false)}
+            rom={romData}
+            onDumped={async (bytes, baseAddress) => {
+              await loadRomBuffer(bytes, undefined, {
+                label: `ECU Dump @ 0x${baseAddress.toString(16).toUpperCase()}`,
+              });
+              useMapStore.getState().setRomBaseAddress(baseAddress);
+            }}
+          />
+        )}
+        {isDiffModalOpen && (
+          <BinDiffModal
+            isOpen={isDiffModalOpen}
+            onClose={() => setIsDiffModalOpen(false)}
+            baseRom={romData}
+            currentDiffs={diffRegions}
+            onDiffsChange={setDiffRegions}
+            onJumpToWaveform={handleJumpToWaveform}
+            onExtractMap={handleExtractDiffRegion}
+            onExtractAllTables={handleExtractAllDiffTables}
+            onVbfLoadRom={handleVbfLoadRom}
+          />
+        )}
+        {isWorkbenchOpen && (
+          <CalibrationWorkbenchModal
+            isOpen={isWorkbenchOpen}
+            onClose={() => setIsWorkbenchOpen(false)}
+            rom={romData}
+            romLoaded={hasRom}
+            romSize={romSize}
+            maps={maps}
+            selectedMap={selectedMap ?? null}
+            activeMatrix={activeMatrix}
+            selection={tableSelection}
+            onAddMaps={(newMaps, selectFirst) => {
+              addMaps(newMaps);
+              if (selectFirst && newMaps.length > 0) {
+                handleSelectMap(newMaps[0].id);
               }
-            }
-            if (writes.length > 0) {
-              await patchRomBytes(writes, 'Workbench Checksum Repair');
-            }
-          }
-          if (checksumOk !== undefined) {
-            useMapStore.getState().setChecksumStatus(checksumOk ? 'valid' : 'invalid');
-          }
-        }}
-        onMatrixUpdated={async (mapDef, nextMatrix) => {
-          await updateMatrix(mapDef, nextMatrix);
-        }}
-        onUpdateMapScaling={(mapId, equation) => {
-          const target = maps.find((m) => m.id === mapId);
-          if (target) {
-            void updateMapDef({ ...target, scaling: { ...target.scaling, equation } });
-          }
-        }}
-      />
-      <MapPropertiesModal
-        isOpen={mapPropsModal.open}
-        onClose={() => setMapPropsModal((s) => ({ ...s, open: false }))}
-        initialMap={mapPropsModal.map}
-        mode={mapPropsModal.mode}
-        createPresetType={mapPropsModal.preset}
-        romSize={romSize}
-        onSaveMap={async (mapDef) => {
-          await updateMapDef(mapDef);
-          selectMap(mapDef.id);
-          syncMapTab(mapDef, 'map-table');
-          setLayoutPreset('standard');
-          notify(
-            mapPropsModal.mode === 'edit'
-              ? `Updated ${mapDef.name}`
-              : `Added ${mapDef.name}`
-          );
-        }}
-      />
-      <AboutModal
-        isOpen={isAboutOpen}
-        onClose={() => setIsAboutOpen(false)}
-        isDesktop={isDesktop}
-        romLabel={activeDocLabel ?? 'None'}
-        romSize={romSize}
-        sha256={hashes?.sha256 ?? null}
-        mapsCount={maps.length}
-        checksumAlgorithmName={checksumAlgorithmName}
-      />
-      <ShortcutsModal isOpen={isShortcutsOpen} onClose={() => setIsShortcutsOpen(false)} />
-      <HowToUseModal isOpen={isHowToUseOpen} onClose={() => setIsHowToUseOpen(false)} />
-      <AutoTuneReviewModal
-        isOpen={isAutoTuneReviewOpen}
-        onClose={() => setIsAutoTuneReviewOpen(false)}
-      />
-      <UpdateModal />
-      {isTelemetryPanelOpen && (
-        <TelemetryDevPanel onClose={() => toggleTelemetryPanel(false)} />
-      )}
+            }}
+            onSelectMap={(mapId) => handleSelectMap(mapId)}
+            onRomUpdated={async (nextRom, checksumOk) => {
+              if (isDesktopApp() && hasRom && nextRom.length === romSize) {
+                await refreshRomSession();
+              } else if (!hasRom || nextRom.length !== romSize) {
+                await loadRomBuffer(nextRom, undefined, { label: activeDocLabel });
+              } else if (romData) {
+                const writes: Array<{ offset: number; bytes: number[] }> = [];
+                for (let i = 0; i < nextRom.length; i++) {
+                  if (nextRom[i] !== romData[i]) {
+                    writes.push({ offset: i, bytes: [nextRom[i]] });
+                  }
+                }
+                if (writes.length > 0) {
+                  await patchRomBytes(writes, 'Workbench Checksum Repair');
+                }
+              }
+              if (checksumOk !== undefined) {
+                useMapStore.getState().setChecksumStatus(checksumOk ? 'valid' : 'invalid');
+              }
+            }}
+            onMatrixUpdated={async (mapDef, nextMatrix) => {
+              await updateMatrix(mapDef, nextMatrix);
+            }}
+            onUpdateMapScaling={(mapId, equation) => {
+              const target = maps.find((m) => m.id === mapId);
+              if (target) {
+                void updateMapDef({ ...target, scaling: { ...target.scaling, equation } });
+              }
+            }}
+          />
+        )}
+        {mapPropsModal.open && (
+          <MapPropertiesModal
+            isOpen={mapPropsModal.open}
+            onClose={() => setMapPropsModal((s) => ({ ...s, open: false }))}
+            initialMap={mapPropsModal.map}
+            mode={mapPropsModal.mode}
+            createPresetType={mapPropsModal.preset}
+            romSize={romSize}
+            onSaveMap={async (mapDef) => {
+              await updateMapDef(mapDef);
+              selectMap(mapDef.id);
+              syncMapTab(mapDef, 'map-table');
+              setLayoutPreset('standard');
+              notify(
+                mapPropsModal.mode === 'edit'
+                  ? `Updated ${mapDef.name}`
+                  : `Added ${mapDef.name}`
+              );
+            }}
+          />
+        )}
+        {isAboutOpen && (
+          <AboutModal
+            isOpen={isAboutOpen}
+            onClose={() => setIsAboutOpen(false)}
+            isDesktop={isDesktop}
+            romLabel={activeDocLabel ?? 'None'}
+            romSize={romSize}
+            sha256={hashes?.sha256 ?? null}
+            mapsCount={maps.length}
+            checksumAlgorithmName={checksumAlgorithmName}
+          />
+        )}
+        {isShortcutsOpen && (
+          <ShortcutsModal isOpen={isShortcutsOpen} onClose={() => setIsShortcutsOpen(false)} />
+        )}
+        {isHowToUseOpen && (
+          <HowToUseModal isOpen={isHowToUseOpen} onClose={() => setIsHowToUseOpen(false)} />
+        )}
+        {isAutoTuneReviewOpen && (
+          <AutoTuneReviewModal
+            isOpen={isAutoTuneReviewOpen}
+            onClose={() => setIsAutoTuneReviewOpen(false)}
+          />
+        )}
+        {isUpdateModalOpen && <UpdateModal />}
+        {isTelemetryPanelOpen && (
+          <TelemetryDevPanel onClose={() => toggleTelemetryPanel(false)} />
+        )}
+      </Suspense>
     </div>
   );
 };

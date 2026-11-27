@@ -100,12 +100,12 @@ export const CalibrationScriptCard: React.FC<CalibrationScriptCardProps> = ({ ro
             type="button"
             disabled={busy}
             onClick={() => void handleLoadSample()}
-            className="inline-flex items-center gap-1 rounded border border-kiviBorderStrong bg-kiviElevated px-2 py-1 text-[11px] text-kiviSecondary hover:text-kiviInk"
+            className="inline-flex items-center gap-1 rounded border border-kiviBorder/70 bg-kiviElevated px-2 py-1 text-[11px] text-kiviSecondary hover:text-kiviInk"
           >
             <Sparkles className="h-3 w-3 text-kiviAccent" />
             <span>Load Example</span>
           </button>
-          <label className="cursor-pointer rounded border border-kiviBorderStrong bg-kiviElevated px-2 py-1 text-[11px] text-kiviSecondary hover:text-kiviInk">
+          <label className="cursor-pointer rounded border border-kiviBorder/70 bg-kiviElevated px-2 py-1 text-[11px] text-kiviSecondary hover:text-kiviInk">
             <span>Import JSON</span>
             <input
               type="file"

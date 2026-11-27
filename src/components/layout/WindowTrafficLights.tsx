@@ -108,10 +108,10 @@ export const WindowTrafficLights: React.FC<WindowTrafficLightsProps> = ({
         aria-label={effectiveCloseLabel}
         title={effectiveCloseLabel}
         onClick={handleClose}
-        className={`relative flex h-[11px] w-[11px] items-center justify-center rounded-full border shadow-[inset_0_1px_0_rgba(255,255,255,0.28)] transition-colors focus-visible:ring-2 focus-visible:ring-kiviAccent ${
+        className={`relative flex h-[11px] w-[11px] items-center justify-center rounded-full border-0 shadow-[inset_0_1px_0_rgba(255,255,255,0.28)] transition-all duration-150 hover:brightness-110 active:scale-90 focus-visible:ring-2 focus-visible:ring-kiviAccent ${
           focused
-            ? 'border-[#E0443E] bg-[#FF5F57]'
-            : 'border-kiviBorderStrong bg-kiviElevated group-hover/lights:border-[#E0443E] group-hover/lights:bg-[#FF5F57]'
+            ? 'bg-[#FF5F57]'
+            : 'bg-kiviMuted/35 group-hover/lights:bg-[#FF5F57]'
         }`}
       >
         <svg
@@ -133,10 +133,10 @@ export const WindowTrafficLights: React.FC<WindowTrafficLightsProps> = ({
         aria-label={effectiveMinLabel}
         title={effectiveMinLabel}
         onClick={handleMinimize}
-        className={`relative flex h-[11px] w-[11px] items-center justify-center rounded-full border shadow-[inset_0_1px_0_rgba(255,255,255,0.28)] transition-colors focus-visible:ring-2 focus-visible:ring-kiviAccent ${
+        className={`relative flex h-[11px] w-[11px] items-center justify-center rounded-full border-0 shadow-[inset_0_1px_0_rgba(255,255,255,0.28)] transition-all duration-150 hover:brightness-110 active:scale-90 focus-visible:ring-2 focus-visible:ring-kiviAccent ${
           focused
-            ? 'border-[#D89E24] bg-[#FEBC2E]'
-            : 'border-kiviBorderStrong bg-kiviElevated group-hover/lights:border-[#D89E24] group-hover/lights:bg-[#FEBC2E]'
+            ? 'bg-[#FEBC2E]'
+            : 'bg-kiviMuted/35 group-hover/lights:bg-[#FEBC2E]'
         }`}
       >
         <svg
@@ -164,10 +164,10 @@ export const WindowTrafficLights: React.FC<WindowTrafficLightsProps> = ({
               : 'Maximize window (Alt+Click for Fullscreen)'
         }
         onClick={handleToggleMax}
-        className={`relative flex h-[11px] w-[11px] items-center justify-center rounded-full border shadow-[inset_0_1px_0_rgba(255,255,255,0.28)] transition-colors focus-visible:ring-2 focus-visible:ring-kiviAccent ${
+        className={`relative flex h-[11px] w-[11px] items-center justify-center rounded-full border-0 shadow-[inset_0_1px_0_rgba(255,255,255,0.28)] transition-all duration-150 hover:brightness-110 active:scale-90 focus-visible:ring-2 focus-visible:ring-kiviAccent ${
           focused
-            ? 'border-[#1AAB29] bg-[#28C840]'
-            : 'border-kiviBorderStrong bg-kiviElevated group-hover/lights:border-[#1AAB29] group-hover/lights:bg-[#28C840]'
+            ? 'bg-[#28C840]'
+            : 'bg-kiviMuted/35 group-hover/lights:bg-[#28C840]'
         }`}
       >
         <svg

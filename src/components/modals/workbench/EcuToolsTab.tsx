@@ -490,7 +490,7 @@ export const EcuToolsTab: React.FC<EcuToolsTabProps> = ({ rom, onInfo }) => {
               type="button"
               disabled={busy}
               onClick={() => void handleExportFormat('ihex')}
-              className="rounded border border-kiviBorderStrong bg-kiviElevated px-2.5 py-1 text-kiviInk"
+              className="rounded border border-kiviBorder/70 bg-kiviElevated px-2.5 py-1 text-kiviInk"
             >
               Export Intel HEX
             </button>
@@ -498,7 +498,7 @@ export const EcuToolsTab: React.FC<EcuToolsTabProps> = ({ rom, onInfo }) => {
               type="button"
               disabled={busy}
               onClick={() => void handleExportFormat('srec')}
-              className="rounded border border-kiviBorderStrong bg-kiviElevated px-2.5 py-1 text-kiviInk"
+              className="rounded border border-kiviBorder/70 bg-kiviElevated px-2.5 py-1 text-kiviInk"
             >
               Export Motorola S37
             </button>
@@ -519,7 +519,7 @@ export const EcuToolsTab: React.FC<EcuToolsTabProps> = ({ rom, onInfo }) => {
             <span>Stock ROM Hash &amp; Signature Registry Check</span>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <label className="cursor-pointer rounded border border-kiviBorderStrong bg-kiviElevated px-2 py-1 text-[11px] text-kiviSecondary hover:text-kiviInk">
+            <label className="cursor-pointer rounded border border-kiviBorder/70 bg-kiviElevated px-2 py-1 text-[11px] text-kiviSecondary hover:text-kiviInk">
               <span>Load Pack JSON</span>
               <input
                 type="file"
@@ -624,7 +624,7 @@ export const EcuToolsTab: React.FC<EcuToolsTabProps> = ({ rom, onInfo }) => {
             type="button"
             disabled={busy}
             onClick={() => void handleOstrichProbe()}
-            className="rounded border border-kiviBorderStrong bg-kiviElevated px-2.5 py-1 text-kiviInk disabled:opacity-50"
+            className="rounded border border-kiviBorder/70 bg-kiviElevated px-2.5 py-1 text-kiviInk disabled:opacity-50"
           >
             Probe Emulator
           </button>

@@ -15,12 +15,14 @@ import {
   type ToolWindowId,
 } from '../../lib/windowControlsBridge';
 import { isDesktopApp } from '../../lib/tauriBridge';
+import { prefersReducedMotion } from '../../hooks/useAnimatedPresence';
 import { WindowTrafficLights } from './WindowTrafficLights';
 import {
   applyWindowResize,
   clampWindowPosition,
   computeInitialRect,
   computeMaximizedRect,
+  fitRectToViewport,
   focusFloatingWindow,
   getOpenFloatingWindowCount,
   getTopFloatingWindowId,
@@ -131,19 +133,39 @@ export const FloatingWindow: React.FC<FloatingWindowProps> = ({
   const [isMinimized, setIsMinimized] = useState(false);
   const [isMaximized, setIsMaximized] = useState(false);
   const [alwaysOnTop, setAlwaysOnTop] = useState(false);
+  const [exitAction, setExitAction] = useState<'none' | 'closing' | 'minimizing'>('none');
   const [, setStackTick] = useState(0);
 
   const restoreRectRef = useRef<WindowRect | null>(null);
+  const exitTimerRef = useRef<number | null>(null);
   const prevOpenRef = useRef(false);
   const rectRef = useRef(rect);
   rectRef.current = rect;
 
   useEffect(() => {
+    return () => {
+      if (exitTimerRef.current !== null) {
+        window.clearTimeout(exitTimerRef.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
     if (standalone || !isOpen) {
       prevOpenRef.current = isOpen;
+      if (exitTimerRef.current !== null) {
+        window.clearTimeout(exitTimerRef.current);
+        exitTimerRef.current = null;
+      }
+      setExitAction('none');
       unregisterFloatingWindow(windowId);
       return;
     }
+    if (exitTimerRef.current !== null) {
+      window.clearTimeout(exitTimerRef.current);
+      exitTimerRef.current = null;
+    }
+    setExitAction('none');
     const vw = window.innerWidth;
     const vh = window.innerHeight;
     setViewportSize({ w: vw, h: vh });
@@ -172,6 +194,11 @@ export const FloatingWindow: React.FC<FloatingWindowProps> = ({
     const unsub = subscribeWindowStack(() => setStackTick((t) => t + 1));
     const unsubRestore = subscribeWindowRestore((restoredId) => {
       if (restoredId === windowId) {
+        if (exitTimerRef.current !== null) {
+          window.clearTimeout(exitTimerRef.current);
+          exitTimerRef.current = null;
+        }
+        setExitAction('none');
         setIsMinimized(false);
         focusFloatingWindow(windowId);
       }
@@ -193,6 +220,21 @@ export const FloatingWindow: React.FC<FloatingWindowProps> = ({
     dock,
   ]);
 
+  const requestClose = useCallback(() => {
+    if (exitAction !== 'none') return;
+    if (standalone || prefersReducedMotion()) {
+      onClose();
+      return;
+    }
+    setExitAction('closing');
+    if (exitTimerRef.current !== null) window.clearTimeout(exitTimerRef.current);
+    exitTimerRef.current = window.setTimeout(() => {
+      exitTimerRef.current = null;
+      setExitAction('none');
+      onClose();
+    }, 120);
+  }, [exitAction, standalone, onClose]);
+
   useEffect(() => {
     if (!isOpen) return;
     const onResize = () => {
@@ -202,16 +244,7 @@ export const FloatingWindow: React.FC<FloatingWindowProps> = ({
       if (standalone) return;
       setRect((prev) => {
         if (isMaximized) return computeMaximizedRect(vw, vh);
-        const clamped = clampWindowPosition(prev, vw, vh);
-        return applyWindowResize(
-          clamped,
-          'se',
-          0,
-          0,
-          { minWidth, minHeight },
-          vw,
-          vh
-        );
+        return fitRectToViewport(prev, { minWidth, minHeight }, vw, vh);
       });
     };
     window.addEventListener('resize', onResize);
@@ -224,11 +257,11 @@ export const FloatingWindow: React.FC<FloatingWindowProps> = ({
       if (e.key !== 'Escape') return;
       if (!standalone && getTopFloatingWindowId() !== windowId) return;
       e.preventDefault();
-      onClose();
+      requestClose();
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [isOpen, standalone, windowId, onClose]);
+  }, [isOpen, standalone, windowId, requestClose]);
 
   const handleDragStart = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
@@ -309,8 +342,19 @@ export const FloatingWindow: React.FC<FloatingWindowProps> = ({
   );
 
   const handleToggleMinimize = useCallback(() => {
-    setIsMinimized((prev) => !prev);
-  }, []);
+    if (exitAction !== 'none') return;
+    if (isMinimized || standalone || prefersReducedMotion()) {
+      setIsMinimized((prev) => !prev);
+      return;
+    }
+    setExitAction('minimizing');
+    if (exitTimerRef.current !== null) window.clearTimeout(exitTimerRef.current);
+    exitTimerRef.current = window.setTimeout(() => {
+      exitTimerRef.current = null;
+      setExitAction('none');
+      setIsMinimized(true);
+    }, 120);
+  }, [exitAction, isMinimized, standalone]);
 
   const handleToggleMaximize = useCallback(() => {
     setIsMinimized(false);
@@ -393,8 +437,14 @@ export const FloatingWindow: React.FC<FloatingWindowProps> = ({
         }
         className={
           standalone
-            ? 'fixed inset-0 flex h-screen w-screen flex-col overflow-hidden border border-kiviBorderStrong bg-kiviSurface font-mono text-kiviInk'
-            : 'kivi-floating-window fixed flex flex-col overflow-hidden rounded-2xl bg-kiviSurface font-mono text-kiviInk'
+            ? 'kivi-anim-window-in fixed inset-0 flex h-screen w-screen flex-col overflow-hidden bg-kiviSurface font-mono text-kiviInk'
+            : `kivi-floating-window fixed flex flex-col overflow-hidden rounded-2xl bg-kiviSurface font-mono text-kiviInk ${
+                exitAction === 'closing'
+                  ? 'kivi-anim-window-out'
+                  : exitAction === 'minimizing'
+                    ? 'kivi-anim-window-minimize'
+                    : 'kivi-anim-window-in'
+              }`
         }
       >
         {/* Slim Borderless Window Titlebar */}
@@ -418,7 +468,7 @@ export const FloatingWindow: React.FC<FloatingWindowProps> = ({
               handleToggleMaximize();
             }
           }}
-          className={`flex h-8 shrink-0 select-none items-center justify-between gap-2 border-b border-kiviBorder px-3 ${
+          className={`flex h-8 shrink-0 select-none items-center justify-between gap-2 px-3 ${
             titlebarTone === 'sidebar' ? 'bg-kiviBg' : 'bg-kiviSurface'
           } ${standalone ? 'cursor-default' : 'cursor-grab active:cursor-grabbing'}`}
         >
@@ -429,11 +479,11 @@ export const FloatingWindow: React.FC<FloatingWindowProps> = ({
             {standalone ? (
               <WindowTrafficLights
                 closeLabel={closeLabel}
-                onClose={onClose}
+                onClose={requestClose}
               />
             ) : (
               <WindowTrafficLights
-                onClose={onClose}
+                onClose={requestClose}
                 onMinimize={handleToggleMinimize}
                 onToggleMaximize={handleToggleMaximize}
                 isMaximized={isMaximized}
@@ -453,7 +503,7 @@ export const FloatingWindow: React.FC<FloatingWindowProps> = ({
               {title}
             </h2>
             {showBadge && (
-              <span className="pointer-events-none shrink-0 whitespace-nowrap rounded border border-kiviBorder/80 bg-kiviBg/80 px-1.5 py-0.5 text-[9px] text-kiviMuted">
+              <span className="pointer-events-none shrink-0 whitespace-nowrap rounded bg-kiviElevated/75 px-1.5 py-0.5 text-[9px] text-kiviMuted">
                 {badge}
               </span>
             )}
@@ -472,10 +522,10 @@ export const FloatingWindow: React.FC<FloatingWindowProps> = ({
                 aria-pressed={alwaysOnTop}
                 title={alwaysOnTop ? 'Unpin from top' : 'Keep window on top'}
                 onClick={handleToggleAlwaysOnTop}
-                className={`inline-flex h-6 items-center gap-1 rounded border px-1.5 text-[10px] font-medium transition-colors focus-visible:ring-2 focus-visible:ring-kiviAccent ${
+                className={`inline-flex h-6 items-center gap-1 rounded px-1.5 text-[10px] font-medium transition-colors focus-visible:ring-2 focus-visible:ring-kiviAccent ${
                   alwaysOnTop
-                    ? 'border-kiviAccent/50 bg-kiviAccent/15 text-kiviAccent'
-                    : 'border-kiviBorder bg-kiviBg/80 text-kiviSecondary hover:text-kiviInk'
+                    ? 'bg-kiviAccent/15 text-kiviAccent'
+                    : 'bg-kiviElevated/65 text-kiviSecondary hover:bg-kiviElevated hover:text-kiviInk'
                 }`}
               >
                 {alwaysOnTop ? (
@@ -492,7 +542,7 @@ export const FloatingWindow: React.FC<FloatingWindowProps> = ({
                 aria-label={`Open ${title} in separate desktop window`}
                 title="Open in separate desktop window"
                 onClick={handlePopout}
-                className="inline-flex h-6 items-center gap-1 rounded border border-kiviBorder bg-kiviBg/80 px-1.5 text-[10px] text-kiviSecondary transition-colors hover:border-kiviAccent/50 hover:text-kiviInk focus-visible:ring-2 focus-visible:ring-kiviAccent"
+                className="inline-flex h-6 items-center gap-1 rounded bg-kiviElevated/65 px-1.5 text-[10px] text-kiviSecondary transition-colors hover:bg-kiviElevated hover:text-kiviInk focus-visible:ring-2 focus-visible:ring-kiviAccent"
               >
                 <ExternalLink className="h-3 w-3 shrink-0" />
                 <span className="hidden sm:inline">Pop out</span>

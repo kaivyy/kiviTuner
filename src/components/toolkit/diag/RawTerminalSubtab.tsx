@@ -110,7 +110,7 @@ export const RawTerminalSubtab: React.FC<RawTerminalSubtabProps> = ({
             value={commandInput}
             onChange={(e) => setCommandInput(e.target.value)}
             placeholder="Type AT command or OBD hex (e.g. ATSH 7E0, 01 0C, 22 F1 90)"
-            className="flex-1 rounded border border-kiviBorderStrong bg-kiviSurface px-2.5 py-1 font-mono text-[11px] text-kiviInk focus-visible:ring-2 focus-visible:ring-kiviAccent"
+            className="flex-1 rounded border border-kiviBorder/70 bg-kiviSurface px-2.5 py-1 font-mono text-[11px] text-kiviInk focus-visible:ring-2 focus-visible:ring-kiviAccent"
           />
           <button
             type="submit"

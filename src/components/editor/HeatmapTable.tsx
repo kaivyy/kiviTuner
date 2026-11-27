@@ -55,6 +55,7 @@ import {
   recordCellHit,
   type HitTracerState,
 } from '../../lib/hitTracerModel';
+import { useAnimatedPresence } from '../../hooks/useAnimatedPresence';
 
 export interface SelectionRange {
   minR: number;
@@ -233,6 +234,7 @@ export const HeatmapTable: React.FC<HeatmapTableProps> = React.memo(({
   const [pasteSpecialMode, setPasteSpecialMode] = useState<'add' | 'multiply'>('add');
   const [pasteSpecialValue, setPasteSpecialValue] = useState<string>('5');
   const [isSetConstantOpen, setIsSetConstantOpen] = useState<boolean>(false);
+  const setConstantPresence = useAnimatedPresence(isSetConstantOpen, 110);
   const [constantInput, setConstantInput] = useState<string>('0');
   const [showSliceChart, setShowSliceChart] = useState<boolean>(false);
   const [hitTraceEnabled, setHitTraceEnabled] = useState<boolean>(true);
@@ -916,8 +918,8 @@ export const HeatmapTable: React.FC<HeatmapTableProps> = React.memo(({
       tabIndex={0}
       onKeyDown={handleKeyDown}
       onPaste={handleContainerPaste}
-      className={`relative flex w-full min-w-0 flex-col rounded-lg border border-kiviBorder bg-kiviSurface shadow-md focus-visible:outline-2 focus-visible:outline-kiviAccent ${
-        fillHeight ? 'h-full min-h-0 flex-1 overflow-hidden' : ''
+      className={`relative flex w-full min-w-0 flex-col overflow-hidden rounded-md border border-kiviBorder/60 bg-kiviSurface focus-visible:outline-2 focus-visible:outline-kiviAccent ${
+        fillHeight ? 'h-full min-h-0 flex-1' : ''
       }`}
     >
       <HeatmapAnalysisBar
@@ -1138,9 +1140,13 @@ export const HeatmapTable: React.FC<HeatmapTableProps> = React.memo(({
         onClosePasteSpecial={() => setIsPasteSpecialOpen(false)}
       />
 
-      {isSetConstantOpen && (
+      {setConstantPresence.mounted && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          className={`fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4 ${
+            setConstantPresence.state === 'closing'
+              ? 'kivi-anim-backdrop-out'
+              : 'kivi-anim-backdrop-in'
+          }`}
           role="dialog"
           aria-modal="true"
           aria-label="Set Constant Cell Value"
@@ -1153,7 +1159,9 @@ export const HeatmapTable: React.FC<HeatmapTableProps> = React.memo(({
               e.preventDefault();
               handleApplySetConstant(Number.parseFloat(constantInput));
             }}
-            className="w-full max-w-xs space-y-3 rounded-lg border border-kiviBorder bg-kiviSurface p-4 text-xs text-kiviInk shadow-xl"
+            className={`w-full max-w-xs space-y-3 rounded-2xl kivi-floating-window bg-kiviSurface p-4 text-xs text-kiviInk ${
+              setConstantPresence.state === 'closing' ? 'kivi-anim-pop-out' : 'kivi-anim-pop-in'
+            }`}
           >
             <h4 className="text-sm font-semibold">Set Constant Value (=)</h4>
             <p className="text-[11px] text-kiviSecondary">
@@ -1166,7 +1174,7 @@ export const HeatmapTable: React.FC<HeatmapTableProps> = React.memo(({
               aria-label="Constant cell value"
               value={constantInput}
               onChange={(e) => setConstantInput(e.target.value)}
-              className="w-full rounded border border-kiviBorderStrong bg-kiviBg px-2.5 py-1.5 font-mono text-xs text-kiviInk focus-visible:outline-2 focus-visible:outline-kiviAccent"
+              className="w-full rounded border border-kiviBorder/70 bg-kiviBg px-2.5 py-1.5 font-mono text-xs text-kiviInk focus-visible:outline-2 focus-visible:outline-kiviAccent"
             />
             <div className="flex justify-end gap-2">
               <button

@@ -4,6 +4,28 @@ All notable changes to kiviTuner are documented in this file.
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-11-28
+
+UI refinement, macOS menu bar integration, responsive layout parity, and WebView memory optimization release ([v0.1.2 Release](https://github.com/kaivyy/kiviTuner/releases/tag/v0.1.2)).
+
+### Added
+
+- Native global macOS top menu bar (`src-tauri/src/native_menu.rs` and `src/lib/nativeMenuBridge.ts`) placing `File`, `Edit`, `XDF`, `View`, `Reverse`, `ECU`, and `Help` in the system bar next to the Apple icon with verified 1-to-1 action parity and race-free listener cleanup, while keeping status pills and window controls inside the app titlebar without menu duplication.
+- Horizontal scrollbar, wheel scrolling, and overflow arrow controls in `WorkspaceTabBar` alongside fixed `h-8` ROM strip and `h-10` editor tab bar heights so opening `Full Waveform` in empty mode causes zero vertical layout jump.
+- Exclusive single-active navigation state resolver (`activityRailModel.ts`) with accent indicator bar, docked panel indicator dot, and smooth GPU transitions across `ActivityRail`, `MobileBottomNav`, and interactive workspace buttons.
+
+### Improved
+
+- Borderless outer-rounded window chrome across all main, floating, and standalone tool windows (`FloatingWindow`, `KiviMenuBar`, `WindowTrafficLights`, `CommandPalette`, and Windows `DWMWA_WINDOW_CORNER_PREFERENCE` / border-none styling) with pure soft elevation shadows and sharp `rounded-none` docked/overlay workspace drawers (`Map Explorer`, `ROM Discovery Scanner`, `Inspector`).
+- Unified `36px` (`h-9`) borderless workspace headers across `Map Explorer`, `Inspector`, `ROM Discovery Scanner`, `Split` pane, and the center view-mode bar plus fixed `32px` (`h-8`) menubar height so small viewport resizes never inflate bar heights or wrap buttons awkwardly.
+- Consistent non-wrapping analysis bar controls in `2D Table` and `Split 3D`, fixed minimum widths on loading buttons across tool dialogs to prevent width jitter, softened borders on `HexdumpView`, `KiviWaveform`, `Surface3DView`, `ScalarFlagEditor`, and reduced WebView2 RAM overhead with lazy-loaded heavy tool panels.
+
+### Fixed
+
+- Fixed stuck active background highlights on `ActivityRail` buttons when moving between `Search`, `Hex Viewer`, `Waveform`, and modal tools, and made `Discovery Scanner` and `Inspector` mutually exclusive on the right side.
+- Fixed responsive drawer clipping where `Map Explorer` and its filter input were covered by the menubar or blocked clicks on `ActivityRail`, and auto-refitted floating windows cleanly inside narrowed viewports.
+- Fixed submenu hover gap and nested `role="menuitem"` ARIA collisions in `KiviMenuBar`, plus GPU-composited open/close/minimize transitions (`useAnimatedPresence`).
+
 ## [0.1.1] - 2026-11-28
 
 Maintenance and usability release ([v0.1.1 Release](https://github.com/kaivyy/kiviTuner/releases/tag/v0.1.1)) covering multi-transport diagnostics, structural `blind_v2` discovery upgrades, desktop windowing stability, 3D surface overhaul, and built-in app updates.

@@ -1,5 +1,6 @@
 import React from 'react';
 import { Percent, ClipboardPaste, ClipboardList, X, Check } from 'lucide-react';
+import { useAnimatedPresence } from '../../../hooks/useAnimatedPresence';
 
 interface HeatmapDialogsProps {
   isPercentModalOpen: boolean;
@@ -31,12 +32,24 @@ export const HeatmapDialogs: React.FC<HeatmapDialogsProps> = ({
   onChangePasteSpecialValue,
   onRunPasteSpecial,
   onClosePasteSpecial,
-}) => (
-  <>
-    {isPercentModalOpen && (
-      <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-        <div className="w-80 rounded-lg border border-kiviBorder bg-kiviSurface p-4 shadow-2xl">
-          <div className="flex items-center justify-between border-b border-kiviBorder pb-2 mb-3">
+}) => {
+  const percentPresence = useAnimatedPresence(isPercentModalOpen, 110);
+  const pastePresence = useAnimatedPresence(isPasteSpecialOpen, 110);
+
+  return (
+    <>
+      {percentPresence.mounted && (
+        <div
+          className={`absolute inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4 ${
+            percentPresence.state === 'closing' ? 'kivi-anim-backdrop-out' : 'kivi-anim-backdrop-in'
+          }`}
+        >
+          <div
+            className={`w-full max-w-xs rounded-2xl kivi-floating-window bg-kiviSurface p-4 ${
+              percentPresence.state === 'closing' ? 'kivi-anim-pop-out' : 'kivi-anim-pop-in'
+            }`}
+          >
+            <div className="flex items-center justify-between pb-2 mb-3">
             <h4 className="text-sm font-semibold text-kiviInk flex items-center gap-1.5">
               <Percent className="h-4 w-4 text-kiviWarn" />
               <span>Adjust by Percentage</span>
@@ -116,10 +129,18 @@ export const HeatmapDialogs: React.FC<HeatmapDialogsProps> = ({
       </div>
     )}
 
-    {isPasteSpecialOpen && (
-      <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-        <div className="w-84 rounded-lg border border-kiviBorder bg-kiviSurface p-4 shadow-2xl">
-          <div className="flex items-center justify-between border-b border-kiviBorder pb-2 mb-3">
+      {pastePresence.mounted && (
+        <div
+          className={`absolute inset-0 z-50 flex items-center justify-center bg-slate-950/40 p-4 ${
+            pastePresence.state === 'closing' ? 'kivi-anim-backdrop-out' : 'kivi-anim-backdrop-in'
+          }`}
+        >
+          <div
+            className={`w-full max-w-sm rounded-2xl kivi-floating-window bg-kiviSurface p-4 ${
+              pastePresence.state === 'closing' ? 'kivi-anim-pop-out' : 'kivi-anim-pop-in'
+            }`}
+          >
+            <div className="flex items-center justify-between pb-2 mb-3">
             <h4 className="text-sm font-semibold text-kiviInk flex items-center gap-1.5">
               <ClipboardList className="h-4 w-4 text-kiviAccent" />
               <span>Paste Special</span>
@@ -203,7 +224,8 @@ export const HeatmapDialogs: React.FC<HeatmapDialogsProps> = ({
             </button>
           </div>
         </div>
-      </div>
-    )}
-  </>
-);
+        </div>
+      )}
+    </>
+  );
+};

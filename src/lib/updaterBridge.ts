@@ -4,7 +4,7 @@ import { check as checkSignedUpdater } from '@tauri-apps/plugin-updater';
 import { exit as exitProcess, relaunch as relaunchProcess } from '@tauri-apps/plugin-process';
 import { isDesktopApp } from './tauriBridge.ts';
 
-export const APP_VERSION = '0.1.1';
+export const APP_VERSION = '0.1.2';
 export const GITHUB_RELEASE_PAGE = 'https://github.com/kaivyy/kiviTuner/releases/latest';
 const GITHUB_API_LATEST = 'https://api.github.com/repos/kaivyy/kiviTuner/releases/latest';
 const UPDATE_PROGRESS_EVENT = 'kivituner:update-progress';

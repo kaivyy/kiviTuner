@@ -51,7 +51,7 @@ export const AboutModal: React.FC<AboutModalProps> = ({
           <button
             type="button"
             onClick={() => void useUpdateStore.getState().checkForUpdates(false)}
-            className="inline-flex items-center gap-1.5 rounded border border-kiviBorderStrong bg-kiviSurface px-3 py-1.5 text-xs font-medium text-kiviInk hover:bg-kiviBg"
+            className="inline-flex items-center gap-1.5 rounded border border-kiviBorder/70 bg-kiviSurface px-3 py-1.5 text-xs font-medium text-kiviInk hover:bg-kiviBg"
           >
             <Download className="h-3.5 w-3.5 text-kiviAccent" />
             <span>Check for Updates</span>

@@ -83,13 +83,13 @@ export function formatCellRecommendationRow(params: {
     statusBadge = {
       status: 'InsufficientEvidence',
       label: 'Insufficient Evidence',
-      badgeClass: 'bg-kiviElevated text-kiviMuted border border-kiviBorderStrong',
+      badgeClass: 'bg-kiviElevated text-kiviMuted border border-kiviBorder/70',
     };
   } else if (rec.status === 'NoChange') {
     statusBadge = {
       status: 'NoChange',
       label: 'On Target (No Change)',
-      badgeClass: 'bg-kiviElevated text-kiviGreen border border-kiviBorderStrong',
+      badgeClass: 'bg-kiviElevated text-kiviGreen border border-kiviBorder/70',
     };
   } else if (rec.is_clamped) {
     statusBadge = {

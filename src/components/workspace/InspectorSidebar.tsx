@@ -23,6 +23,7 @@ interface InspectorSidebarProps {
   onViewInHex?: (address: number) => void;
   onRevertMapToOriginal?: () => void;
   onClose?: () => void;
+  animState?: 'open' | 'closing';
 }
 
 export const InspectorSidebar: React.FC<InspectorSidebarProps> = ({
@@ -43,6 +44,7 @@ export const InspectorSidebar: React.FC<InspectorSidebarProps> = ({
   onViewInHex,
   onRevertMapToOriginal,
   onClose,
+  animState = 'open',
 }) => {
   const romData = useMapStore((s) => s.romData);
   const originalRomData = useMapStore((s) => s.originalRomData);
@@ -52,26 +54,33 @@ export const InspectorSidebar: React.FC<InspectorSidebarProps> = ({
   );
 
   return (
-  <aside className="fixed inset-y-0 right-0 z-40 flex w-[min(85vw,16rem)] flex-col border-l border-kiviBorder bg-kiviSurface shadow-2xl lg:static lg:z-auto lg:w-60 lg:shrink-0 lg:shadow-none xl:w-64">
-    <div className="flex items-center justify-between border-b border-kiviBorder px-3 py-2 text-xs font-semibold uppercase tracking-wider text-kiviSecondary">
-      <div className="flex items-center gap-1.5">
+  <aside
+    className={`absolute inset-y-0 right-0 z-40 flex w-[min(85vw,16rem)] flex-col overflow-hidden rounded-none kivi-panel-surface bg-kiviSurface lg:static lg:inset-y-auto lg:right-auto lg:z-auto lg:w-60 lg:shrink-0 lg:shadow-none lg:border-l lg:border-kiviBorder/60 xl:w-64 ${
+      animState === 'closing' ? 'kivi-anim-slide-right-out' : 'kivi-anim-slide-right-in'
+    }`}
+  >
+    <div
+      data-testid="panel-titlebar-inspector"
+      className="flex h-9 shrink-0 items-center justify-between gap-2 bg-kiviSurface px-3 text-xs font-semibold uppercase tracking-wider text-kiviSecondary"
+    >
+      <div className="flex min-w-0 items-center gap-1.5">
         <Info className="h-3.5 w-3.5 shrink-0 text-kiviAccent" />
-        <span className="whitespace-nowrap">Inspector</span>
+        <span className="truncate whitespace-nowrap">Inspector</span>
       </div>
       {onClose && (
         <button
           type="button"
           aria-label="Close inspector panel"
           onClick={onClose}
-          className="flex min-h-[36px] min-w-[36px] items-center justify-center rounded text-kiviMuted hover:bg-kiviElevated hover:text-kiviInk"
+          className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-kiviMuted transition-colors hover:bg-kiviElevated hover:text-kiviInk"
         >
-          <X className="h-4 w-4" />
+          <X className="h-3.5 w-3.5" />
         </button>
       )}
     </div>
 
     <div className="flex-1 space-y-3 overflow-y-auto p-3 text-xs">
-      <div className="rounded-lg border border-kiviBorder bg-kiviBg p-2.5">
+      <div className="rounded-md border border-kiviBorder/60 bg-kiviBg p-2.5">
         <h3 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-kiviSecondary">
           ROM Project
         </h3>
@@ -105,7 +114,7 @@ export const InspectorSidebar: React.FC<InspectorSidebarProps> = ({
         </div>
       </div>
 
-      <div className="rounded-lg border border-kiviBorder bg-kiviBg p-2.5">
+      <div className="rounded-md border border-kiviBorder/60 bg-kiviBg p-2.5">
         <h3 className="mb-1.5 flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-kiviSecondary">
           <Crosshair className="h-3 w-3 text-kiviAccent" />
           <span>Waveform Selection</span>
@@ -143,7 +152,7 @@ export const InspectorSidebar: React.FC<InspectorSidebarProps> = ({
         )}
       </div>
 
-      <div className="rounded-lg border border-kiviBorder bg-kiviBg p-2.5">
+      <div className="rounded-md border border-kiviBorder/60 bg-kiviBg p-2.5">
         <h3 className="mb-1.5 flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-kiviSecondary">
           {checksumStatus === 'valid' ? (
             <ShieldCheck className="h-3.5 w-3.5 text-kiviGreen" />
@@ -180,7 +189,7 @@ export const InspectorSidebar: React.FC<InspectorSidebarProps> = ({
             <button
               type="button"
               onClick={onFixChecksum}
-              className="mt-1.5 w-full rounded border border-kiviBorderStrong bg-kiviElevated py-1 text-[11px] text-kiviInk transition-colors hover:border-kiviAccent"
+              className="mt-1.5 w-full rounded border border-kiviBorder/70 bg-kiviElevated py-1 text-[11px] text-kiviInk transition-colors hover:border-kiviAccent"
             >
               Recalculate &amp; Repair
             </button>
@@ -190,7 +199,7 @@ export const InspectorSidebar: React.FC<InspectorSidebarProps> = ({
 
       <div
         data-testid="inspector-delta-ledger"
-        className="rounded-lg border border-kiviBorder bg-kiviBg p-2.5"
+        className="rounded-md border border-kiviBorder/60 bg-kiviBg p-2.5"
       >
         <div className="mb-1.5 flex items-center justify-between gap-2">
           <h3 className="flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-kiviSecondary">
@@ -247,7 +256,7 @@ export const InspectorSidebar: React.FC<InspectorSidebarProps> = ({
       </div>
 
       {selectedMap && (
-        <div className="rounded-lg border border-kiviBorder bg-kiviBg p-2.5">
+        <div className="rounded-md border border-kiviBorder/60 bg-kiviBg p-2.5">
           <h3 className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-kiviSecondary">
             Selected Map
           </h3>
@@ -279,7 +288,7 @@ export const InspectorSidebar: React.FC<InspectorSidebarProps> = ({
               <button
                 type="button"
                 onClick={() => onEditMapProperties(selectedMap)}
-                className="flex items-center justify-center gap-1 rounded border border-kiviBorderStrong bg-kiviElevated py-1 text-[11px] text-kiviInk hover:border-kiviAccent"
+                className="flex items-center justify-center gap-1 rounded border border-kiviBorder/70 bg-kiviElevated py-1 text-[11px] text-kiviInk hover:border-kiviAccent"
               >
                 <Pencil className="h-3 w-3 text-kiviAccent" />
                 <span>Edit Map Properties</span>
@@ -289,7 +298,7 @@ export const InspectorSidebar: React.FC<InspectorSidebarProps> = ({
               <button
                 type="button"
                 onClick={() => onViewInHex(selectedMap.address)}
-                className="flex items-center justify-center gap-1 rounded border border-kiviBorderStrong bg-kiviElevated py-1 text-[11px] text-kiviInk hover:border-kiviAccent"
+                className="flex items-center justify-center gap-1 rounded border border-kiviBorder/70 bg-kiviElevated py-1 text-[11px] text-kiviInk hover:border-kiviAccent"
               >
                 <Binary className="h-3 w-3 text-kiviAccent" />
                 <span>View in Hex</span>

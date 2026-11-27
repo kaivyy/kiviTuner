@@ -5,6 +5,7 @@ import {
   applyWindowResize,
   clampWindowPosition,
   computeInitialRect,
+  fitRectToViewport,
   focusFloatingWindow,
   getMinimizedFloatingWindows,
   getTopFloatingWindowId,
@@ -98,4 +99,15 @@ test('minimized windows dock cleanly into StatusBar registry and restore on dema
 
   assert.deepEqual(restoredIds, ['diff']);
   assert.deepEqual(getMinimizedFloatingWindows(), []);
+});
+
+test('fitRectToViewport keeps shrunk desktop windows inside narrow viewports below mobile menubar', () => {
+  const fitted = fitRectToViewport(
+    { x: 320, y: 120, width: 960, height: 720 },
+    { minWidth: 520, minHeight: 440 },
+    640,
+    520
+  );
+  assert.ok(fitted.x >= 8 && fitted.x + fitted.width <= 632);
+  assert.ok(fitted.y >= 34 && fitted.y + fitted.height <= 512);
 });

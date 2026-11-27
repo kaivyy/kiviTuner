@@ -122,3 +122,15 @@ test('getStandaloneWindowId validates known ?window= params and rejects unknown 
   assert.equal(invoked[0].cmd, 'open_tool_window');
   assert.equal(invoked[1].cmd, 'set_current_window_always_on_top');
 });
+
+test('isMacDesktop identifies macOS desktop cleanly without leaking in browser or Windows/Linux', async () => {
+  const { isMacDesktop } = await import('./windowControlsBridge.ts');
+  assert.equal(isMacDesktop({ isDesktop: () => false, platform: 'MacIntel' }), false);
+  assert.equal(isMacDesktop({ isDesktop: () => true, platform: 'Win32' }), false);
+  assert.equal(isMacDesktop({ isDesktop: () => true, platform: 'Linux x86_64' }), false);
+  assert.equal(isMacDesktop({ isDesktop: () => true, platform: 'MacIntel' }), true);
+  assert.equal(
+    isMacDesktop({ isDesktop: () => true, platform: '', userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X)' }),
+    true
+  );
+});

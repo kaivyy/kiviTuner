@@ -158,6 +158,10 @@ export const KiviWaveform: React.FC<KiviWaveformProps> = ({
     return () => {
       ro.disconnect();
       window.removeEventListener('resize', refreshRect);
+      if (canvasRef.current) {
+        canvasRef.current.width = 0;
+        canvasRef.current.height = 0;
+      }
     };
   }, []);
 
@@ -257,7 +261,7 @@ export const KiviWaveform: React.FC<KiviWaveformProps> = ({
     if (!ctx) return;
 
     const { width, height: h } = canvasDimensions;
-    const dpr = window.devicePixelRatio || 1;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
     const isLight = theme === 'light';
     const bgHex = isLight ? '#F8FAFC' : '#0A0D12';
     const gridHex = isLight ? '#E2E8F0' : '#1E293B';
@@ -853,14 +857,14 @@ export const KiviWaveform: React.FC<KiviWaveformProps> = ({
     <div
       tabIndex={0}
       onKeyDown={handleContainerKeyDown}
-      className={`flex flex-col rounded-lg border border-kiviBorder bg-kiviBg text-kiviInk select-none focus-visible:outline-2 focus-visible:outline-kiviAccent ${className}`}
+      className={`flex flex-col overflow-hidden rounded-md border border-kiviBorder/60 bg-kiviBg text-kiviInk select-none focus-visible:outline-2 focus-visible:outline-kiviAccent ${className}`}
     >
       {/* Waveform Controls Toolbar */}
-      <div className="flex flex-wrap items-center justify-between border-b border-kiviBorder bg-kiviSurface px-3 py-1.5 text-xs gap-2">
+      <div className="flex flex-wrap items-center justify-between border-b border-kiviBorder/50 bg-kiviSurface px-3 py-1.5 text-xs gap-2">
         {/* Left Toolbar: Bit depth, Endianness & Pitch */}
         <div className="flex items-center gap-2 flex-wrap">
           {/* Bit depth toggle */}
-          <div className="flex items-center rounded bg-kiviSurface p-0.5 border border-kiviBorder">
+          <div className="flex items-center rounded bg-kiviSurface p-0.5 border border-kiviBorder/60">
             <button
               type="button"
               onClick={() => setIs16Bit(false)}
@@ -887,7 +891,7 @@ export const KiviWaveform: React.FC<KiviWaveformProps> = ({
 
           {/* Endianness toggle (only active/visible in 16-bit mode) */}
           {is16Bit && (
-            <div className="flex items-center rounded bg-kiviSurface p-0.5 border border-kiviBorder">
+            <div className="flex items-center rounded bg-kiviSurface p-0.5 border border-kiviBorder/60">
               <button
                 type="button"
                 onClick={() => setIsBigEndian(false)}
@@ -915,7 +919,6 @@ export const KiviWaveform: React.FC<KiviWaveformProps> = ({
             </div>
           )}
 
-          <div className="h-3.5 w-px bg-kiviBorder" />
 
           {/* Column Pitch Guide Controls */}
           <div className="flex items-center gap-1">
@@ -994,7 +997,7 @@ export const KiviWaveform: React.FC<KiviWaveformProps> = ({
         {/* Right Toolbar: Tools, Zoom & Navigation */}
         <div className="flex items-center gap-1.5">
           {/* Interaction Mode Toggle */}
-          <div className="flex items-center rounded bg-kiviSurface p-0.5 border border-kiviBorder">
+          <div className="flex items-center rounded bg-kiviSurface p-0.5 border border-kiviBorder/60">
             <button
               type="button"
               onClick={() => setInteractionMode('select')}
@@ -1021,7 +1024,6 @@ export const KiviWaveform: React.FC<KiviWaveformProps> = ({
             </button>
           </div>
 
-          <div className="h-3.5 w-px bg-kiviBorder" />
 
           {/* Zoom Buttons */}
           <button
@@ -1088,7 +1090,7 @@ export const KiviWaveform: React.FC<KiviWaveformProps> = ({
           );
 
           return (
-            <div className="pointer-events-none absolute bottom-8 right-2 flex min-w-[236px] items-center gap-2 whitespace-nowrap rounded border border-kiviBorderStrong bg-kiviSurface px-2.5 py-1 font-mono text-[10px] text-kiviSecondary shadow-lg tabular-nums">
+            <div className="pointer-events-none absolute bottom-8 right-2 flex min-w-[236px] items-center gap-2 whitespace-nowrap rounded-lg kivi-panel-surface bg-kiviSurface/95 px-2.5 py-1 font-mono text-[10px] text-kiviSecondary tabular-nums">
               <span>
                 Addr: <span className="text-kiviAccent">0x{hoverInfo.byteOffset.toString(16).toUpperCase().padStart(6, '0')}</span>
               </span>

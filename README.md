@@ -7,7 +7,7 @@
 Cross-platform ECU binary calibration, structural map discovery, multi-OEM checksum workbench, and hardware flashing studio built with Rust, Tauri, and React.
 
 [![Build Desktop Installers](https://github.com/kaivyy/kiviTuner/actions/workflows/build-desktop.yml/badge.svg)](https://github.com/kaivyy/kiviTuner/actions/workflows/build-desktop.yml)
-[![Release v0.1.1](https://img.shields.io/badge/release-v0.1.1-0369A1)](https://github.com/kaivyy/kiviTuner/releases)
+[![Release v0.1.2](https://img.shields.io/badge/release-v0.1.2-0369A1)](https://github.com/kaivyy/kiviTuner/releases)
 [![License MIT](https://img.shields.io/badge/license-MIT-166534)](LICENSE)
 [![Stack Rust Tauri React](https://img.shields.io/badge/stack-Rust%20%7C%20Tauri%202%20%7C%20React%2018-1E293B)](Cargo.toml)
 
@@ -37,11 +37,11 @@ Cross-platform ECU binary calibration, structural map discovery, multi-OEM check
 
 | Domain | Included Functionality |
 |---|---|
-| Map & Curve Editing | Collapsible nested `Map Explorer` category folders, scrollable 2D heatmap grid, interactive `1xN` / `Nx1` curve and row-slice chart, calibrated 3D surface viewer (camera-aware cage, X/Y/Z axis ticks, color legend, base ROM ghost wireframe), `Split 3D` / `Full 3D` / `2D Table` instant switching with LRU matrix caching, and TSV clipboard + Paste Special. |
-| Binary & Map Discovery | Virtualized 4 KiB LRU hex inspector with live Data Inspector (`u8`/`i8`/`u16`/`i16`/`u32`/`i32`/`f32` LE/BE), 2D binary waveform scrubber, upgraded `blind_v2` structural 2D/1D scanner (`u8`-header OEM structs, signed zero-crossing `i16`/`i8`, Geary's C, Bartels RVN, turning-point gates, rule classifier, Fisher-Yates null checks), address-gated binary diff, and stock SHA-256 registry. |
+| Map & Curve Editing | Collapsible nested `Map Explorer` category folders, horizontally scrollable `WorkspaceTabBar` with wheel/arrow controls, scrollable 2D heatmap grid, interactive `1xN` / `Nx1` curve and row-slice chart, calibrated 3D surface viewer (camera-aware cage, X/Y/Z axis ticks, color legend, base ROM ghost wireframe), `Split 3D` / `Full 3D` / `2D Table` instant switching with LRU matrix caching, and TSV clipboard + Paste Special. |
+| Binary & Map Discovery | Virtualized 4 KiB LRU hex inspector with live Data Inspector (`u8`/`i8`/`u16`/`i16`/`u32`/`i32`/`f32` LE/BE), 2D binary waveform scrubber, upgraded `blind_v2` structural 2D/1D scanner (`u8`-header OEM structs, signed zero-crossing `i16`/`i8`, Geary's C, Bartels RVN, turning-point gates, rule classifier, Fisher-Yates null checks), mutually exclusive `Discovery Scanner` and `Inspector` panels, address-gated binary diff, and stock SHA-256 registry. |
 | Checksum Engines | Native verify/repair engines for Keihin, Honda, Bosch EDC15/EDC16/EDC17/ME3/ME7/MG1 GF(2), BMW MS41/MS43/GS20/EM2K, GM P01 to E92, Subaru Denso/Hitachi, VAG Simos, generic CRC/sum, XDF checksum blocks, and declarative JSON checksum plugins. |
 | Formats & Definitions | Reads and exports `.bin`, `.rom`, Intel `.hex`, Motorola `.s19`, `.vbf`, `.xdf`, `.a2l`, DAMOS/SPZ/UMP, `.kp`, `.kivi.json`, Speeduino/MegaSquirt `.ini`, and CSV map definitions. |
-| Telemetry, Diagnostics & Updates | Multi-transport ELM327 (USB / Bluetooth SPP / Wi-Fi TCP), Raw K-Line, 5-tab OBD-II/UDS/Motorcycle diagnostics (Honda 4-pin, Euro 5 CAN, Yamaha, Kawasaki KDS, Suzuki SDS + DLC pinout guide), Auto-Tune review modal, Bus Flight Recorder, independent OS pop-out tool windows, and built-in GitHub Releases updater (`SHA256SUMS.txt` verification + one-click restart). |
+| Desktop Shell, Telemetry & Updates | Native global macOS top menu bar integration next to the Apple icon (`native_menu.rs`), borderless outer-rounded OS and floating tool windows, unified 36px borderless workspace headers, exclusive `ActivityRail` focus indicator, low-RAM WebView2 tuning with lazy tool bundles, multi-transport ELM327/K-Line/OBD/UDS/Motorcycle diagnostics, Auto-Tune review, and built-in GitHub Releases updater (`SHA256SUMS.txt` verification + one-click restart). |
 
 ## Hardware Support
 
@@ -71,8 +71,8 @@ flowchart LR
 
 | Crate / Module | Responsibility |
 |---|---|
-| `src/` | React 18 UI: `KiviMenuBar`, `ActivityRail`, `WorkspaceTabBar`, `MapTreeSidebar` collapsible folder tree, `HeatmapTable`, `CurveProfileChart`, `Surface3DView` 3D CAD viewer, `KiviWaveform`, `HexdumpView`, `ScannerDrawer`, `BinDiffModal`, `CalibrationWorkbenchModal`, `FlashPanel`, `CataloguePanel`, `TelemetryDevPanel`, `AutoTuneReviewModal`, `UpdateModal`, and independent pop-out tool windows (`StandaloneWindowHost`). |
-| `src-tauri/` | Single-owner multi-document ROM session state (`memory` + immutable `original_memory`), 4 KiB hex/waveform paging, async pop-out OS window manager, GitHub Releases `SHA256SUMS.txt` / Tauri updater installer (`updater.rs`), and streaming IPC commands. |
+| `src/` | React 18 UI: `KiviMenuBar` (with native macOS global menu event bridge), exclusive `ActivityRail` focus indicator, scrollable `WorkspaceTabBar`, `MapTreeSidebar`, `HeatmapTable`, `CurveProfileChart`, `Surface3DView`, `KiviWaveform`, `HexdumpView`, mutually exclusive `ScannerDrawer` and `InspectorSidebar`, plus lazy-loaded floating and standalone OS pop-out tool windows. |
+| `src-tauri/` | Single-owner multi-document ROM session state (`memory` + immutable `original_memory`), 4 KiB hex/waveform paging, macOS global native menu builder (`native_menu.rs`), borderless outer-rounded DWM window manager with low-RAM WebView2 tuning (`window_manager.rs`), GitHub Releases updater (`updater.rs`), and streaming IPC commands. |
 | `crates/kivi-core` | Zero-copy memory map, signed/unsigned int & `f32` LE/BE decoders, rounded write-back, affine scaling, SHA-256 hashing, and undo/redo patch stack. |
 | `crates/kivi-defs` | Parsers and exporters for `.xdf`, `.a2l`, DAMOS/SPZ/UMP, `.ini`, `.kivi.json`, CSV, interpolation, and smoothing math. |
 | `crates/kivi-scanner` | `blind_v2` multi-brand structural map/curve discovery, 16-bit window scanner, heuristic detector, rule classifier, signature scripts, and stock ROM index. |

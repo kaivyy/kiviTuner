@@ -274,7 +274,7 @@ export const StandaloneWindowHost: React.FC<StandaloneWindowHostProps> = ({ tool
   return (
     <Suspense
       fallback={
-        <div className="fixed inset-0 flex h-screen w-screen items-center justify-center border border-kiviBorderStrong bg-kiviSurface font-mono text-xs text-kiviMuted">
+        <div className="fixed inset-0 flex h-screen w-screen items-center justify-center bg-kiviSurface font-mono text-xs text-kiviMuted">
           Loading {toolId}...
         </div>
       }

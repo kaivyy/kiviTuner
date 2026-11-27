@@ -447,7 +447,7 @@ export const BinDiffModal: React.FC<BinDiffModalProps> = ({
       }
     >
       <div className="flex min-h-0 flex-1 flex-col select-none overflow-hidden">
-        <div className="shrink-0 border-b border-kiviBorder bg-kiviBg px-5 py-1.5 text-[11px] text-kiviMuted">
+        <div className="shrink-0 border-b border-kiviBorder/50 bg-kiviBg px-5 py-1.5 text-[11px] text-kiviMuted">
           Identify modified calibration tables, axes, and scalar parameters between two ROMs.
         </div>
 
@@ -479,7 +479,7 @@ export const BinDiffModal: React.FC<BinDiffModalProps> = ({
         />
 
         {/* VBF container panel (Wave 5) */}
-        <div className="border-b border-kiviBorder bg-kiviBg px-5 py-2 text-[11px]">
+        <div className="border-b border-kiviBorder/50 bg-kiviBg px-5 py-2 text-[11px]">
           <div className="flex flex-wrap items-center gap-3">
             <span className="font-semibold uppercase tracking-wide text-kiviMuted">VBF</span>
             <button
@@ -496,7 +496,7 @@ export const BinDiffModal: React.FC<BinDiffModalProps> = ({
               aria-label="Export ROM as VBF"
               disabled={!hasBaseRom}
               onClick={() => void handleExportVbf()}
-              className="rounded border border-kiviBorder bg-kiviElevated px-2 py-1 text-kiviInk hover:bg-kiviBorderStrong disabled:opacity-40"
+              className="rounded border border-kiviBorder bg-kiviElevated px-2 py-1 text-kiviInk hover:bg-kiviBorder/40 disabled:opacity-40"
             >
               Export ROM as VBF
             </button>
@@ -551,7 +551,7 @@ export const BinDiffModal: React.FC<BinDiffModalProps> = ({
         </div>
 
         {/* Workspace ROM base address (B4a) */}
-        <div className="flex flex-wrap items-center gap-3 border-b border-kiviBorder bg-kiviBg px-5 py-2 text-[11px]">
+        <div className="flex flex-wrap items-center gap-3 border-b border-kiviBorder/50 bg-kiviBg px-5 py-2 text-[11px]">
           <span className="font-semibold uppercase tracking-wide text-kiviMuted">Base address</span>
           <label className="flex items-center gap-1.5 text-kiviMuted">
             <span>Workspace ROM</span>
@@ -572,7 +572,7 @@ export const BinDiffModal: React.FC<BinDiffModalProps> = ({
             type="button"
             onClick={() => void handleApplyBaseAddress()}
             disabled={!hasBaseRom}
-            className="rounded border border-kiviBorder bg-kiviElevated px-2 py-0.5 text-kiviInk hover:bg-kiviBorderStrong disabled:opacity-40"
+            className="rounded border border-kiviBorder bg-kiviElevated px-2 py-0.5 text-kiviInk hover:bg-kiviBorder/40 disabled:opacity-40"
           >
             Apply
           </button>
@@ -592,7 +592,7 @@ export const BinDiffModal: React.FC<BinDiffModalProps> = ({
         </div>
 
         {/* Read-only verification bar */}
-        <div className="flex flex-wrap items-center gap-3 border-b border-kiviBorder bg-kiviBg px-5 py-2 text-[11px]">
+        <div className="flex flex-wrap items-center gap-3 border-b border-kiviBorder/50 bg-kiviBg px-5 py-2 text-[11px]">
           <span className="font-semibold uppercase tracking-wide text-kiviMuted">Verify</span>
           <button
             type="button"
@@ -609,7 +609,7 @@ export const BinDiffModal: React.FC<BinDiffModalProps> = ({
               type="button"
               disabled={verifyPending}
               onClick={() => void handleReverify()}
-              className="rounded border border-kiviBorder bg-kiviElevated px-2 py-1 text-kiviInk hover:bg-kiviBorderStrong disabled:opacity-40"
+              className="min-w-[84px] shrink-0 whitespace-nowrap rounded border border-kiviBorder bg-kiviElevated px-2 py-1 text-center text-kiviInk hover:bg-kiviBorder/40 disabled:opacity-40"
             >
               {verifyPending ? 'Verifying...' : 'Re-verify'}
             </button>
@@ -626,7 +626,7 @@ export const BinDiffModal: React.FC<BinDiffModalProps> = ({
         </div>
 
         {/* Action Controls */}
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-kiviBorder bg-kiviBg px-5 py-2.5">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-kiviBorder/50 bg-kiviBg px-5 py-2.5">
           <div className="flex items-center gap-2">
             <button
               type="button"

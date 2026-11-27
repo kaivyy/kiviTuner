@@ -96,7 +96,12 @@ export const HexdumpView: React.FC<HexdumpViewProps> = ({
     updateHeight();
     const ro = new ResizeObserver(updateHeight);
     ro.observe(el);
-    return () => ro.disconnect();
+    return () => {
+      ro.disconnect();
+      pageGenRef.current += 1;
+      pagesRef.current.clear();
+      inflightRef.current.clear();
+    };
   }, []);
 
   useEffect(() => {
@@ -429,7 +434,7 @@ export const HexdumpView: React.FC<HexdumpViewProps> = ({
       onKeyDown={handleContainerKeyDown}
       className="flex h-full min-w-0 flex-col bg-kiviBg font-mono text-[11px] text-kiviInk focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-kiviAccent"
     >
-      <div className="flex flex-wrap items-center gap-2 border-b border-kiviBorder bg-kiviSurface px-3 py-1.5">
+      <div className="flex flex-wrap items-center gap-2 border-b border-kiviBorder/50 bg-kiviSurface px-3 py-1.5">
         <span className="shrink-0 whitespace-nowrap text-kiviMuted">Offset</span>
         <input
           type="text"
@@ -439,17 +444,16 @@ export const HexdumpView: React.FC<HexdumpViewProps> = ({
           onKeyDown={(e) => {
             if (e.key === 'Enter') handleJump();
           }}
-          className="w-24 shrink-0 rounded border border-kiviBorderStrong bg-kiviBg px-1.5 py-0.5 text-kiviInk tabular-nums focus-visible:outline-2 focus-visible:outline-kiviAccent"
+          className="w-24 shrink-0 rounded border border-kiviBorder/70 bg-kiviBg px-1.5 py-0.5 text-kiviInk tabular-nums focus-visible:outline-2 focus-visible:outline-kiviAccent"
         />
         <button
           type="button"
           onClick={handleJump}
-          className="shrink-0 whitespace-nowrap rounded border border-kiviBorderStrong bg-kiviElevated px-2 py-0.5 text-kiviSecondary hover:text-kiviInk"
+          className="shrink-0 whitespace-nowrap rounded border border-kiviBorder/70 bg-kiviElevated px-2 py-0.5 text-kiviSecondary hover:text-kiviInk"
         >
           Go
         </button>
 
-        <div className="mx-0.5 hidden h-3.5 w-px bg-kiviBorder sm:block" />
 
         {/* Hex View Controls: 8/16-bit, Hex/Dec, Columns (W/M), Diff Highlight */}
         <div
@@ -581,7 +585,6 @@ export const HexdumpView: React.FC<HexdumpViewProps> = ({
           </div>
         )}
 
-        <div className="mx-0.5 hidden h-3.5 w-px bg-kiviBorder sm:block" />
 
         <input
           type="text"
@@ -592,12 +595,12 @@ export const HexdumpView: React.FC<HexdumpViewProps> = ({
           onKeyDown={(e) => {
             if (e.key === 'Enter') void handleSearch();
           }}
-          className="min-w-0 flex-1 rounded border border-kiviBorderStrong bg-kiviBg px-2 py-0.5 text-kiviInk focus-visible:outline-2 focus-visible:outline-kiviAccent sm:w-36 sm:flex-none"
+          className="min-w-0 flex-1 rounded border border-kiviBorder/70 bg-kiviBg px-2 py-0.5 text-kiviInk focus-visible:outline-2 focus-visible:outline-kiviAccent sm:w-36 sm:flex-none"
         />
         <button
           type="button"
           onClick={() => void handleSearch()}
-          className="shrink-0 whitespace-nowrap rounded border border-kiviAccent/40 bg-kiviAccent/15 px-2 py-0.5 text-kiviAccent hover:bg-kiviAccent/25"
+          className="min-w-[52px] shrink-0 whitespace-nowrap rounded border border-kiviAccent/40 bg-kiviAccent/15 px-2 py-0.5 text-center text-kiviAccent hover:bg-kiviAccent/25"
         >
           Find
         </button>

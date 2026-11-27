@@ -13,6 +13,7 @@ import {
 } from '../../lib/workbenchBridge';
 import { blindTableToMapDef } from '../modals/calibrationWorkbenchController';
 import type { MapDef } from '../../types/kivi';
+import { useAnimatedPresence } from '../../hooks/useAnimatedPresence';
 
 type ScannerTab = 'blind_v2' | 'heuristics' | 'window';
 
@@ -68,6 +69,7 @@ export const ScannerDrawer: React.FC<ScannerDrawerProps> = ({
   const [blindResults, setBlindResults] = useState<ClassifiedBlindResult[]>([]);
   const [blindError, setBlindError] = useState<string | null>(null);
   const blindSeqRef = useRef(0);
+  const presence = useAnimatedPresence(isOpen, 120);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -126,31 +128,34 @@ export const ScannerDrawer: React.FC<ScannerDrawerProps> = ({
     }
   };
 
-  if (!isOpen) return null;
+  if (!presence.mounted) return null;
 
   return (
     <aside
       aria-label="ROM Scanner Drawer"
-      className="fixed inset-y-0 right-0 z-40 flex w-[min(92vw,21rem)] flex-col border-l border-kiviBorder bg-kiviSurface shadow-2xl lg:static lg:z-auto lg:w-80 lg:shrink-0 lg:shadow-xl"
+      className={`absolute inset-y-0 right-0 z-40 flex w-[min(92vw,21rem)] flex-col overflow-hidden rounded-none kivi-panel-surface bg-kiviSurface lg:static lg:inset-y-auto lg:right-auto lg:z-auto lg:w-80 lg:shrink-0 lg:shadow-none lg:border-l lg:border-kiviBorder/60 ${
+        presence.state === 'closing' ? 'kivi-anim-slide-right-out' : 'kivi-anim-slide-right-in'
+      }`}
     >
-      <div className="flex items-center justify-between border-b border-kiviBorder bg-kiviElevated px-4 py-2.5">
-        <div className="flex items-center gap-2">
-          <Radar className="h-4 w-4 text-kiviAccent" />
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-kiviInk">
-            ROM Discovery Scanner
-          </h2>
+      <div
+        data-testid="panel-titlebar-scanner"
+        className="flex h-9 shrink-0 items-center justify-between gap-2 bg-kiviSurface px-3 text-xs font-semibold uppercase tracking-wider text-kiviSecondary"
+      >
+        <div className="flex min-w-0 items-center gap-1.5">
+          <Radar className="h-3.5 w-3.5 shrink-0 text-kiviAccent" />
+          <h2 className="truncate whitespace-nowrap">ROM Discovery Scanner</h2>
         </div>
         <button
           type="button"
           onClick={onClose}
           aria-label="Close scanner"
-          className="rounded p-1 text-kiviMuted hover:bg-kiviBg hover:text-kiviInk"
+          className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-kiviMuted transition-colors hover:bg-kiviElevated hover:text-kiviInk"
         >
           <X className="h-3.5 w-3.5" />
         </button>
       </div>
 
-      <div className="space-y-2 border-b border-kiviBorder bg-kiviBg/40 px-3 py-2">
+      <div className="space-y-2 border-b border-kiviBorder/50 bg-kiviBg/40 px-3 py-2">
         <div className="grid grid-cols-3 gap-1 rounded border border-kiviBorder bg-kiviBg p-0.5 text-[10px]">
           <button
             type="button"
@@ -197,7 +202,7 @@ export const ScannerDrawer: React.FC<ScannerDrawerProps> = ({
             onChange={(e) =>
               onChangeSensitivity(e.target.value as 'strict' | 'balanced' | 'aggressive')
             }
-            className="rounded border border-kiviBorderStrong bg-kiviSurface px-2 py-0.5 text-[11px] text-kiviInk"
+            className="rounded border border-kiviBorder/70 bg-kiviSurface px-2 py-0.5 text-[11px] text-kiviInk"
           >
             <option value="strict">Strict (High Conf)</option>
             <option value="balanced">Balanced</option>
@@ -281,7 +286,7 @@ export const ScannerDrawer: React.FC<ScannerDrawerProps> = ({
               type="button"
               disabled={isWindowScanning || !hasRomData}
               onClick={onRunWindowScanner}
-              className="flex w-full items-center justify-center gap-1.5 rounded border border-kiviBorderStrong bg-kiviElevated py-1.5 text-xs font-medium text-kiviInk transition-colors hover:border-kiviAccent/60 disabled:opacity-50"
+              className="flex w-full items-center justify-center gap-1.5 rounded border border-kiviBorder/70 bg-kiviElevated py-1.5 text-xs font-medium text-kiviInk transition-colors hover:border-kiviAccent/60 disabled:opacity-50"
             >
               <Search className="h-3.5 w-3.5 text-kiviAccent" />
               <span>{isWindowScanning ? 'Scanning windows...' : 'Scan 16-bit windows'}</span>
@@ -317,7 +322,7 @@ export const ScannerDrawer: React.FC<ScannerDrawerProps> = ({
               return (
                 <div
                   key={`blind-${t.address}-${idx}`}
-                  className="rounded-lg border border-kiviBorder bg-kiviBg p-2.5 text-xs hover:border-kiviAccent/50"
+                  className="rounded-md border border-kiviBorder bg-kiviBg p-2.5 text-xs hover:border-kiviAccent/50"
                 >
                   <div className="mb-1 flex items-start justify-between gap-1">
                     <span className="truncate text-[11px] font-semibold text-kiviInk">{label}</span>
@@ -391,7 +396,7 @@ export const ScannerDrawer: React.FC<ScannerDrawerProps> = ({
           detectedCandidates.map((c, idx) => (
             <div
               key={`${c.id}-${c.start_addr}-${idx}`}
-              className="rounded-lg border border-kiviBorder bg-kiviBg p-2.5 text-xs transition-colors hover:border-kiviAccent/50"
+              className="rounded-md border border-kiviBorder bg-kiviBg p-2.5 text-xs transition-colors hover:border-kiviAccent/50"
             >
               <div className="mb-1.5 flex items-start justify-between gap-1">
                 <span className="truncate text-[11px] font-semibold text-kiviInk" title={c.name_hint}>

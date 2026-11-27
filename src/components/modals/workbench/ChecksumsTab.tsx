@@ -456,7 +456,7 @@ export const ChecksumsTab: React.FC<ChecksumsTabProps> = ({
               type="button"
               disabled={isBusy}
               onClick={() => void handleEdc17(false)}
-              className="rounded border border-kiviBorderStrong bg-kiviElevated px-2.5 py-1 text-[11px] text-kiviInk"
+              className="rounded border border-kiviBorder/70 bg-kiviElevated px-2.5 py-1 text-[11px] text-kiviInk"
             >
               Verify CRC-32C
             </button>
@@ -476,7 +476,7 @@ export const ChecksumsTab: React.FC<ChecksumsTabProps> = ({
             aria-label="EDC17 block label"
             value={edc17Label}
             onChange={(e) => setEdc17Label(e.target.value)}
-            className="rounded border border-kiviBorderStrong bg-kiviBg px-2 py-1 text-kiviInk"
+            className="rounded border border-kiviBorder/70 bg-kiviBg px-2 py-1 text-kiviInk"
           />
           <input
             type="text"
@@ -484,7 +484,7 @@ export const ChecksumsTab: React.FC<ChecksumsTabProps> = ({
             placeholder="Start hex"
             value={edc17StartHex}
             onChange={(e) => setEdc17StartHex(e.target.value)}
-            className="rounded border border-kiviBorderStrong bg-kiviBg px-2 py-1 text-kiviInk"
+            className="rounded border border-kiviBorder/70 bg-kiviBg px-2 py-1 text-kiviInk"
           />
           <input
             type="text"
@@ -492,7 +492,7 @@ export const ChecksumsTab: React.FC<ChecksumsTabProps> = ({
             placeholder="End incl hex"
             value={edc17EndHex}
             onChange={(e) => setEdc17EndHex(e.target.value)}
-            className="rounded border border-kiviBorderStrong bg-kiviBg px-2 py-1 text-kiviInk"
+            className="rounded border border-kiviBorder/70 bg-kiviBg px-2 py-1 text-kiviInk"
           />
           <input
             type="text"
@@ -500,7 +500,7 @@ export const ChecksumsTab: React.FC<ChecksumsTabProps> = ({
             placeholder="Store offset hex"
             value={edc17StoreHex}
             onChange={(e) => setEdc17StoreHex(e.target.value)}
-            className="rounded border border-kiviBorderStrong bg-kiviBg px-2 py-1 text-kiviInk"
+            className="rounded border border-kiviBorder/70 bg-kiviBg px-2 py-1 text-kiviInk"
           />
           <label className="flex items-center gap-1.5 text-kiviSecondary">
             <input
@@ -535,7 +535,7 @@ export const ChecksumsTab: React.FC<ChecksumsTabProps> = ({
               type="button"
               disabled={isBusy}
               onClick={() => void handleXdfChecksums(false)}
-              className="rounded border border-kiviBorderStrong bg-kiviElevated px-2.5 py-1 text-[11px] text-kiviInk"
+              className="rounded border border-kiviBorder/70 bg-kiviElevated px-2.5 py-1 text-[11px] text-kiviInk"
             >
               Verify XDF Checksums
             </button>
@@ -582,7 +582,7 @@ export const ChecksumsTab: React.FC<ChecksumsTabProps> = ({
               type="button"
               disabled={isBusy}
               onClick={() => void handleLoadSampleCustomPlugin()}
-              className="rounded border border-kiviBorderStrong bg-kiviElevated px-2.5 py-1 text-[11px] text-kiviSecondary hover:text-kiviInk"
+              className="rounded border border-kiviBorder/70 bg-kiviElevated px-2.5 py-1 text-[11px] text-kiviSecondary hover:text-kiviInk"
             >
               Load Example
             </button>
@@ -590,7 +590,7 @@ export const ChecksumsTab: React.FC<ChecksumsTabProps> = ({
               type="button"
               disabled={isBusy}
               onClick={() => void handleCustomPlugin(false)}
-              className="rounded border border-kiviBorderStrong bg-kiviElevated px-2.5 py-1 text-[11px] text-kiviInk"
+              className="rounded border border-kiviBorder/70 bg-kiviElevated px-2.5 py-1 text-[11px] text-kiviInk"
             >
               Verify Plugin
             </button>

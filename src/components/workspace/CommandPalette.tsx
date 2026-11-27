@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Command, CornerDownLeft, Search, X } from 'lucide-react';
 import type { MapDef } from '../../types/kivi';
+import { useAnimatedPresence } from '../../hooks/useAnimatedPresence';
 
 export interface CommandPaletteAction {
   id: string;
@@ -38,6 +39,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
   const [query, setQuery] = useState('');
   const [selectedIdx, setSelectedIdx] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
+  const presence = useAnimatedPresence(isOpen, 110);
 
   useEffect(() => {
     if (isOpen) {
@@ -93,7 +95,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
     }
   }, [items.length, selectedIdx]);
 
-  if (!isOpen) return null;
+  if (!presence.mounted) return null;
 
   const runItem = (item: PaletteItem | undefined) => {
     if (!item || item.disabled) return;
@@ -103,7 +105,9 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center bg-black/65 pt-20 px-4"
+      className={`fixed inset-0 z-50 flex items-start justify-center bg-slate-950/40 pt-20 px-4 ${
+        presence.state === 'closing' ? 'kivi-anim-backdrop-out' : 'kivi-anim-backdrop-in'
+      }`}
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -111,8 +115,12 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
       aria-modal="true"
       aria-label="Command palette"
     >
-      <div className="w-full max-w-xl overflow-hidden rounded-lg border border-kiviBorderStrong bg-kiviSurface shadow-2xl">
-        <div className="flex items-center gap-2 border-b border-kiviBorder px-3 py-2.5">
+      <div
+        className={`w-full max-w-xl overflow-hidden rounded-2xl kivi-floating-window bg-kiviSurface ${
+          presence.state === 'closing' ? 'kivi-anim-pop-out' : 'kivi-anim-pop-in'
+        }`}
+      >
+        <div className="flex h-10 shrink-0 items-center gap-2 border-b border-kiviBorder/50 px-3">
           <Search className="h-4 w-4 text-kiviAccent" />
           <input
             ref={inputRef}

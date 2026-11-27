@@ -76,7 +76,7 @@ export const BlindScanTab: React.FC<BlindScanTabProps> = ({
         type="button"
         disabled={busy}
         onClick={onRunScan}
-        className="rounded bg-kiviAccent/20 px-3 py-1 font-medium text-kiviAccent hover:bg-kiviAccent/30 disabled:opacity-50"
+        className="min-w-[192px] shrink-0 whitespace-nowrap rounded bg-kiviAccent/20 px-3 py-1 text-center font-medium text-kiviAccent hover:bg-kiviAccent/30 disabled:opacity-50"
       >
         {busy ? 'Scanning...' : 'Run Auto-Scan + Classifier'}
       </button>
@@ -159,7 +159,7 @@ export const BlindScanTab: React.FC<BlindScanTabProps> = ({
                       onAddMaps([m], true);
                       onSelectMap(m.id);
                     }}
-                    className="rounded border border-kiviBorderStrong bg-kiviElevated px-2 py-0.5 text-[10px] text-kiviInk hover:border-kiviAccent"
+                    className="rounded border border-kiviBorder/70 bg-kiviElevated px-2 py-0.5 text-[10px] text-kiviInk hover:border-kiviAccent"
                   >
                     Open Map
                   </button>

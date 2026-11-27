@@ -81,7 +81,7 @@ export const HeatmapFooterBar: React.FC<HeatmapFooterBarProps> = ({
     </div>
 
     {toastMessage && (
-      <div className="absolute top-12 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 rounded bg-kiviSurface border border-kiviAccent/60 px-3 py-1.5 text-xs text-kiviInk shadow-xl animate-fade-in">
+      <div className="absolute top-12 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 rounded-lg kivi-panel-surface bg-kiviSurface px-3 py-1.5 text-xs text-kiviInk ring-1 ring-kiviAccent/30 kivi-anim-reveal">
         <Check className="h-3.5 w-3.5 text-kiviAccent" />
         <span>{toastMessage}</span>
       </div>

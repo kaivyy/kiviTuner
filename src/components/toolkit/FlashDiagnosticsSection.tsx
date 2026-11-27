@@ -286,7 +286,7 @@ export const FlashDiagnosticsSection: React.FC<FlashDiagnosticsSectionProps> = (
               aria-label="Target ECU CAN ID"
               value={txCanId}
               onChange={(e) => setTxCanId(Number(e.target.value))}
-              className="w-full rounded border border-kiviBorderStrong bg-kiviSurface px-2 py-1 font-mono text-[11px] text-kiviInk"
+              className="w-full rounded border border-kiviBorder/70 bg-kiviSurface px-2 py-1 font-mono text-[11px] text-kiviInk"
             >
               {STANDARD_ECU_TARGETS.map((m) => (
                 <option key={m.txId} value={m.txId}>
@@ -504,7 +504,7 @@ export const FlashDiagnosticsSection: React.FC<FlashDiagnosticsSectionProps> = (
                 value={dtcLookupQuery}
                 onChange={(e) => setDtcLookupQuery(e.target.value)}
                 placeholder="Offline DTC dictionary lookup (e.g. P0171, U0100)"
-                className="flex-1 rounded border border-kiviBorderStrong bg-kiviSurface px-2 py-1 font-mono text-[10px] text-kiviInk"
+                className="flex-1 rounded border border-kiviBorder/70 bg-kiviSurface px-2 py-1 font-mono text-[10px] text-kiviInk"
               />
               <button
                 type="submit"
@@ -536,7 +536,7 @@ export const FlashDiagnosticsSection: React.FC<FlashDiagnosticsSectionProps> = (
                 type="button"
                 disabled={busy || !hasDevice}
                 onClick={() => void loadImAndFreeze()}
-                className="min-h-[30px] rounded border border-kiviBorderStrong bg-kiviSurface px-2.5 py-1 font-mono text-[10px] text-kiviInk hover:border-kiviAccent disabled:opacity-50"
+                className="min-h-[30px] rounded border border-kiviBorder/70 bg-kiviSurface px-2.5 py-1 font-mono text-[10px] text-kiviInk hover:border-kiviAccent disabled:opacity-50"
               >
                 Scan Readiness &amp; Freeze Frame
               </button>
@@ -604,7 +604,7 @@ export const FlashDiagnosticsSection: React.FC<FlashDiagnosticsSectionProps> = (
                 aria-label="ECU reset mode"
                 value={resetMode}
                 onChange={(e) => setResetMode(e.target.value as EcuResetMode)}
-                className="min-h-[32px] flex-1 rounded border border-kiviBorderStrong bg-kiviSurface px-2 py-1 font-mono text-[11px] text-kiviInk focus-visible:ring-2 focus-visible:ring-kiviAccent"
+                className="min-h-[32px] flex-1 rounded border border-kiviBorder/70 bg-kiviSurface px-2 py-1 font-mono text-[11px] text-kiviInk focus-visible:ring-2 focus-visible:ring-kiviAccent"
               >
                 {RESET_MODES.map((m) => (
                   <option key={m.value} value={m.value}>

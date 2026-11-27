@@ -73,10 +73,10 @@ export const ScalarFlagEditor: React.FC<ScalarFlagEditorProps> = ({
   return (
     <div
       data-testid="scalar-flag-editor"
-      className="flex flex-1 flex-col gap-3 rounded-lg border border-kiviBorder bg-kiviSurface p-4 font-mono"
+      className="flex flex-1 flex-col gap-3 rounded-md border border-kiviBorder/60 bg-kiviSurface p-4 font-mono"
     >
       {/* Header Strip */}
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-kiviBorder pb-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-kiviBorder/50 pb-3">
         <div className="flex min-w-0 items-center gap-2">
           {preferFlags ? (
             <ToggleLeft className="h-4 w-4 shrink-0 text-kiviAccent" />
@@ -117,7 +117,7 @@ export const ScalarFlagEditor: React.FC<ScalarFlagEditorProps> = ({
             <button
               type="button"
               onClick={onEditProperties}
-              className="inline-flex items-center gap-1 rounded border border-kiviBorderStrong bg-kiviBg px-2.5 py-1 text-[11px] text-kiviSecondary transition-colors hover:border-kiviAccent hover:text-kiviInk"
+              className="inline-flex items-center gap-1 rounded border border-kiviBorder/70 bg-kiviBg px-2.5 py-1 text-[11px] text-kiviSecondary transition-colors hover:border-kiviAccent hover:text-kiviInk"
             >
               <Settings2 className="h-3.5 w-3.5 shrink-0" />
               <span>Properties</span>
@@ -126,7 +126,7 @@ export const ScalarFlagEditor: React.FC<ScalarFlagEditorProps> = ({
           <button
             type="button"
             onClick={onSwitchToGrid}
-            className="inline-flex items-center gap-1 rounded border border-kiviBorderStrong bg-kiviElevated px-2.5 py-1 text-[11px] text-kiviInk transition-colors hover:border-kiviAccent"
+            className="inline-flex items-center gap-1 rounded border border-kiviBorder/70 bg-kiviElevated px-2.5 py-1 text-[11px] text-kiviInk transition-colors hover:border-kiviAccent"
           >
             <Grid className="h-3.5 w-3.5 shrink-0 text-kiviAccent" />
             <span>Grid View</span>
@@ -153,7 +153,7 @@ export const ScalarFlagEditor: React.FC<ScalarFlagEditorProps> = ({
               disabled={readOnly}
               aria-label="Decrement scalar value"
               onClick={() => onCommitValue(Number((value - stepSize).toFixed(decimals)))}
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded border border-kiviBorderStrong bg-kiviSurface text-kiviSecondary hover:bg-kiviElevated hover:text-kiviInk disabled:opacity-40"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded border border-kiviBorder/70 bg-kiviSurface text-kiviSecondary hover:bg-kiviElevated hover:text-kiviInk disabled:opacity-40"
             >
               <Minus className="h-3.5 w-3.5 text-kiviRed" />
             </button>
@@ -165,7 +165,7 @@ export const ScalarFlagEditor: React.FC<ScalarFlagEditorProps> = ({
               aria-label="Scalar parameter value"
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
-              className="h-9 min-w-[140px] flex-1 rounded border border-kiviBorderStrong bg-kiviSurface px-3 text-base font-bold text-kiviInk tabular-nums focus:border-kiviAccent focus-visible:ring-2 focus-visible:ring-kiviAccent disabled:opacity-50"
+              className="h-9 min-w-[140px] flex-1 rounded border border-kiviBorder/70 bg-kiviSurface px-3 text-base font-bold text-kiviInk tabular-nums focus:border-kiviAccent focus-visible:ring-2 focus-visible:ring-kiviAccent disabled:opacity-50"
             />
 
             <button
@@ -173,7 +173,7 @@ export const ScalarFlagEditor: React.FC<ScalarFlagEditorProps> = ({
               disabled={readOnly}
               aria-label="Increment scalar value"
               onClick={() => onCommitValue(Number((value + stepSize).toFixed(decimals)))}
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded border border-kiviBorderStrong bg-kiviSurface text-kiviSecondary hover:bg-kiviElevated hover:text-kiviInk disabled:opacity-40"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded border border-kiviBorder/70 bg-kiviSurface text-kiviSecondary hover:bg-kiviElevated hover:text-kiviInk disabled:opacity-40"
             >
               <Plus className="h-3.5 w-3.5 text-kiviGreen" />
             </button>
@@ -275,7 +275,7 @@ export const ScalarFlagEditor: React.FC<ScalarFlagEditorProps> = ({
                   className={`flex items-center justify-between rounded border px-2.5 py-2 text-[11px] transition-colors disabled:opacity-40 ${
                     item.enabled
                       ? 'border-kiviGreen/60 bg-kiviGreen/15 text-kiviGreen'
-                      : 'border-kiviBorder bg-kiviSurface text-kiviSecondary hover:border-kiviBorderStrong hover:text-kiviInk'
+                      : 'border-kiviBorder bg-kiviSurface text-kiviSecondary hover:border-kiviBorder/70 hover:text-kiviInk'
                   }`}
                 >
                   <span className="text-left leading-tight">

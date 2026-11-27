@@ -192,7 +192,7 @@ export const FlashSafetyFlightCard: React.FC<FlashSafetyFlightCardProps> = ({ on
             type="button"
             disabled={busy || !backendAvailable}
             onClick={() => void refreshStatus()}
-            className="inline-flex items-center gap-1 rounded border border-kiviBorderStrong bg-kiviBg px-2 py-0.5 text-[10px] text-kiviSecondary hover:text-kiviInk disabled:opacity-40"
+            className="inline-flex items-center gap-1 rounded border border-kiviBorder/70 bg-kiviBg px-2 py-0.5 text-[10px] text-kiviSecondary hover:text-kiviInk disabled:opacity-40"
           >
             <RefreshCw className="h-3 w-3" />
             <span>Refresh</span>
@@ -201,7 +201,7 @@ export const FlashSafetyFlightCard: React.FC<FlashSafetyFlightCardProps> = ({ on
             type="button"
             disabled={!backendAvailable || frames.length === 0}
             onClick={() => void handleExportAsc()}
-            className="inline-flex items-center gap-1 rounded border border-kiviBorderStrong bg-kiviBg px-2 py-0.5 text-[10px] text-kiviInk hover:bg-kiviElevated disabled:opacity-40"
+            className="inline-flex items-center gap-1 rounded border border-kiviBorder/70 bg-kiviBg px-2 py-0.5 text-[10px] text-kiviInk hover:bg-kiviElevated disabled:opacity-40"
           >
             <Download className="h-3 w-3" />
             <span>Export .ASC</span>
@@ -210,7 +210,7 @@ export const FlashSafetyFlightCard: React.FC<FlashSafetyFlightCardProps> = ({ on
             type="button"
             disabled={!backendAvailable || frames.length === 0}
             onClick={() => void handleExportJsonl()}
-            className="inline-flex items-center gap-1 rounded border border-kiviBorderStrong bg-kiviBg px-2 py-0.5 text-[10px] text-kiviInk hover:bg-kiviElevated disabled:opacity-40"
+            className="inline-flex items-center gap-1 rounded border border-kiviBorder/70 bg-kiviBg px-2 py-0.5 text-[10px] text-kiviInk hover:bg-kiviElevated disabled:opacity-40"
           >
             <Download className="h-3 w-3" />
             <span>JSONL</span>

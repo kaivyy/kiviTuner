@@ -13,7 +13,10 @@ const read = (p: string): string => readFileSync(p, 'utf8');
 
 test('the toolkit panel is imported by the app shell', () => {
   const src = read('src/App.tsx');
-  assert.match(src, /import \{ EngineeringToolkit \} from '\.\/components\/toolkit\/EngineeringToolkit'/);
+  assert.match(
+    src,
+    /(?:import \{ EngineeringToolkit \} from|import\()\s*'\.\/components\/toolkit\/EngineeringToolkit'/
+  );
 });
 
 test('the toolkit panel is rendered with open/close state', () => {

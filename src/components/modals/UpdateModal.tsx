@@ -58,7 +58,7 @@ export const UpdateModal: React.FC = () => {
               type="button"
               disabled={status === 'checking' || status === 'downloading'}
               onClick={() => void checkForUpdates(false)}
-              className="inline-flex items-center gap-1.5 rounded border border-kiviBorderStrong bg-kiviSurface px-3 py-1.5 text-xs font-medium text-kiviInk hover:bg-kiviBg disabled:opacity-40"
+              className="inline-flex items-center gap-1.5 rounded border border-kiviBorder/70 bg-kiviSurface px-3 py-1.5 text-xs font-medium text-kiviInk hover:bg-kiviBg disabled:opacity-40"
             >
               <RefreshCw className={`h-3.5 w-3.5 ${status === 'checking' ? 'animate-spin' : ''}`} />
               <span>Check Again</span>
@@ -79,7 +79,7 @@ export const UpdateModal: React.FC = () => {
               <button
                 type="button"
                 onClick={() => void restartToApply()}
-                className="inline-flex items-center gap-1.5 rounded bg-kiviGreen px-3 py-1.5 text-xs font-semibold text-white hover:opacity-90"
+                className="inline-flex items-center gap-1.5 rounded bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-700"
               >
                 <RotateCw className="h-3.5 w-3.5" />
                 <span>Restart App Now</span>

@@ -131,7 +131,7 @@ export const MotoDiagnosticsSubtab: React.FC<MotoDiagnosticsSubtabProps> = ({
             aria-label="Motorcycle protocol family"
             value={family}
             onChange={(e) => setFamily(e.target.value as MotoProtocolFamily)}
-            className="rounded border border-kiviBorderStrong bg-kiviSurface px-2 py-1 font-mono text-[11px] text-kiviInk focus-visible:ring-2 focus-visible:ring-kiviAccent"
+            className="rounded border border-kiviBorder/70 bg-kiviSurface px-2 py-1 font-mono text-[11px] text-kiviInk focus-visible:ring-2 focus-visible:ring-kiviAccent"
           >
             {MOTO_PROTOCOLS.map((p) => (
               <option key={p.value} value={p.value}>
@@ -166,7 +166,7 @@ export const MotoDiagnosticsSubtab: React.FC<MotoDiagnosticsSubtabProps> = ({
             type="button"
             disabled={busy || !hasDevice}
             onClick={() => void readDtcs()}
-            className="inline-flex min-h-[32px] items-center gap-1.5 rounded border border-kiviBorderStrong bg-kiviSurface px-2.5 py-1 font-mono text-[11px] text-kiviInk hover:border-kiviAccent focus-visible:ring-2 focus-visible:ring-kiviAccent disabled:opacity-50"
+            className="inline-flex min-h-[32px] items-center gap-1.5 rounded border border-kiviBorder/70 bg-kiviSurface px-2.5 py-1 font-mono text-[11px] text-kiviInk hover:border-kiviAccent focus-visible:ring-2 focus-visible:ring-kiviAccent disabled:opacity-50"
           >
             <RefreshCw className="h-3 w-3" />
             <span>Read Bike DTCs / Blink Codes</span>

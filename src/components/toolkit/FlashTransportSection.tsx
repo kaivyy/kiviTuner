@@ -159,7 +159,7 @@ export const FlashTransportSection: React.FC<FlashTransportSectionProps> = ({
             type="button"
             disabled={isBusy || autoConnecting}
             onClick={onAutoConnect}
-            className="inline-flex items-center gap-1.5 rounded border border-kiviAccent/50 bg-kiviAccent px-2.5 py-1 text-[11px] font-semibold text-kiviAccentFg hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex min-w-[198px] shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded border border-kiviAccent/50 bg-kiviAccent px-2.5 py-1 text-[11px] font-semibold text-kiviAccentFg hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
           >
             {autoConnecting ? (
               <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -175,7 +175,7 @@ export const FlashTransportSection: React.FC<FlashTransportSectionProps> = ({
             disabled={isBusy || autoConnecting}
             onClick={onRefresh}
             aria-label="Refresh hardware devices and drivers"
-            className="inline-flex items-center gap-1 rounded border border-kiviBorderStrong bg-kiviSurface px-2 py-1 text-[10px] text-kiviSecondary hover:bg-kiviElevated hover:text-kiviInk disabled:cursor-not-allowed disabled:opacity-50"
+            className="inline-flex items-center gap-1 rounded border border-kiviBorder/70 bg-kiviSurface px-2 py-1 text-[10px] text-kiviSecondary hover:bg-kiviElevated hover:text-kiviInk disabled:cursor-not-allowed disabled:opacity-50"
           >
             <RefreshCw className="h-3 w-3" />
             <span>Refresh</span>
@@ -261,7 +261,7 @@ export const FlashTransportSection: React.FC<FlashTransportSectionProps> = ({
           <div
             className={`flex items-start gap-2 rounded border px-2 py-1.5 text-[11px] ${
               activeDevice?.isMock
-                ? 'border-kiviBorderStrong bg-kiviElevated text-kiviSecondary'
+                ? 'border-kiviBorder/70 bg-kiviElevated text-kiviSecondary'
                 : 'border-kiviRed/40 bg-kiviRed/10 text-kiviRed'
             }`}
           >
@@ -305,7 +305,7 @@ export const FlashTransportSection: React.FC<FlashTransportSectionProps> = ({
                     type="button"
                     disabled={isBusy}
                     onClick={() => onAttachKLineSerial(p.port_name)}
-                    className="rounded border border-kiviBorderStrong px-2 py-0.5 text-[10px] text-kiviSecondary hover:bg-kiviElevated"
+                    className="rounded border border-kiviBorder/70 px-2 py-0.5 text-[10px] text-kiviSecondary hover:bg-kiviElevated"
                   >
                     Attach Raw K-Line
                   </button>
@@ -473,7 +473,7 @@ export const FlashTransportSection: React.FC<FlashTransportSectionProps> = ({
                 type="button"
                 disabled={isBusy}
                 onClick={() => onAttachOpenPort2()}
-                className="rounded border border-kiviBorderStrong px-2 py-1 text-[10px] text-kiviSecondary hover:bg-kiviElevated"
+                className="rounded border border-kiviBorder/70 px-2 py-1 text-[10px] text-kiviSecondary hover:bg-kiviElevated"
               >
                 Attach OpenPort 2.0
               </button>
@@ -491,7 +491,7 @@ export const FlashTransportSection: React.FC<FlashTransportSectionProps> = ({
                 type="button"
                 disabled={isBusy}
                 onClick={() => onAttachKLineSerial()}
-                className="rounded border border-kiviBorderStrong px-2 py-1 text-[10px] text-kiviSecondary hover:bg-kiviElevated"
+                className="rounded border border-kiviBorder/70 px-2 py-1 text-[10px] text-kiviSecondary hover:bg-kiviElevated"
               >
                 Attach Raw K-Line USB
               </button>
@@ -529,7 +529,7 @@ export const FlashTransportSection: React.FC<FlashTransportSectionProps> = ({
                 type="button"
                 disabled={isBusy || !customLibPath.trim()}
                 onClick={() => onAttachJ2534(customLibPath.trim())}
-                className="rounded border border-kiviBorderStrong px-2 py-1 text-[10px] text-kiviSecondary hover:bg-kiviElevated disabled:cursor-not-allowed disabled:opacity-50"
+                className="rounded border border-kiviBorder/70 px-2 py-1 text-[10px] text-kiviSecondary hover:bg-kiviElevated disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Attach Library
               </button>
@@ -548,7 +548,7 @@ export const FlashTransportSection: React.FC<FlashTransportSectionProps> = ({
                   type="button"
                   disabled={isBusy}
                   onClick={onAttachDoIp}
-                  className="rounded border border-kiviBorderStrong px-2 py-1 text-[10px] text-kiviSecondary hover:bg-kiviElevated"
+                  className="rounded border border-kiviBorder/70 px-2 py-1 text-[10px] text-kiviSecondary hover:bg-kiviElevated"
                 >
                   Attach DoIP
                 </button>
@@ -565,7 +565,7 @@ export const FlashTransportSection: React.FC<FlashTransportSectionProps> = ({
                   type="button"
                   disabled={isBusy}
                   onClick={onAttachSocketCan}
-                  className="rounded border border-kiviBorderStrong px-2 py-1 text-[10px] text-kiviSecondary hover:bg-kiviElevated"
+                  className="rounded border border-kiviBorder/70 px-2 py-1 text-[10px] text-kiviSecondary hover:bg-kiviElevated"
                 >
                   Attach SocketCAN
                 </button>

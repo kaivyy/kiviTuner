@@ -10,10 +10,10 @@ Native hardware adapters (SAE J2534 with automatic Win64-to-Win32 bridging, Tact
 
 ## 2. Open a ROM and Load Map Definitions
 
-1. Press `Ctrl+O` or open `File -> Open ROM...` to load a firmware image (`.bin`, `.rom`, Intel `.hex`, Motorola `.s19`, or `.vbf`).
+1. Press `Ctrl+O` or open `File -> Open ROM...` (on macOS, use the global menu bar next to the Apple icon) to load a firmware image (`.bin`, `.rom`, Intel `.hex`, Motorola `.s19`, or `.vbf`).
 2. Press `Ctrl+D` or open `Definition (XDF) -> Load XDF...` to import an existing definition file (`.xdf`, `.a2l`, `.kp`, `.ini`, or `.kivi.json`).
 3. Confirm the checksum indicator in the top menu bar reads green before making calibration edits.
-4. Open the Command Palette (`Ctrl+K`) at any time to run menu actions without searching through submenus.
+4. Open the Command Palette (`Ctrl+K`) at any time to run menu actions without searching through submenus, and scroll horizontally across `WorkspaceTabBar` with mouse wheel gestures or overflow arrow buttons when many tabs are open.
 
 When a ROM loads, kiviTuner keeps an immutable snapshot of the original bytes (`original_memory` on desktop, `originalRomData` in browser mode) separate from the editable working buffer.
 
@@ -35,7 +35,7 @@ Right-click or click the Split icon on any map in `Map Explorer` (or toggle Spli
 
 If you open an undefined binary image, combine `Discovery Scanner`, `Hexdump Pro`, and `KiviWaveform`:
 
-1. Open `Discovery Scanner` from the left `ActivityRail` (`Ctrl+F`) to run `blind_v2` structural 2D/1D discovery (desktop), Heuristic scan, or the 16-bit Window scanner. Candidate addresses populate `Potential Maps`.
+1. Open `Discovery Scanner` from the left `ActivityRail` (`Ctrl+F`) to run `blind_v2` structural 2D/1D discovery (desktop), Heuristic scan, or the 16-bit Window scanner (`Discovery Scanner` and `Inspector` share the right sidebar slot cleanly). Candidate addresses populate `Potential Maps`.
 2. Switch to the `Hex` tab from `WorkspaceTabBar` or `ActivityRail`.
 3. Toggle `8b` / `16b` word width and `Hex` / `Dec` display, then adjust column alignment with `-` / `+` (or `W` / `M`) until repeating row patterns line up vertically.
 4. Enable `Diff` to highlight bytes changed relative to stock in green, and press `F` / `Shift+F` to jump across amber `Potential Maps` blocks.

@@ -29,6 +29,10 @@ function clamp(v: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, v));
 }
 
+export function topInsetForViewport(_viewportW: number): number {
+  return VIEWPORT_TOP_INSET;
+}
+
 /** Resolves effective minimum width/height clamped cleanly to narrow mobile viewports. */
 export function resolveEffectiveMinimums(
   minWidth: number,
@@ -36,8 +40,9 @@ export function resolveEffectiveMinimums(
   viewportW: number,
   viewportH: number
 ): WindowBounds {
+  const topInset = topInsetForViewport(viewportW);
   const maxAvailW = Math.max(220, viewportW - VIEWPORT_EDGE_PAD * 2);
-  const maxAvailH = Math.max(180, viewportH - VIEWPORT_TOP_INSET - VIEWPORT_EDGE_PAD);
+  const maxAvailH = Math.max(180, viewportH - topInset - VIEWPORT_EDGE_PAD);
   return {
     minWidth: Math.min(Math.max(220, minWidth), maxAvailW),
     minHeight: Math.min(Math.max(180, minHeight), maxAvailH),
@@ -57,18 +62,16 @@ export function computeInitialRect(
 ): WindowRect {
   const safeVw = Math.max(300, viewportW);
   const safeVh = Math.max(300, viewportH);
+  const topInset = topInsetForViewport(safeVw);
   const mins = resolveEffectiveMinimums(minW, minH, safeVw, safeVh);
 
   const maxAvailW = Math.max(mins.minWidth, safeVw - VIEWPORT_EDGE_PAD * 2);
-  const maxAvailH = Math.max(
-    mins.minHeight,
-    safeVh - VIEWPORT_TOP_INSET - VIEWPORT_EDGE_PAD * 2
-  );
+  const maxAvailH = Math.max(mins.minHeight, safeVh - topInset - VIEWPORT_EDGE_PAD * 2);
 
   if (safeVw < 640) {
     return {
       x: VIEWPORT_EDGE_PAD,
-      y: VIEWPORT_TOP_INSET + 4,
+      y: topInset + 4,
       width: maxAvailW,
       height: clamp(defaultH, mins.minHeight, maxAvailH),
     };
@@ -87,10 +90,10 @@ export function computeInitialRect(
 
   const rawY =
     dock === 'right'
-      ? VIEWPORT_TOP_INSET + 8 + step
+      ? topInset + 8 + step
       : Math.max(
-          VIEWPORT_TOP_INSET + 8,
-          Math.round((safeVh - VIEWPORT_TOP_INSET - height) / 2) + VIEWPORT_TOP_INSET + step
+          topInset + 8,
+          Math.round((safeVh - topInset - height) / 2) + topInset + step
         );
 
   const clamped = clampWindowPosition({ x: rawX, y: rawY, width, height }, safeVw, safeVh);
@@ -98,8 +101,8 @@ export function computeInitialRect(
     x: clamp(clamped.x, VIEWPORT_EDGE_PAD, Math.max(VIEWPORT_EDGE_PAD, safeVw - width - VIEWPORT_EDGE_PAD)),
     y: clamp(
       clamped.y,
-      VIEWPORT_TOP_INSET + 4,
-      Math.max(VIEWPORT_TOP_INSET + 4, safeVh - height - VIEWPORT_EDGE_PAD)
+      topInset + 4,
+      Math.max(topInset + 4, safeVh - height - VIEWPORT_EDGE_PAD)
     ),
     width,
     height,
@@ -117,7 +120,7 @@ export function clampWindowPosition(
   const keepInsideX = Math.min(rect.width, MIN_VISIBLE_TITLE_X);
   const minX = -rect.width + keepInsideX;
   const maxX = safeVw - keepInsideX;
-  const minY = VIEWPORT_TOP_INSET;
+  const minY = topInsetForViewport(safeVw);
   const maxY = Math.max(minY, safeVh - TITLEBAR_HEIGHT - VIEWPORT_EDGE_PAD);
 
   return {
@@ -160,7 +163,7 @@ export function applyWindowResize(
     height = clamp(startRect.height + dy, eff.minHeight, maxH);
   }
   if (edge.includes('n')) {
-    const minY = VIEWPORT_TOP_INSET;
+    const minY = topInsetForViewport(safeVw);
     const maxY = startBottom - eff.minHeight;
     y = clamp(startRect.y + dy, minY, maxY);
     height = startBottom - y;
@@ -174,15 +177,41 @@ export function applyWindowResize(
   };
 }
 
+/** Refits an existing floating window cleanly inside a newly resized viewport without spilling off-screen. */
+export function fitRectToViewport(
+  rect: WindowRect,
+  bounds: WindowBounds,
+  viewportW: number,
+  viewportH: number
+): WindowRect {
+  const safeVw = Math.max(300, viewportW);
+  const safeVh = Math.max(300, viewportH);
+  const topInset = topInsetForViewport(safeVw);
+  const eff = resolveEffectiveMinimums(bounds.minWidth, bounds.minHeight, safeVw, safeVh);
+  const maxW = Math.max(eff.minWidth, safeVw - VIEWPORT_EDGE_PAD * 2);
+  const maxH = Math.max(eff.minHeight, safeVh - topInset - VIEWPORT_EDGE_PAD);
+  const width = Math.round(clamp(rect.width, eff.minWidth, maxW));
+  const height = Math.round(clamp(rect.height, eff.minHeight, maxH));
+  const maxX = Math.max(VIEWPORT_EDGE_PAD, safeVw - width - VIEWPORT_EDGE_PAD);
+  const maxY = Math.max(topInset, safeVh - height - VIEWPORT_EDGE_PAD);
+  return {
+    x: Math.round(clamp(rect.x, VIEWPORT_EDGE_PAD, maxX)),
+    y: Math.round(clamp(rect.y, topInset, maxY)),
+    width,
+    height,
+  };
+}
+
 /** Computes a fullscreen-within-workspace rectangle for the green maximize button. */
 export function computeMaximizedRect(viewportW: number, viewportH: number): WindowRect {
   const safeVw = Math.max(300, viewportW);
   const safeVh = Math.max(300, viewportH);
+  const topInset = topInsetForViewport(safeVw);
   return {
     x: VIEWPORT_EDGE_PAD,
-    y: VIEWPORT_TOP_INSET,
+    y: topInset,
     width: Math.max(240, safeVw - VIEWPORT_EDGE_PAD * 2),
-    height: Math.max(200, safeVh - VIEWPORT_TOP_INSET - VIEWPORT_EDGE_PAD),
+    height: Math.max(200, safeVh - topInset - VIEWPORT_EDGE_PAD),
   };
 }
 

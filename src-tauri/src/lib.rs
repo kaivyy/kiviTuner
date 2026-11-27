@@ -4,10 +4,13 @@ pub mod datalog_manager;
 pub mod flash_commands;
 pub mod flash_diag;
 pub mod flash_stream;
+pub mod native_menu;
 pub mod telemetry_manager;
 pub mod toolkit;
 pub mod updater;
 pub mod window_manager;
+
+use tauri::Manager;
 
 pub use commands::AppState;
 pub use datalog_manager::{DatalogManager, DatalogRecorderStatus};
@@ -35,6 +38,24 @@ pub fn run() {
     }
 
     builder
+        .setup(|app| {
+            if let Some(main_win) = app.get_webview_window("main") {
+                window_manager::apply_native_window_chrome(&main_win);
+            }
+            #[cfg(target_os = "macos")]
+            {
+                let menu = native_menu::build_macos_menu(app.handle())?;
+                app.set_menu(menu)?;
+            }
+            Ok(())
+        })
+        .on_menu_event(|app, event| {
+            let id = event.id().as_ref();
+            if native_menu::is_known_menu_id(id) {
+                use tauri::Emitter;
+                let _ = app.emit(native_menu::NATIVE_MENU_EVENT, id.to_string());
+            }
+        })
         .invoke_handler(tauri::generate_handler![
             commands::load_bin_data,
             commands::load_bin_file,

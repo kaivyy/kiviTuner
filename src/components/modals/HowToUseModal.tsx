@@ -54,7 +54,7 @@ const HowToUseBody: React.FC<{
         value={searchQuery}
         onChange={(e) => onSearchChange(e.target.value)}
         placeholder="Cari topik (ELM327, Hex, 1x1)..."
-        className="w-full rounded-md border border-kiviBorderStrong bg-kiviBg py-1.5 pl-8 pr-7 text-[11px] text-kiviInk placeholder:text-kiviMuted focus:border-kiviAccent"
+        className="w-full rounded-md border border-kiviBorder/70 bg-kiviBg py-1.5 pl-8 pr-7 text-[11px] text-kiviInk placeholder:text-kiviMuted focus:border-kiviAccent"
       />
       {searchQuery && (
         <button
@@ -144,7 +144,7 @@ const HowToUseBody: React.FC<{
               type="button"
               data-testid="guide-reset-search"
               onClick={() => onSearchChange('')}
-              className="min-h-[40px] rounded-md border border-kiviBorderStrong bg-kiviElevated px-3 py-1.5 text-[11px] font-semibold text-kiviInk hover:border-kiviAccent sm:min-h-0"
+              className="min-h-[40px] rounded-md border border-kiviBorder/70 bg-kiviElevated px-3 py-1.5 text-[11px] font-semibold text-kiviInk hover:border-kiviAccent sm:min-h-0"
             >
               Reset Pencarian
             </button>
@@ -164,7 +164,7 @@ const HowToUseBody: React.FC<{
               <p className="text-[11px] leading-relaxed text-kiviSecondary">{activeChapter.subtitle}</p>
             </header>
 
-            <figure className="overflow-hidden rounded-xl border border-kiviBorder bg-kiviBg">
+            <figure className="overflow-hidden rounded-lg border border-kiviBorder bg-kiviBg">
               <div className="aspect-[560/270] w-full">
                 <TutorialCutoutArt
                   sceneId={activeChapter.id}
@@ -191,7 +191,7 @@ const HowToUseBody: React.FC<{
                     className={`flex min-h-[44px] flex-col items-start gap-1 rounded-lg border p-2.5 text-left transition-colors ${
                       pressed
                         ? 'border-kiviAccent bg-kiviElevated'
-                        : 'border-kiviBorder bg-kiviBg hover:border-kiviBorderStrong'
+                        : 'border-kiviBorder bg-kiviBg hover:border-kiviBorder/70'
                     }`}
                   >
                     <div className="flex w-full items-center gap-1.5">
@@ -199,7 +199,7 @@ const HowToUseBody: React.FC<{
                         className={`inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[10px] font-bold tabular-nums ${
                           pressed
                             ? 'bg-kiviAccent text-kiviAccentFg'
-                            : 'border border-kiviBorderStrong bg-kiviSurface text-kiviInk'
+                            : 'border border-kiviBorder/70 bg-kiviSurface text-kiviInk'
                         }`}
                       >
                         {c.pin}
@@ -236,7 +236,7 @@ const HowToUseBody: React.FC<{
                     <span className="inline-flex items-center gap-0.5">
                       {sc.keys.map((k, kIdx) => (
                         <React.Fragment key={kIdx}>
-                          <kbd className="rounded border border-kiviBorderStrong bg-kiviElevated px-1 font-mono text-[10px] font-bold text-kiviInk">
+                          <kbd className="rounded border border-kiviBorder/70 bg-kiviElevated px-1 font-mono text-[10px] font-bold text-kiviInk">
                             {k}
                           </kbd>
                           {kIdx < sc.keys.length - 1 && <span className="text-kiviMuted">+</span>}
@@ -277,7 +277,7 @@ const HowToUseFooter: React.FC<{
         <span>Bab {activeChapter ? activeChapter.index : 0} / {TUTORIAL_CHAPTERS.length}</span>
         {width >= 520 && (
           <span className="inline-flex items-center gap-1.5">
-            <kbd className="rounded border border-kiviBorderStrong bg-kiviElevated px-1.5 py-0.5 text-[10px] text-kiviSecondary">Esc</kbd>
+            <kbd className="rounded border border-kiviBorder/70 bg-kiviElevated px-1.5 py-0.5 text-[10px] text-kiviSecondary">Esc</kbd>
             <span>Tutup</span>
           </span>
         )}
@@ -288,7 +288,7 @@ const HowToUseFooter: React.FC<{
           data-testid="guide-prev-btn"
           disabled={!prevId}
           onClick={() => prevId && onSelectChapter(prevId)}
-          className="inline-flex min-h-[44px] items-center gap-1 rounded-md border border-kiviBorderStrong bg-kiviElevated px-3 py-1 text-[11px] font-medium text-kiviInk transition-colors hover:border-kiviAccent disabled:opacity-40 sm:min-h-[30px]"
+          className="inline-flex min-h-[44px] items-center gap-1 rounded-md border border-kiviBorder/70 bg-kiviElevated px-3 py-1 text-[11px] font-medium text-kiviInk transition-colors hover:border-kiviAccent disabled:opacity-40 sm:min-h-[30px]"
         >
           <ChevronLeft className="h-3.5 w-3.5" aria-hidden="true" />
           <span>Sebelumnya</span>

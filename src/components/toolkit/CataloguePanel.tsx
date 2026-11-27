@@ -225,13 +225,13 @@ export const CataloguePanel: React.FC<CataloguePanelProps> = ({
             onKeyDown={(e) => {
               if (e.key === 'Enter') void executeSearchForTab(tab, query);
             }}
-            className="min-w-[240px] flex-1 rounded border border-kiviBorder bg-kiviBg px-2.5 py-1 font-mono text-[11px] text-kiviInk"
+            className="min-w-[160px] flex-1 rounded border border-kiviBorder bg-kiviBg px-2.5 py-1 font-mono text-[11px] text-kiviInk"
           />
           <button
             type="button"
             disabled={isLoading}
             onClick={() => void executeSearchForTab(tab, query)}
-            className="flex items-center gap-1 rounded bg-kiviAccent/20 px-3 py-1 text-[11px] font-medium text-kiviAccent hover:bg-kiviAccent/30 disabled:opacity-50"
+            className="flex min-w-[104px] shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded bg-kiviAccent/20 px-3 py-1 text-[11px] font-medium text-kiviAccent hover:bg-kiviAccent/30 disabled:opacity-50"
           >
             <Search className="h-3 w-3" />
             <span>{isLoading ? 'Searching...' : 'Search'}</span>
@@ -278,7 +278,7 @@ export const CataloguePanel: React.FC<CataloguePanelProps> = ({
                     setQuery(preset);
                     void executeSearchForTab('module', preset);
                   }}
-                  className="rounded border border-kiviBorderStrong bg-kiviSurface px-2 py-0.5 text-kiviSecondary hover:border-kiviBorderStrong"
+                  className="rounded border border-kiviBorder/70 bg-kiviSurface px-2 py-0.5 text-kiviSecondary hover:border-kiviAccent/50"
                 >
                   {preset}
                 </button>

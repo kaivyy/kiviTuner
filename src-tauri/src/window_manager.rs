@@ -9,6 +9,53 @@ use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindow, WebviewWindo
 
 const HARD_MIN_WIDTH: f64 = 320.0;
 const HARD_MIN_HEIGHT: f64 = 240.0;
+const WEBVIEW_LOW_MEM_ARGS: &str = "--disable-features=Translate,BackForwardCache,MediaRouter,CalculateNativeWinOcclusion,InterestFeedContentSuggestions,OptimizationHints --disable-extensions --disable-component-update --disable-background-networking --disable-sync --disk-cache-size=16777216 --renderer-process-limit=2 --js-flags=--optimize-for-size";
+
+/// Applies native OS full-rounded outer corners and borderless DWM chrome on Windows 11.
+#[cfg(target_os = "windows")]
+pub fn apply_native_window_chrome(window: &WebviewWindow) {
+    use std::ffi::c_void;
+    use std::mem::size_of;
+
+    #[link(name = "dwmapi")]
+    extern "system" {
+        fn DwmSetWindowAttribute(
+            hwnd: isize,
+            dw_attribute: u32,
+            pv_attribute: *const c_void,
+            cb_attribute: u32,
+        ) -> i32;
+    }
+
+    const DWMWA_WINDOW_CORNER_PREFERENCE: u32 = 33;
+    const DWMWCP_ROUND: u32 = 2;
+    const DWMWA_BORDER_COLOR: u32 = 34;
+    const DWMWA_COLOR_NONE: u32 = 0xFFFFFFFE;
+
+    if let Ok(hwnd) = window.hwnd() {
+        let raw_hwnd = hwnd.0 as isize;
+        unsafe {
+            let corner = DWMWCP_ROUND;
+            let _ = DwmSetWindowAttribute(
+                raw_hwnd,
+                DWMWA_WINDOW_CORNER_PREFERENCE,
+                (&corner as *const u32).cast::<c_void>(),
+                size_of::<u32>() as u32,
+            );
+            let no_border = DWMWA_COLOR_NONE;
+            let _ = DwmSetWindowAttribute(
+                raw_hwnd,
+                DWMWA_BORDER_COLOR,
+                (&no_border as *const u32).cast::<c_void>(),
+                size_of::<u32>() as u32,
+            );
+        }
+    }
+}
+
+/// No-op fallback on non-Windows hosts where platform compositors manage window corners.
+#[cfg(not(target_os = "windows"))]
+pub fn apply_native_window_chrome(_window: &WebviewWindow) {}
 
 /// Supported popup/tool window identifiers synced with the TypeScript bridge.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -132,17 +179,21 @@ pub async fn open_tool_window(spec: ToolWindowSpec, app: AppHandle) -> Result<St
         spec.title.trim().to_string()
     };
 
-    WebviewWindowBuilder::new(&app, &label, WebviewUrl::App(route.into()))
+    let created = WebviewWindowBuilder::new(&app, &label, WebviewUrl::App(route.into()))
         .title(&title)
         .decorations(false)
         .shadow(true)
         .resizable(true)
+        .background_color(tauri::webview::Color(10, 13, 18, 255))
+        .additional_browser_args(WEBVIEW_LOW_MEM_ARGS)
         .inner_size(width, height)
         .min_inner_size(min_w, min_h)
         .always_on_top(spec.always_on_top.unwrap_or(false))
         .center()
         .build()
         .map_err(|e| format!("failed to create window '{label}': {e}"))?;
+
+    apply_native_window_chrome(&created);
 
     Ok(label)
 }

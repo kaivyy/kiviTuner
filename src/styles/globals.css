@@ -32,7 +32,9 @@
   --kivi-warn-rgb: 251 191 36;
   --kivi-danger: #F87171;
   --kivi-danger-rgb: 248 113 113;
-  --kivi-window-shadow: 0 22px 58px -14px rgba(0, 0, 0, 0.52), 0 0 0 1px rgba(241, 245, 249, 0.08);
+  --kivi-window-shadow: 0 14px 34px -10px rgba(0, 0, 0, 0.34), 0 4px 12px -4px rgba(0, 0, 0, 0.20), 0 0 0 1px rgba(148, 163, 184, 0.10);
+  --kivi-panel-shadow: 0 8px 22px -10px rgba(0, 0, 0, 0.28), 0 2px 6px -2px rgba(0, 0, 0, 0.14), 0 0 0 1px rgba(148, 163, 184, 0.08);
+  --kivi-menu-shadow: 0 14px 30px -8px rgba(0, 0, 0, 0.44), 0 4px 12px -4px rgba(0, 0, 0, 0.24);
   --kivi-scroll-thumb: rgba(148, 163, 184, 0.24);
   --kivi-scroll-thumb-hover: rgba(148, 163, 184, 0.48);
   --kivi-scroll-thumb-active: rgba(56, 189, 248, 0.72);
@@ -66,7 +68,9 @@
   --kivi-warn-rgb: 146 64 14;
   --kivi-danger: #B91C1C;
   --kivi-danger-rgb: 185 28 28;
-  --kivi-window-shadow: 0 20px 50px -12px rgba(15, 23, 42, 0.16), 0 0 0 1px rgba(15, 23, 42, 0.07);
+  --kivi-window-shadow: 0 14px 30px -10px rgba(15, 23, 42, 0.09), 0 4px 10px -4px rgba(15, 23, 42, 0.05), 0 0 0 1px rgba(15, 23, 42, 0.06);
+  --kivi-panel-shadow: 0 6px 18px -8px rgba(15, 23, 42, 0.07), 0 2px 6px -2px rgba(15, 23, 42, 0.04), 0 0 0 1px rgba(15, 23, 42, 0.06);
+  --kivi-menu-shadow: 0 12px 26px -8px rgba(15, 23, 42, 0.14), 0 4px 10px -4px rgba(15, 23, 42, 0.07);
   --kivi-scroll-thumb: rgba(71, 85, 105, 0.24);
   --kivi-scroll-thumb-hover: rgba(71, 85, 105, 0.46);
   --kivi-scroll-thumb-active: rgba(3, 105, 161, 0.72);
@@ -92,6 +96,15 @@
   input[type='checkbox'],
   input[type='radio'] {
     cursor: pointer;
+  }
+
+  button,
+  [role='button'] {
+    transition: color 140ms cubic-bezier(0.22, 1, 0.36, 1),
+      background-color 140ms cubic-bezier(0.22, 1, 0.36, 1),
+      border-color 140ms cubic-bezier(0.22, 1, 0.36, 1),
+      opacity 140ms cubic-bezier(0.22, 1, 0.36, 1),
+      transform 120ms cubic-bezier(0.22, 1, 0.36, 1);
   }
 
   button:disabled,
@@ -136,6 +149,39 @@ body {
 .kivi-floating-window {
   border: 0;
   box-shadow: var(--kivi-window-shadow);
+}
+
+.kivi-panel-surface {
+  border: 0;
+  box-shadow: var(--kivi-panel-shadow);
+}
+
+.kivi-menu-flyout {
+  border: 0;
+  box-shadow: var(--kivi-menu-shadow);
+}
+
+.kivi-tab-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: var(--kivi-scroll-thumb) transparent;
+}
+
+.kivi-tab-scrollbar::-webkit-scrollbar {
+  height: 4px;
+}
+
+.kivi-tab-scrollbar::-webkit-scrollbar-track,
+.kivi-tab-scrollbar::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+.kivi-tab-scrollbar::-webkit-scrollbar-thumb {
+  background-color: var(--kivi-scroll-thumb);
+  border-radius: 9999px;
+}
+
+.kivi-tab-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: var(--kivi-scroll-thumb-hover);
 }
 
 * {
@@ -202,6 +248,250 @@ body {
 
 :root[data-theme='light'] .text-slate-500 {
   color: var(--kivi-muted);
+}
+
+@keyframes kiviWindowIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.975);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes kiviWindowOut {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    opacity: 0;
+    transform: translateY(6px) scale(0.97);
+  }
+}
+
+@keyframes kiviWindowMinimize {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    opacity: 0;
+    transform: translateY(18px) scale(0.94);
+  }
+}
+
+@keyframes kiviPopIn {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.975);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes kiviPopOut {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.975);
+  }
+}
+
+@keyframes kiviBackdropIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes kiviBackdropOut {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes kiviMenuIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes kiviSheetIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes kiviSheetOut {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes kiviSlideLeftIn {
+  from {
+    opacity: 0;
+    transform: translateX(-14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes kiviSlideLeftOut {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    opacity: 0;
+    transform: translateX(-14px);
+  }
+}
+
+@keyframes kiviSlideRightIn {
+  from {
+    opacity: 0;
+    transform: translateX(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes kiviSlideRightOut {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+  to {
+    opacity: 0;
+    transform: translateX(14px);
+  }
+}
+
+@keyframes kiviReveal {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes kiviTabIn {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.kivi-anim-window-in {
+  animation: kiviWindowIn 180ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.kivi-anim-window-out {
+  animation: kiviWindowOut 120ms cubic-bezier(0.4, 0, 1, 1) forwards;
+  pointer-events: none;
+}
+
+.kivi-anim-window-minimize {
+  animation: kiviWindowMinimize 120ms cubic-bezier(0.4, 0, 1, 1) forwards;
+  pointer-events: none;
+}
+
+.kivi-anim-pop-in {
+  animation: kiviPopIn 160ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.kivi-anim-pop-out {
+  animation: kiviPopOut 110ms cubic-bezier(0.4, 0, 1, 1) forwards;
+  pointer-events: none;
+}
+
+.kivi-anim-backdrop-in {
+  animation: kiviBackdropIn 150ms ease-out both;
+}
+
+.kivi-anim-backdrop-out {
+  animation: kiviBackdropOut 110ms ease-in forwards;
+  pointer-events: none;
+}
+
+.kivi-anim-menu-in {
+  transform-origin: top left;
+  animation: kiviMenuIn 135ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.kivi-anim-sheet-in {
+  animation: kiviSheetIn 170ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.kivi-anim-sheet-out {
+  animation: kiviSheetOut 120ms cubic-bezier(0.4, 0, 1, 1) forwards;
+  pointer-events: none;
+}
+
+.kivi-anim-slide-left-in {
+  animation: kiviSlideLeftIn 170ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.kivi-anim-slide-left-out {
+  animation: kiviSlideLeftOut 120ms cubic-bezier(0.4, 0, 1, 1) forwards;
+  pointer-events: none;
+}
+
+.kivi-anim-slide-right-in {
+  animation: kiviSlideRightIn 170ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.kivi-anim-slide-right-out {
+  animation: kiviSlideRightOut 120ms cubic-bezier(0.4, 0, 1, 1) forwards;
+  pointer-events: none;
+}
+
+.kivi-anim-reveal {
+  animation: kiviReveal 115ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.kivi-anim-tab-in {
+  animation: kiviTabIn 135ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 @media (prefers-reduced-motion: reduce) {

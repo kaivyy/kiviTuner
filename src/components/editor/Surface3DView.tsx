@@ -250,6 +250,10 @@ export const Surface3DView: React.FC<Surface3DViewProps> = React.memo(({
       window.removeEventListener('resize', refreshRect);
       window.removeEventListener('scroll', refreshRect, { capture: true });
       if (hoverRafRef.current !== null) cancelAnimationFrame(hoverRafRef.current);
+      if (canvasRef.current) {
+        canvasRef.current.width = 0;
+        canvasRef.current.height = 0;
+      }
     };
   }, []);
 
@@ -345,7 +349,7 @@ export const Surface3DView: React.FC<Surface3DViewProps> = React.memo(({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    const dpr = window.devicePixelRatio || 1;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
     const { width, height } = dimensions;
 
     const pixelW = Math.floor(width * dpr);
@@ -1017,16 +1021,16 @@ export const Surface3DView: React.FC<Surface3DViewProps> = React.memo(({
     <div
       tabIndex={0}
       onKeyDown={handleKeyDown}
-      className="relative flex h-full w-full min-h-0 min-w-0 flex-col overflow-hidden rounded-lg border border-kiviBorder bg-kiviBg select-none focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-kiviAccent"
+      className="relative flex h-full w-full min-h-0 min-w-0 flex-col overflow-hidden rounded-md border border-kiviBorder/60 bg-kiviBg select-none focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-kiviAccent"
     >
       {/* Responsive Wrapping 3D Calibration Toolbar */}
-      <div className="z-10 flex min-w-0 shrink-0 flex-wrap items-center justify-between gap-x-2 gap-y-1.5 border-b border-kiviBorder bg-kiviSurface px-2.5 py-1.5">
+      <div className="z-10 flex min-w-0 shrink-0 flex-wrap items-center justify-between gap-x-2 gap-y-1.5 border-b border-kiviBorder/50 bg-kiviSurface px-2.5 py-1.5">
         <div className="flex min-w-0 items-center gap-1.5">
           <Box className="h-3.5 w-3.5 shrink-0 text-kiviAccent" />
           <span className="truncate text-xs font-semibold text-kiviInk">
             {title || '3D Surface Mesh'}
           </span>
-          <span className="shrink-0 whitespace-nowrap rounded border border-kiviBorderStrong bg-kiviElevated px-1.5 py-0.5 font-mono text-[10px] text-kiviMuted tabular-nums">
+          <span className="shrink-0 whitespace-nowrap rounded border border-kiviBorder/70 bg-kiviElevated px-1.5 py-0.5 font-mono text-[10px] text-kiviMuted tabular-nums">
             {origRows} &times; {origCols}
           </span>
           {normalized.is1DRibbon && (
@@ -1188,7 +1192,7 @@ export const Surface3DView: React.FC<Surface3DViewProps> = React.memo(({
         />
 
         {activeCellCoord && activeCellValue !== null && activeCellValue !== undefined && (
-          <div className="pointer-events-none absolute top-2.5 left-2.5 z-10 min-w-[168px] rounded border border-kiviBorderStrong bg-kiviSurface/95 px-2.5 py-2 shadow-lg tabular-nums">
+          <div className="pointer-events-none absolute top-2.5 left-2.5 z-10 min-w-[168px] rounded-lg kivi-panel-surface bg-kiviSurface/95 px-2.5 py-2 tabular-nums">
             <div className="mb-1 flex items-center justify-between gap-2 border-b border-kiviBorder pb-1 text-[10px] font-semibold text-kiviInk">
               <span>
                 [{activeCellCoord.r}, {activeCellCoord.c}]

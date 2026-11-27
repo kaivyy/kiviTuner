@@ -185,7 +185,7 @@ export const DefinitionsTab: React.FC<DefinitionsTabProps> = ({
                   onInfo(`Exported ${storeMaps.length} map definitions as ${fmt.toUpperCase()}.`);
                 })()
               }
-              className="flex items-center gap-1 rounded border border-kiviBorderStrong bg-kiviElevated px-2 py-1 text-[10px] font-medium text-kiviInk hover:border-kiviAccent disabled:opacity-40"
+              className="flex items-center gap-1 rounded border border-kiviBorder/70 bg-kiviElevated px-2 py-1 text-[10px] font-medium text-kiviInk hover:border-kiviAccent disabled:opacity-40"
             >
               <Download className="h-3 w-3 text-kiviAccent" />
               <span>Export .{fmt}</span>
@@ -210,7 +210,7 @@ export const DefinitionsTab: React.FC<DefinitionsTabProps> = ({
           <option value="ols">OLS Project (.ols binary)</option>
         </select>
 
-        <label className="flex cursor-pointer items-center gap-1 rounded border border-kiviBorderStrong bg-kiviElevated px-2.5 py-1 text-kiviInk hover:border-kiviBorderStrong">
+        <label className="flex cursor-pointer items-center gap-1 rounded border border-kiviBorder/70 bg-kiviElevated px-2.5 py-1 text-kiviInk hover:border-kiviAccent/50">
           <Upload className="h-3.5 w-3.5" />
           <span>Load File</span>
           <input
@@ -454,7 +454,7 @@ export const DefinitionsTab: React.FC<DefinitionsTabProps> = ({
                                 type="button"
                                 disabled={busy || !hasRom}
                                 onClick={() => onTogglePatch(patch, true)}
-                                className="rounded border border-kiviBorderStrong bg-kiviElevated px-2 py-0.5 text-kiviSecondary disabled:opacity-40"
+                                className="rounded border border-kiviBorder/70 bg-kiviElevated px-2 py-0.5 text-kiviSecondary disabled:opacity-40"
                               >
                                 Revert
                               </button>

@@ -146,14 +146,19 @@ export const WorkspaceViewport: React.FC<WorkspaceViewportProps> = React.memo(({
     if (!splitTab) return null;
     return (
       <section className="flex min-h-0 min-w-0 flex-1 flex-col border-t border-kiviBorder bg-kiviBg lg:border-t-0 lg:border-l">
-        <div className="flex h-8 shrink-0 items-center justify-between border-b border-kiviBorder bg-kiviSurface px-3 text-xs">
-          <span className="truncate font-medium text-kiviInk">Split: {splitTab.title}</span>
+        <div
+          data-testid="panel-titlebar-split"
+          className="flex h-9 shrink-0 items-center justify-between gap-2 bg-kiviSurface px-3 text-xs"
+        >
+          <span className="min-w-0 truncate whitespace-nowrap font-medium text-kiviInk">
+            Split: {splitTab.title}
+          </span>
           {onCloseSplit && (
             <button
               type="button"
               aria-label="Close split pane"
               onClick={onCloseSplit}
-              className="rounded p-0.5 text-kiviMuted hover:bg-kiviElevated hover:text-kiviInk"
+              className="flex h-6 w-6 shrink-0 items-center justify-center rounded text-kiviMuted transition-colors hover:bg-kiviElevated hover:text-kiviInk"
             >
               <X className="h-3.5 w-3.5" />
             </button>
@@ -247,13 +252,16 @@ export const WorkspaceViewport: React.FC<WorkspaceViewportProps> = React.memo(({
 
   return (
     <main className="flex min-w-0 flex-1 flex-col overflow-hidden bg-kiviBg">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-kiviBorder bg-kiviSurface px-2.5 py-1.5 md:px-4">
-        <div className="flex min-w-0 max-w-full items-center gap-2">
-          <div className="no-scrollbar flex max-w-full items-center gap-0.5 overflow-x-auto rounded border border-kiviBorder bg-kiviBg p-0.5 text-xs">
+      <div
+        data-testid="workspace-viewbar"
+        className="flex h-9 shrink-0 flex-nowrap items-center justify-between gap-2 bg-kiviSurface px-2.5 md:px-3"
+      >
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          <div className="no-scrollbar flex min-w-0 max-w-full items-center gap-0.5 overflow-x-auto rounded bg-kiviBg p-0.5 text-xs">
             <button
               type="button"
               onClick={() => setLayoutPreset('standard')}
-              className={`flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded px-2 py-1 font-medium transition-colors md:px-2.5 ${
+              className={`flex h-6 shrink-0 items-center gap-1.5 whitespace-nowrap rounded px-2 font-medium transition-colors md:px-2.5 ${
                 effectivePreset === 'standard' && !showHexPrimary
                   ? 'bg-kiviAccent font-semibold text-kiviAccentFg'
                   : 'text-kiviSecondary hover:text-kiviInk'
@@ -267,7 +275,7 @@ export const WorkspaceViewport: React.FC<WorkspaceViewportProps> = React.memo(({
             <button
               type="button"
               onClick={() => setLayoutPreset('split_3d')}
-              className={`flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded px-2 py-1 font-medium transition-colors md:px-2.5 ${
+              className={`flex h-6 shrink-0 items-center gap-1.5 whitespace-nowrap rounded px-2 font-medium transition-colors md:px-2.5 ${
                 effectivePreset === 'split_3d' && !showHexPrimary
                   ? 'bg-kiviAccent font-semibold text-kiviAccentFg'
                   : 'text-kiviSecondary hover:text-kiviInk'
@@ -281,7 +289,7 @@ export const WorkspaceViewport: React.FC<WorkspaceViewportProps> = React.memo(({
             <button
               type="button"
               onClick={() => setLayoutPreset('split_waveform')}
-              className={`flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded px-2 py-1 font-medium transition-colors md:px-2.5 ${
+              className={`flex h-6 shrink-0 items-center gap-1.5 whitespace-nowrap rounded px-2 font-medium transition-colors md:px-2.5 ${
                 effectivePreset === 'split_waveform' && !showHexPrimary
                   ? 'bg-kiviAccent font-semibold text-kiviAccentFg'
                   : 'text-kiviSecondary hover:text-kiviInk'
@@ -295,7 +303,7 @@ export const WorkspaceViewport: React.FC<WorkspaceViewportProps> = React.memo(({
             <button
               type="button"
               onClick={() => setLayoutPreset('full_waveform')}
-              className={`flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded px-2 py-1 font-medium transition-colors md:px-2.5 ${
+              className={`flex h-6 shrink-0 items-center gap-1.5 whitespace-nowrap rounded px-2 font-medium transition-colors md:px-2.5 ${
                 effectivePreset === 'full_waveform' && !showHexPrimary
                   ? 'bg-kiviAccent font-semibold text-kiviAccentFg'
                   : 'text-kiviSecondary hover:text-kiviInk'
@@ -309,7 +317,7 @@ export const WorkspaceViewport: React.FC<WorkspaceViewportProps> = React.memo(({
             <button
               type="button"
               onClick={() => setLayoutPreset('full_3d')}
-              className={`flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded px-2 py-1 font-medium transition-colors md:px-2.5 ${
+              className={`flex h-6 shrink-0 items-center gap-1.5 whitespace-nowrap rounded px-2 font-medium transition-colors md:px-2.5 ${
                 effectivePreset === 'full_3d' && !showHexPrimary
                   ? 'bg-kiviAccent font-semibold text-kiviAccentFg'
                   : 'text-kiviSecondary hover:text-kiviInk'
@@ -328,12 +336,12 @@ export const WorkspaceViewport: React.FC<WorkspaceViewportProps> = React.memo(({
           )}
         </div>
 
-        <div className="no-scrollbar flex max-w-full items-center gap-1.5 overflow-x-auto md:gap-2">
+        <div className="flex shrink-0 items-center gap-1.5 md:gap-2">
           <button
             type="button"
             aria-label="Open engineering toolkit"
             onClick={onOpenToolkit}
-            className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded border border-kiviBorder bg-kiviElevated px-2.5 py-1 text-xs font-medium text-kiviSecondary transition-colors hover:text-kiviInk"
+            className="flex h-6 shrink-0 items-center gap-1.5 whitespace-nowrap rounded border border-kiviBorder/60 bg-kiviElevated px-2.5 text-xs font-medium text-kiviSecondary transition-colors hover:text-kiviInk"
             title="Fuel, air mass, timing, torque, sensor decode, flash chip layout"
           >
             <Calculator className="h-3.5 w-3.5 shrink-0 text-kiviAccent" />
@@ -344,7 +352,7 @@ export const WorkspaceViewport: React.FC<WorkspaceViewportProps> = React.memo(({
             <button
               type="button"
               onClick={onExtractMap}
-              className="flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded border border-kiviAccent/50 bg-kiviAccent/15 px-2.5 py-1 text-xs font-medium text-kiviAccent transition-colors hover:bg-kiviAccent/25"
+              className="flex h-6 shrink-0 items-center gap-1.5 whitespace-nowrap rounded border border-kiviAccent/50 bg-kiviAccent/15 px-2.5 text-xs font-medium text-kiviAccent transition-colors hover:bg-kiviAccent/25"
             >
               <PlusCircle className="h-3.5 w-3.5 shrink-0" />
               <span className="font-mono tabular-nums">
@@ -367,7 +375,7 @@ export const WorkspaceViewport: React.FC<WorkspaceViewportProps> = React.memo(({
           }`}
         >
           {showHexPrimary ? (
-            <div className="flex flex-1 flex-col overflow-hidden rounded-lg border border-kiviBorder">
+            <div className="flex flex-1 flex-col overflow-hidden rounded-md border border-kiviBorder/60">
               <HexdumpView
                 data={romData}
                 romLoaded={romLoaded}
@@ -380,7 +388,7 @@ export const WorkspaceViewport: React.FC<WorkspaceViewportProps> = React.memo(({
               />
             </div>
           ) : effectivePreset === 'full_waveform' ? (
-            <div className="flex flex-1 flex-col">
+            <div className="flex min-h-0 flex-1 flex-col">
               <div className="mb-2 flex items-center justify-between">
                 <div>
                   <h2 className="flex items-center gap-1.5 text-sm font-semibold text-kiviInk">
@@ -529,7 +537,7 @@ export const WorkspaceViewport: React.FC<WorkspaceViewportProps> = React.memo(({
                   />
                 </div>
               )}
-              <div className="rounded-lg border border-kiviBorder bg-kiviSurface p-2">
+              <div className="rounded-md border border-kiviBorder/60 bg-kiviSurface p-2">
                 <div className="mb-1.5 flex items-center justify-between px-1">
                   <span className="flex items-center gap-1 text-xs font-medium text-kiviSecondary">
                     <Activity className="h-3.5 w-3.5 text-kiviAccent" />
@@ -619,7 +627,7 @@ export const WorkspaceViewport: React.FC<WorkspaceViewportProps> = React.memo(({
                 )
               ) : (
                 <div className="flex flex-1 flex-col items-center justify-center p-8 text-center">
-                  <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-xl border border-kiviBorder bg-kiviSurface">
+                  <div className="mb-4 flex h-14 w-14 items-center justify-center rounded-lg border border-kiviBorder bg-kiviSurface">
                     <Binary className="h-7 w-7 text-kiviAccent" />
                   </div>
                   <h3 className="mb-1 text-base font-medium text-kiviInk">

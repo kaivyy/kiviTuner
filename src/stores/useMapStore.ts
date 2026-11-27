@@ -81,7 +81,7 @@ interface DesktopDocMeta {
 
 const MAX_BROWSER_UNDO = 128;
 const MAX_RECENT_ROMS = 10;
-const MAX_MATRIX_CACHE = 32;
+const MAX_MATRIX_CACHE = 16;
 
 const matrixCache = new Map<string, { active: number[][]; base: number[][] }>();
 

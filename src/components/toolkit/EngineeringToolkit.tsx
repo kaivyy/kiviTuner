@@ -904,7 +904,7 @@ export const EngineeringToolkit: React.FC<EngineeringToolkitProps> = ({
                             <span className="whitespace-nowrap">{b.length} B</span>
                             <span className="whitespace-nowrap text-kiviMuted">{b.block_type}</span>
                             {!b.write_safe && (
-                              <span className="whitespace-nowrap rounded border border-kiviWarn/40 bg-kiviWarn/10 px-1.5 py-0.2 text-kiviWarn">
+                              <span className="whitespace-nowrap rounded border border-kiviWarn/40 bg-kiviWarn/10 px-1.5 py-0.5 text-kiviWarn">
                                 write-blocked
                               </span>
                             )}

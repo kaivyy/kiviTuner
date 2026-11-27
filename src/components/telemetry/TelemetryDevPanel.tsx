@@ -227,7 +227,7 @@ export const TelemetryDevPanel: React.FC<TelemetryDevPanelProps> = ({
               <span>{sourceBadge.label}</span>
             </span>
           ) : (
-            <span className="inline-flex min-w-[106px] items-center justify-center gap-1.5 whitespace-nowrap rounded-full border border-kiviBorderStrong bg-kiviMuted/10 px-2.5 py-0.5 text-[11px] font-medium text-kiviMuted">
+            <span className="inline-flex min-w-[106px] items-center justify-center gap-1.5 whitespace-nowrap rounded-full border border-kiviBorder/70 bg-kiviMuted/10 px-2.5 py-0.5 text-[11px] font-medium text-kiviMuted">
               <span className="h-2 w-2 shrink-0 rounded-full bg-kiviMuted" />
               <span>{sourceBadge.label}</span>
             </span>
@@ -404,7 +404,7 @@ export const TelemetryDevPanel: React.FC<TelemetryDevPanelProps> = ({
                     onClick={() => setPlaybackSpeed(speed)}
                     className={`rounded px-1.5 py-0.5 text-[10px] font-mono tabular-nums transition-colors ${
                       currentSpeed === speed
-                        ? 'bg-kiviAccent text-kiviAccentFg font-bold shadow-xs'
+                        ? 'bg-kiviAccent text-kiviAccentFg font-bold'
                         : 'bg-kiviBg text-kiviMuted hover:text-kiviInk border border-kiviBorder'
                     }`}
                   >
@@ -490,7 +490,7 @@ export const TelemetryDevPanel: React.FC<TelemetryDevPanelProps> = ({
               disabled={!toolbarStates.canImport}
               className={`flex items-center gap-1.5 whitespace-nowrap rounded px-3 py-1 text-xs font-semibold transition-colors ${
                 toolbarStates.canImport
-                  ? 'border border-kiviBorderStrong bg-kiviElevated text-kiviInk hover:border-kiviAccent'
+                  ? 'border border-kiviBorder/70 bg-kiviElevated text-kiviInk hover:border-kiviAccent'
                   : 'bg-kiviBg text-kiviMuted border border-kiviBorder cursor-not-allowed opacity-50'
               }`}
             >
@@ -542,7 +542,7 @@ export const TelemetryDevPanel: React.FC<TelemetryDevPanelProps> = ({
             <button
               onClick={handleToggleConnection}
               disabled={isConnecting || (!isConnected && !selectedDriverId)}
-              className={`flex min-w-[108px] shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded px-3 py-1 text-xs font-semibold transition-colors disabled:opacity-50 ${
+              className={`flex min-w-[118px] shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded px-3 py-1 text-xs font-semibold transition-colors disabled:opacity-50 ${
                 isConnected
                   ? 'bg-kiviRed/10 text-kiviRed border border-kiviRed/40 hover:bg-kiviRed/20'
                   : 'bg-kiviGreen text-kiviAccentFg hover:opacity-90'

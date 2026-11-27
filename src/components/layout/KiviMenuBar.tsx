@@ -5,7 +5,6 @@ import {
   Wrench,
   GitCommit,
   Eye,
-  ChevronDown,
   ChevronRight,
   Check,
   Circle,
@@ -23,8 +22,10 @@ import { WindowTrafficLights } from './WindowTrafficLights.tsx';
 import {
   bridgeWindowStartDragging,
   bridgeWindowToggleMaximize,
+  isMacDesktop,
 } from '../../lib/windowControlsBridge.ts';
 import { APP_VERSION } from '../../lib/updaterBridge.ts';
+import { useAnimatedPresence } from '../../hooks/useAnimatedPresence';
 
 const COMPACT_MENU_LABELS: Record<string, string> = {
   file: 'File',
@@ -107,6 +108,7 @@ export const KiviMenuBar: React.FC<KiviMenuBarProps> = ({
   // Path of open submenus [level1Id, level2Id, ...]
   const [activeSubmenuPath, setActiveSubmenuPath] = useState<string[]>([]);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const mobileMenuPresence = useAnimatedPresence(isMobileMenuOpen, 120);
 
   const menuBarRef = useRef<HTMLDivElement>(null);
 
@@ -163,10 +165,13 @@ export const KiviMenuBar: React.FC<KiviMenuBarProps> = ({
     setIsMobileMenuOpen(false);
   }, []);
 
+  const hideInWindowMenus = isMacDesktop();
+
   return (
     <div
       ref={menuBarRef}
-      className="relative z-[90] flex h-10 w-full shrink-0 select-none items-center justify-between gap-1.5 border-b border-kiviBorder bg-kiviSurface px-2.5 text-xs text-kiviInk md:h-8 md:gap-2 md:px-3"
+      data-testid="main-window-menubar"
+      className="relative z-[90] flex h-8 w-full shrink-0 select-none items-center justify-between gap-1.5 bg-kiviSurface px-2.5 text-xs text-kiviInk md:gap-2 md:px-3"
     >
       {/* Left: Tahoe Traffic Lights + Brand Identity + Mobile Menu Trigger + Desktop Cascading Menus */}
       <div className="flex min-w-0 shrink-0 items-center gap-2">
@@ -192,69 +197,73 @@ export const KiviMenuBar: React.FC<KiviMenuBarProps> = ({
           <span className="pointer-events-none whitespace-nowrap text-[11px] font-bold tracking-wider text-kiviInk">
             {brandTitle}
           </span>
-          <span className="pointer-events-none hidden whitespace-nowrap rounded border border-kiviBorder/80 bg-kiviBg/80 px-1 py-0.5 font-mono text-[9px] text-kiviMuted sm:inline-block">
+          <span className="pointer-events-none hidden whitespace-nowrap rounded bg-kiviBg/80 px-1 py-0.5 font-mono text-[9px] text-kiviMuted sm:inline-block">
             {brandVersion}
           </span>
         </div>
 
         {/* Mobile Menu Trigger (< 768px) */}
-        <button
-          type="button"
-          aria-label="Toggle application menu"
-          aria-expanded={isMobileMenuOpen}
-          onClick={() => setIsMobileMenuOpen((prev) => !prev)}
-          className="flex min-h-[30px] shrink-0 items-center gap-1 whitespace-nowrap rounded border border-kiviBorderStrong bg-kiviElevated px-2 py-0.5 text-[11px] font-medium text-kiviInk transition-colors active:bg-kiviBorder md:hidden"
-        >
-          {isMobileMenuOpen ? (
-            <X className="h-3.5 w-3.5 shrink-0 text-kiviAccent" />
-          ) : (
-            <Menu className="h-3.5 w-3.5 shrink-0 text-kiviAccent" />
-          )}
-          <span>Menu</span>
-        </button>
+        {!hideInWindowMenus && (
+          <button
+            type="button"
+            aria-label="Toggle application menu"
+            aria-expanded={isMobileMenuOpen}
+            onClick={() => setIsMobileMenuOpen((prev) => !prev)}
+            className="flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded bg-kiviElevated px-2 py-0.5 text-[11px] font-medium text-kiviInk transition-colors active:bg-kiviBorder md:hidden"
+          >
+            {isMobileMenuOpen ? (
+              <X className="h-3.5 w-3.5 shrink-0 text-kiviAccent" />
+            ) : (
+              <Menu className="h-3.5 w-3.5 shrink-0 text-kiviAccent" />
+            )}
+            <span>Menu</span>
+          </button>
+        )}
 
-        {/* 7 Top-Level Menu Buttons (>= 768px) */}
-        <nav className="hidden items-center gap-0.5 md:flex" role="menubar">
-          {menus.map((menu) => {
-            const isOpen = activeRootId === menu.id;
-            const compactLabel = COMPACT_MENU_LABELS[menu.id] ?? menu.label;
-            return (
-              <div key={menu.id} className="relative shrink-0">
-                <button
-                  type="button"
-                  role="menuitem"
-                  aria-label={menu.label}
-                  title={menu.label}
-                  aria-haspopup="true"
-                  aria-expanded={isOpen}
-                  onClick={() => handleRootClick(menu.id)}
-                  onMouseEnter={() => handleRootMouseEnter(menu.id)}
-                  className={`shrink-0 whitespace-nowrap rounded px-1.5 py-0.5 text-[11px] font-medium transition-colors cursor-pointer ${
-                    isOpen
-                      ? 'bg-kiviElevated text-kiviInk ring-1 ring-kiviBorderStrong'
-                      : 'text-kiviSecondary hover:bg-kiviElevated hover:text-kiviInk'
-                  }`}
-                >
-                  <span className="whitespace-nowrap 2xl:hidden">{compactLabel}</span>
-                  <span className="hidden whitespace-nowrap 2xl:inline">{menu.label}</span>
-                </button>
+        {/* 7 Top-Level Menu Buttons (>= 768px) - omitted on macOS where global top bar owns the menu */}
+        {!hideInWindowMenus && (
+          <nav className="hidden items-center gap-0.5 md:flex" role="menubar">
+            {menus.map((menu) => {
+              const isOpen = activeRootId === menu.id;
+              const compactLabel = COMPACT_MENU_LABELS[menu.id] ?? menu.label;
+              return (
+                <div key={menu.id} className="relative shrink-0">
+                  <button
+                    type="button"
+                    role="menuitem"
+                    aria-label={menu.label}
+                    title={menu.label}
+                    aria-haspopup="true"
+                    aria-expanded={isOpen}
+                    onClick={() => handleRootClick(menu.id)}
+                    onMouseEnter={() => handleRootMouseEnter(menu.id)}
+                    className={`shrink-0 whitespace-nowrap rounded px-1.5 py-0.5 text-[11px] font-medium transition-colors cursor-pointer ${
+                      isOpen
+                        ? 'bg-kiviElevated text-kiviInk'
+                        : 'text-kiviSecondary hover:bg-kiviElevated hover:text-kiviInk'
+                    }`}
+                  >
+                    <span className="whitespace-nowrap 2xl:hidden">{compactLabel}</span>
+                    <span className="hidden whitespace-nowrap 2xl:inline">{menu.label}</span>
+                  </button>
 
-                {/* Root Dropdown Menu Flyout */}
-                {isOpen && menu.children && (
-                  <div className="absolute left-0 top-full z-50 mt-1">
-                    <FlyoutMenuPanel
-                      items={menu.children}
-                      depth={0}
-                      activeSubmenuPath={activeSubmenuPath}
-                      setActiveSubmenuPath={setActiveSubmenuPath}
-                      onCloseAll={closeAll}
-                    />
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </nav>
+                  {/* Root Dropdown Menu Flyout */}
+                  {isOpen && menu.children && (
+                    <div className="absolute left-0 top-full z-50 mt-1">
+                      <FlyoutMenuPanel
+                        items={menu.children}
+                        depth={0}
+                        activeSubmenuPath={activeSubmenuPath}
+                        setActiveSubmenuPath={setActiveSubmenuPath}
+                        onCloseAll={closeAll}
+                      />
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </nav>
+        )}
       </div>
 
       {/* Draggable frameless desktop titlebar spacer */}
@@ -281,10 +290,10 @@ export const KiviMenuBar: React.FC<KiviMenuBarProps> = ({
                 ? 'Restart kiviTuner to finish applying update'
                 : `New release v${updateVersion ?? ''} available`
             }
-            className={`flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded border px-2 py-0.5 font-mono text-[10px] font-semibold transition-colors ${
+            className={`flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded px-2 py-0.5 font-mono text-[10px] font-semibold transition-colors ${
               updateStatus === 'ready-to-restart'
-                ? 'border-kiviGreen/50 bg-kiviGreen/15 text-kiviGreen hover:bg-kiviGreen/25'
-                : 'border-kiviAccent/50 bg-kiviAccent/15 text-kiviAccent hover:bg-kiviAccent/25'
+                ? 'bg-kiviGreen/15 text-kiviGreen hover:bg-kiviGreen/25'
+                : 'bg-kiviAccent/15 text-kiviAccent hover:bg-kiviAccent/25'
             }`}
           >
             <Download className="h-3 w-3 shrink-0" />
@@ -304,7 +313,7 @@ export const KiviMenuBar: React.FC<KiviMenuBarProps> = ({
             type="button"
             onClick={onVerifyChecksum}
             title="Checksum integrity valid. Click to re-verify."
-            className="flex h-6 min-w-[68px] shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded border border-kiviGreen/40 bg-kiviGreen/10 px-1.5 py-0.5 font-mono text-[10px] tabular-nums text-kiviGreen transition-colors hover:bg-kiviGreen/20"
+            className="hidden sm:flex h-6 min-w-[68px] shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded bg-kiviGreen/10 px-1.5 py-0.5 font-mono text-[10px] tabular-nums text-kiviGreen transition-colors hover:bg-kiviGreen/20"
           >
             <ShieldCheck className="h-3 w-3 shrink-0" />
             <span>CS: OK</span>
@@ -314,7 +323,7 @@ export const KiviMenuBar: React.FC<KiviMenuBarProps> = ({
             type="button"
             onClick={onFixChecksum}
             title="Checksum mismatch detected! Click to calculate and auto-fix."
-            className="flex h-6 min-w-[68px] shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded border border-kiviRed/50 bg-kiviRed/10 px-1.5 py-0.5 font-mono text-[10px] tabular-nums text-kiviRed transition-colors hover:bg-kiviRed/20"
+            className="hidden sm:flex h-6 min-w-[68px] shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded bg-kiviRed/10 px-1.5 py-0.5 font-mono text-[10px] tabular-nums text-kiviRed transition-colors hover:bg-kiviRed/20"
           >
             <ShieldAlert className="h-3 w-3 shrink-0" />
             <span>CS: BAD</span>
@@ -325,7 +334,7 @@ export const KiviMenuBar: React.FC<KiviMenuBarProps> = ({
             type="button"
             onClick={onVerifyChecksum}
             title="Click to verify calibration checksum integrity"
-            className="flex h-6 min-w-[68px] shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded border border-kiviBorderStrong bg-kiviBg px-1.5 py-0.5 font-mono text-[10px] tabular-nums text-kiviSecondary transition-colors hover:bg-kiviElevated hover:text-kiviInk"
+            className="hidden sm:flex h-6 min-w-[68px] shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded bg-kiviBg px-1.5 py-0.5 font-mono text-[10px] tabular-nums text-kiviSecondary transition-colors hover:bg-kiviElevated hover:text-kiviInk"
           >
             <ShieldCheck className="h-3 w-3 shrink-0 text-kiviMuted" />
             <span>CS: CHK</span>
@@ -337,10 +346,10 @@ export const KiviMenuBar: React.FC<KiviMenuBarProps> = ({
           type="button"
           onClick={onDeltaClick}
           title={deltaCount > 0 ? `${deltaCount} modified cells since last commit` : 'No uncommitted changes'}
-          className={`hidden h-6 min-w-[76px] shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded border px-1.5 py-0.5 font-mono text-[10px] tabular-nums transition-colors lg:flex ${
+          className={`hidden h-6 min-w-[76px] shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded px-1.5 py-0.5 font-mono text-[10px] tabular-nums transition-colors lg:flex ${
             deltaCount > 0
-              ? 'border-kiviAccent/50 bg-kiviAccent/10 text-kiviAccent hover:bg-kiviAccent/20'
-              : 'border-kiviBorder bg-kiviBg text-kiviSecondary hover:bg-kiviElevated hover:text-kiviInk'
+              ? 'bg-kiviAccent/12 text-kiviAccent hover:bg-kiviAccent/20'
+              : 'bg-kiviBg text-kiviSecondary hover:bg-kiviElevated hover:text-kiviInk'
           }`}
         >
           <GitCommit className={`h-3 w-3 shrink-0 ${deltaCount > 0 ? 'text-kiviAccent' : 'text-kiviMuted'}`} />
@@ -350,7 +359,7 @@ export const KiviMenuBar: React.FC<KiviMenuBarProps> = ({
         {/* 3. Display Mode Pill */}
         <div
           title="Active calibration table data representation"
-          className="hidden h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded border border-kiviBorder bg-kiviBg px-2 py-0.5 font-mono text-[10px] text-kiviSecondary 2xl:flex"
+          className="hidden h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded bg-kiviBg px-2 py-0.5 font-mono text-[10px] text-kiviSecondary 2xl:flex"
         >
           <Eye className="h-3 w-3 shrink-0 text-kiviMuted" />
           <span>{displayModeText}</span>
@@ -359,7 +368,7 @@ export const KiviMenuBar: React.FC<KiviMenuBarProps> = ({
         {/* 4. ROM Metadata Pill */}
         <div
           title={romName ? `Active ROM: ${romName} (${romSizeBytes} bytes)` : 'No ROM calibration loaded'}
-          className="hidden h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded border border-kiviBorder bg-kiviBg px-2 py-0.5 font-mono text-[10px] text-kiviSecondary xl:flex"
+          className="hidden h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded bg-kiviBg px-2 py-0.5 font-mono text-[10px] text-kiviSecondary xl:flex"
         >
           <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${romName ? 'bg-kiviGreen' : 'bg-kiviMuted'}`} />
           <span className="max-w-[140px] truncate">
@@ -371,11 +380,13 @@ export const KiviMenuBar: React.FC<KiviMenuBarProps> = ({
       </div>
 
       {/* Mobile Full Accordion Sheet (< 768px) */}
-      {isMobileMenuOpen && (
+      {!hideInWindowMenus && mobileMenuPresence.mounted && (
         <div
           role="dialog"
           aria-label="Application navigation menu"
-          className="fixed inset-x-0 top-10 bottom-0 z-50 overflow-y-auto border-t border-kiviBorder bg-kiviSurface p-3 md:hidden"
+          className={`fixed inset-x-0 top-8 bottom-0 z-50 overflow-y-auto bg-kiviSurface p-3 md:hidden ${
+            mobileMenuPresence.state === 'closing' ? 'kivi-anim-sheet-out' : 'kivi-anim-sheet-in'
+          }`}
         >
           <div className="space-y-1.5">
             {menus.map((menu) => (
@@ -398,13 +409,13 @@ const MobileMenuAccordion: React.FC<MobileMenuAccordionProps> = ({ node, depth, 
   const [expanded, setExpanded] = useState(false);
 
   if (node.type === 'separator') {
-    return <div className="my-1 h-px bg-kiviBorder" role="separator" />;
+    return <div className="my-1 h-px bg-kiviBorder/40" role="separator" />;
   }
 
   const hasChildren = node.type === 'submenu' && Boolean(node.children && node.children.length > 0);
   if (hasChildren) {
     return (
-      <div className="rounded border border-kiviBorder bg-kiviBg/60">
+      <div className="rounded-lg bg-kiviBg/60">
         <button
           type="button"
           aria-expanded={expanded}
@@ -412,14 +423,14 @@ const MobileMenuAccordion: React.FC<MobileMenuAccordionProps> = ({ node, depth, 
           className="flex min-h-[44px] w-full items-center justify-between gap-2 px-3 py-2 text-left text-xs font-medium text-kiviInk active:bg-kiviElevated"
         >
           <span className="truncate">{node.label}</span>
-          {expanded ? (
-            <ChevronDown className="h-4 w-4 shrink-0 text-kiviAccent" />
-          ) : (
-            <ChevronRight className="h-4 w-4 shrink-0 text-kiviMuted" />
-          )}
+          <ChevronRight
+            className={`h-4 w-4 shrink-0 transition-transform duration-150 ${
+              expanded ? 'rotate-90 text-kiviAccent' : 'text-kiviMuted'
+            }`}
+          />
         </button>
         {expanded && node.children && (
-          <div className="space-y-1 border-t border-kiviBorder bg-kiviSurface p-1.5 pl-3">
+          <div className="kivi-anim-reveal space-y-1 bg-kiviSurface p-1.5 pl-3">
             {node.children.map((child) => (
               <MobileMenuAccordion
                 key={child.id}
@@ -464,7 +475,7 @@ const MobileMenuAccordion: React.FC<MobileMenuAccordionProps> = ({ node, depth, 
             className={`flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded border ${
               node.checked
                 ? 'border-kiviAccent bg-kiviAccent text-kiviAccentFg'
-                : 'border-kiviBorderStrong bg-kiviBg'
+                : 'border-kiviBorder/70 bg-kiviBg'
             }`}
           >
             {node.checked && <Check className="h-2.5 w-2.5 stroke-[3]" />}
@@ -499,7 +510,7 @@ const FlyoutMenuPanel: React.FC<FlyoutMenuPanelProps> = ({
   return (
     <div
       role="menu"
-      className="min-w-[220px] max-w-[280px] rounded-lg border border-kiviBorderStrong bg-kiviSurface py-1.5 shadow-2xl text-kiviInk select-none"
+      className="kivi-anim-menu-in kivi-menu-flyout min-w-[220px] max-w-[280px] rounded-xl bg-kiviSurface py-1.5 text-kiviInk select-none"
     >
       {items.map((item) => (
         <FlyoutMenuItem
@@ -593,69 +604,69 @@ const FlyoutMenuItem: React.FC<FlyoutMenuItemProps> = ({
   };
 
   if (item.type === 'separator') {
-    return <div className="my-1 h-px bg-kiviBorder mx-1.5" role="separator" />;
+    return <div className="my-1 h-px bg-kiviBorder/40 mx-1.5" role="separator" />;
   }
 
   return (
-    <div
-      ref={itemRef}
-      role="menuitem"
-      aria-disabled={item.disabled}
-      aria-haspopup={isSubmenu ? 'true' : undefined}
-      aria-expanded={isSubmenu ? isExpanded : undefined}
-      onClick={handleClick}
-      onMouseEnter={handleMouseEnter}
-      className={`relative flex items-center justify-between px-3 py-1.5 text-xs transition-colors cursor-pointer select-none ${
-        item.disabled
-          ? 'text-kiviMuted opacity-50 cursor-not-allowed'
-          : isExpanded
-          ? 'bg-kiviElevated text-kiviInk'
-          : 'text-kiviSecondary hover:bg-kiviElevated hover:text-kiviInk'
-      }`}
-    >
-      <div className="flex items-center gap-2 truncate pr-2">
-        {/* State Indicators (Radio / Checkbox) */}
-        {item.type === 'radio' && (
-          <span className="flex h-3.5 w-3.5 items-center justify-center shrink-0">
-            {item.checked ? (
-              <span className="h-2 w-2 rounded-full bg-kiviAccent" />
-            ) : (
-              <Circle className="h-2 w-2 text-kiviMuted" />
-            )}
-          </span>
-        )}
+    <div ref={itemRef} onMouseEnter={handleMouseEnter} className="relative">
+      <div
+        role="menuitem"
+        aria-disabled={item.disabled}
+        aria-haspopup={isSubmenu ? 'true' : undefined}
+        aria-expanded={isSubmenu ? isExpanded : undefined}
+        onClick={handleClick}
+        className={`flex items-center justify-between px-3 py-1.5 text-xs transition-colors cursor-pointer select-none ${
+          item.disabled
+            ? 'text-kiviMuted opacity-50 cursor-not-allowed'
+            : isExpanded
+            ? 'bg-kiviElevated text-kiviInk'
+            : 'text-kiviSecondary hover:bg-kiviElevated hover:text-kiviInk'
+        }`}
+      >
+        <div className="flex items-center gap-2 truncate pr-2">
+          {/* State Indicators (Radio / Checkbox) */}
+          {item.type === 'radio' && (
+            <span className="flex h-3.5 w-3.5 items-center justify-center shrink-0">
+              {item.checked ? (
+                <span className="h-2 w-2 rounded-full bg-kiviAccent" />
+              ) : (
+                <Circle className="h-2 w-2 text-kiviMuted" />
+              )}
+            </span>
+          )}
 
-        {item.type === 'checkbox' && (
-          <span
-            className={`flex h-3.5 w-3.5 items-center justify-center rounded border shrink-0 ${
-              item.checked
-                ? 'border-kiviAccent bg-kiviAccent text-kiviAccentFg'
-                : 'border-kiviBorderStrong bg-kiviBg'
-            }`}
-          >
-            {item.checked && <Check className="h-2.5 w-2.5 stroke-[3]" />}
-          </span>
-        )}
+          {item.type === 'checkbox' && (
+            <span
+              className={`flex h-3.5 w-3.5 items-center justify-center rounded border shrink-0 ${
+                item.checked
+                  ? 'border-kiviAccent bg-kiviAccent text-kiviAccentFg'
+                  : 'border-kiviBorder/70 bg-kiviBg'
+              }`}
+            >
+              {item.checked && <Check className="h-2.5 w-2.5 stroke-[3]" />}
+            </span>
+          )}
 
-        {/* Custom Icon if provided */}
-        {item.icon && <span className="shrink-0">{item.icon}</span>}
+          {/* Custom Icon if provided */}
+          {item.icon && <span className="shrink-0">{item.icon}</span>}
 
-        {/* Label */}
-        <span className="truncate whitespace-nowrap">{item.label}</span>
+          {/* Label */}
+          <span className="truncate whitespace-nowrap">{item.label}</span>
+        </div>
+
+        {/* Right side: Shortcut label or Submenu Arrow */}
+        <div className="flex items-center gap-1.5 shrink-0 ml-auto pl-2">
+          {item.shortcut && (
+            <span className="font-mono text-[10px] text-kiviMuted tracking-wider whitespace-nowrap">
+              {item.shortcut}
+            </span>
+          )}
+
+          {isSubmenu && <ChevronRight className="h-3.5 w-3.5 shrink-0 text-kiviMuted" />}
+        </div>
       </div>
 
-      {/* Right side: Shortcut label or Submenu Arrow */}
-      <div className="flex items-center gap-1.5 shrink-0 ml-auto pl-2">
-        {item.shortcut && (
-          <span className="font-mono text-[10px] text-kiviMuted tracking-wider whitespace-nowrap">
-            {item.shortcut}
-          </span>
-        )}
-
-        {isSubmenu && <ChevronRight className="h-3.5 w-3.5 shrink-0 text-kiviMuted" />}
-      </div>
-
-      {/* Child Submenu Flyout (Recursive up to 3 levels deep) */}
+      {/* Child Submenu Flyout (Sibling element avoids nested menuitem ARIA & keeps hover bridge) */}
       {isSubmenu && isExpanded && item.children && (
         <div
           style={{
@@ -663,7 +674,7 @@ const FlyoutMenuItem: React.FC<FlyoutMenuItemProps> = ({
             left: flipLeft ? undefined : '100%',
             right: flipLeft ? '100%' : undefined,
           }}
-          className={`absolute z-50 ${flipLeft ? 'mr-1' : 'ml-1'}`}
+          className={`absolute z-50 ${flipLeft ? 'pr-1' : 'pl-1'}`}
         >
           <FlyoutMenuPanel
             items={item.children}

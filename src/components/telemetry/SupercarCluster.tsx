@@ -162,7 +162,7 @@ export const SupercarCluster: React.FC<SupercarClusterProps> = ({ latestFrame, h
   const renderHeroGauge = () => (
     <div
       data-testid="supercar-hero-gauge"
-      className="relative flex flex-col items-center justify-between rounded-xl border border-kiviBorderStrong/80 bg-kiviSurface px-3 py-2.5"
+      className="relative flex flex-col items-center justify-between rounded-lg border border-kiviBorder/70 bg-kiviSurface px-3 py-2.5"
     >
       {/* Top Instrument Mode & Shift Alert Row */}
       <div className="flex w-full items-center justify-between gap-2 pb-2">

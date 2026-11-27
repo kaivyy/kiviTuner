@@ -52,6 +52,18 @@ function defaultIsDesktop(deps?: WindowControlsDeps): boolean {
   }
 }
 
+/** Returns `true` only when running inside the Tauri macOS desktop runtime. */
+export function isMacDesktop(
+  deps?: WindowControlsDeps & { platform?: string; userAgent?: string }
+): boolean {
+  if (!defaultIsDesktop(deps)) return false;
+  const plat =
+    deps?.platform ?? (typeof navigator !== 'undefined' ? navigator.platform ?? '' : '');
+  const ua =
+    deps?.userAgent ?? (typeof navigator !== 'undefined' ? navigator.userAgent ?? '' : '');
+  return /Mac/i.test(`${plat} ${ua}`);
+}
+
 function desktopWindow(deps?: WindowControlsDeps): DesktopWindowLike {
   return (deps?.getWindow ?? getCurrentWindow)();
 }

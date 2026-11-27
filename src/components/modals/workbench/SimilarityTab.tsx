@@ -203,7 +203,7 @@ export const SimilarityTab: React.FC<SimilarityTabProps> = ({
                         onAddMaps([m], true);
                         onSelectMap(m.id);
                       }}
-                      className="rounded border border-kiviBorderStrong bg-kiviElevated px-2 py-0.5 text-[10px]"
+                      className="rounded border border-kiviBorder/70 bg-kiviElevated px-2 py-0.5 text-[10px]"
                     >
                       Open Map
                     </button>

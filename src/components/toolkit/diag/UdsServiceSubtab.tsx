@@ -171,7 +171,7 @@ export const UdsServiceSubtab: React.FC<UdsServiceSubtabProps> = ({
             type="button"
             disabled={busy || !hasDevice}
             onClick={() => void switchSession(0x01, 'Default 0x01')}
-            className="min-h-[32px] rounded border border-kiviBorderStrong bg-kiviSurface px-2.5 py-1 font-mono text-[11px] text-kiviInk hover:border-kiviAccent focus-visible:ring-2 focus-visible:ring-kiviAccent disabled:opacity-50"
+            className="min-h-[32px] rounded border border-kiviBorder/70 bg-kiviSurface px-2.5 py-1 font-mono text-[11px] text-kiviInk hover:border-kiviAccent focus-visible:ring-2 focus-visible:ring-kiviAccent disabled:opacity-50"
           >
             Default Session (0x01)
           </button>
@@ -221,7 +221,7 @@ export const UdsServiceSubtab: React.FC<UdsServiceSubtabProps> = ({
           value={customDidInput}
           onChange={(e) => setCustomDidInput(e.target.value)}
           placeholder="F186, F190, F187, F189"
-          className="w-full rounded border border-kiviBorderStrong bg-kiviSurface px-2 py-1 font-mono text-[11px] text-kiviInk focus-visible:ring-2 focus-visible:ring-kiviAccent"
+          className="w-full rounded border border-kiviBorder/70 bg-kiviSurface px-2 py-1 font-mono text-[11px] text-kiviInk focus-visible:ring-2 focus-visible:ring-kiviAccent"
         />
         {didsState?.kind === 'ok' && (
           <div className="space-y-1">
@@ -262,7 +262,7 @@ export const UdsServiceSubtab: React.FC<UdsServiceSubtabProps> = ({
             aria-label="UDS routine preset"
             value={routineIdInput}
             onChange={(e) => setRoutineIdInput(e.target.value)}
-            className="rounded border border-kiviBorderStrong bg-kiviSurface px-2 py-1 font-mono text-[11px] text-kiviInk focus-visible:ring-2 focus-visible:ring-kiviAccent"
+            className="rounded border border-kiviBorder/70 bg-kiviSurface px-2 py-1 font-mono text-[11px] text-kiviInk focus-visible:ring-2 focus-visible:ring-kiviAccent"
           >
             {ROUTINE_PRESETS.map((p) => (
               <option key={p.idHex} value={p.idHex}>
@@ -276,13 +276,13 @@ export const UdsServiceSubtab: React.FC<UdsServiceSubtabProps> = ({
             value={routineIdInput}
             onChange={(e) => setRoutineIdInput(e.target.value)}
             placeholder="0xF001"
-            className="rounded border border-kiviBorderStrong bg-kiviSurface px-2 py-1 font-mono text-[11px] text-kiviInk focus-visible:ring-2 focus-visible:ring-kiviAccent"
+            className="rounded border border-kiviBorder/70 bg-kiviSurface px-2 py-1 font-mono text-[11px] text-kiviInk focus-visible:ring-2 focus-visible:ring-kiviAccent"
           />
           <select
             aria-label="Routine control subfunction"
             value={routineSubfunc}
             onChange={(e) => setRoutineSubfunc(Number(e.target.value))}
-            className="rounded border border-kiviBorderStrong bg-kiviSurface px-2 py-1 font-mono text-[11px] text-kiviInk focus-visible:ring-2 focus-visible:ring-kiviAccent"
+            className="rounded border border-kiviBorder/70 bg-kiviSurface px-2 py-1 font-mono text-[11px] text-kiviInk focus-visible:ring-2 focus-visible:ring-kiviAccent"
           >
             <option value={1}>0x01 Start Routine</option>
             <option value={2}>0x02 Stop Routine</option>
@@ -296,7 +296,7 @@ export const UdsServiceSubtab: React.FC<UdsServiceSubtabProps> = ({
             value={routineOptInput}
             onChange={(e) => setRoutineOptInput(e.target.value)}
             placeholder="Optional hex record bytes (e.g. 00 01)"
-            className="flex-1 rounded border border-kiviBorderStrong bg-kiviSurface px-2 py-1 font-mono text-[11px] text-kiviInk focus-visible:ring-2 focus-visible:ring-kiviAccent"
+            className="flex-1 rounded border border-kiviBorder/70 bg-kiviSurface px-2 py-1 font-mono text-[11px] text-kiviInk focus-visible:ring-2 focus-visible:ring-kiviAccent"
           />
           <button
             type="button"
@@ -366,13 +366,13 @@ export const UdsServiceSubtab: React.FC<UdsServiceSubtabProps> = ({
             value={ioDidInput}
             onChange={(e) => setIoDidInput(e.target.value)}
             placeholder="DID e.g. 0x1234"
-            className="rounded border border-kiviBorderStrong bg-kiviSurface px-2 py-1 font-mono text-[11px] text-kiviInk"
+            className="rounded border border-kiviBorder/70 bg-kiviSurface px-2 py-1 font-mono text-[11px] text-kiviInk"
           />
           <select
             aria-label="IOControl parameter"
             value={ioParam}
             onChange={(e) => setIoParam(Number(e.target.value))}
-            className="rounded border border-kiviBorderStrong bg-kiviSurface px-2 py-1 font-mono text-[11px] text-kiviInk"
+            className="rounded border border-kiviBorder/70 bg-kiviSurface px-2 py-1 font-mono text-[11px] text-kiviInk"
           >
             <option value={3}>0x03 Short-Term Adjust</option>
             <option value={2}>0x02 Freeze Current State</option>
@@ -385,7 +385,7 @@ export const UdsServiceSubtab: React.FC<UdsServiceSubtabProps> = ({
             value={ioStateHex}
             onChange={(e) => setIoStateHex(e.target.value)}
             placeholder="Control state bytes (hex)"
-            className="rounded border border-kiviBorderStrong bg-kiviSurface px-2 py-1 font-mono text-[11px] text-kiviInk"
+            className="rounded border border-kiviBorder/70 bg-kiviSurface px-2 py-1 font-mono text-[11px] text-kiviInk"
           />
         </div>
         <div className="flex flex-wrap justify-end gap-2">

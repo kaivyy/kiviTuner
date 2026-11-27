@@ -1046,7 +1046,7 @@ export const FlashPanel: React.FC<FlashPanelProps> = ({
                 aria-label="ECU or ROM size preset"
                 value={selectedPresetId}
                 onChange={(e) => handleSelectPreset(e.target.value)}
-                className="w-full rounded border border-kiviBorderStrong bg-kiviSurface px-2 py-1 text-[11px] text-kiviInk sm:w-72"
+                className="w-full rounded border border-kiviBorder/70 bg-kiviSurface px-2 py-1 text-[11px] text-kiviInk sm:w-72"
               >
                 {hasRom && activeRomBytes > 0 && (
                   <optgroup label="Active Editor ROM">
@@ -1147,7 +1147,7 @@ export const FlashPanel: React.FC<FlashPanelProps> = ({
                       setReadLen(formatHexAddr(selectedMotoProfile.rom_size_bytes, 5));
                       pushLog('info', 'Range set to full ROM read (including protected bootloader).');
                     }}
-                    className="rounded border border-kiviBorderStrong bg-kiviSurface px-2 py-0.5 text-[10px] text-kiviSecondary hover:bg-kiviElevated"
+                    className="rounded border border-kiviBorder/70 bg-kiviSurface px-2 py-0.5 text-[10px] text-kiviSecondary hover:bg-kiviElevated"
                   >
                     Use Full Read Range
                   </button>
@@ -1229,7 +1229,7 @@ export const FlashPanel: React.FC<FlashPanelProps> = ({
                 aria-label="ECU kernel session protocol"
                 value={protocolKind}
                 onChange={(e) => setProtocolKind(e.target.value as SessionProtocolChoice['kind'])}
-                className="rounded border border-kiviBorderStrong bg-kiviBg px-2 py-1 text-kiviInk"
+                className="rounded border border-kiviBorder/70 bg-kiviBg px-2 py-1 text-kiviInk"
               >
                 <option value="uds_standard">ISO 14229 UDS Standard</option>
                 <option value="honda_keihin_k_line">Honda Keihin K-Line</option>
@@ -1363,7 +1363,7 @@ export const FlashPanel: React.FC<FlashPanelProps> = ({
               type="button"
               disabled={!canFlash}
               onClick={() => void handleFlash()}
-              className={`inline-flex items-center gap-2 rounded px-3 py-1.5 text-[11px] ${
+              className={`inline-flex min-w-[164px] shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded px-3 py-1.5 text-[11px] ${
                 canFlash
                   ? 'bg-kiviRed/15 text-kiviRed hover:bg-kiviRed/25'
                   : 'cursor-not-allowed bg-kiviElevated text-kiviMuted'
