@@ -125,11 +125,16 @@ npx --yes @tauri-apps/cli@2 build
 
 | Document | Contents |
 |---|---|
+| [Getting Started Guide](docs/guides/getting-started.md) | End-to-end ROM opening, definition loading, discovery scanning, table editing, diffing, checksums, and saving. |
+| [Checksum Engines & JSON Plugins](docs/guides/checksum-plugins.md) | Built-in OEM checksum algorithms and declarative JSON custom checksum plugin schema and examples. |
 | [Design System & Workspace Architecture](DESIGN.md) | Visual tokens (Carbon Dark / Lab Light AA ratios), single-owner shell, and store concurrency model. |
 | [Drivers and Hardware Interfaces](docs/hardware/drivers-and-interfaces.md) | OS vs built-in vs vendor J2534 drivers, Linux `udev` / SocketCAN, Win64 32-bit bridge, and troubleshooting. |
 | [Building and Packaging Installers](docs/guides/building-and-packaging.md) | 5-target GitHub Actions release matrix, local Windows/Linux/macOS build commands, and CI cache/CLI setup. |
+| [Release Process](docs/guides/releasing.md) | Version-bump checklist across workspace manifests, tagged auto-publish flow, and manual draft workflow runs. |
 | [Hardware Bench Validation Guide](docs/guides/hardware-bench-validation.md) | Mandatory stock-first read/diff/checksum/verify checklist and bench power supply bounds. |
 | [OBD-II Serial Compatibility Matrix](docs/hardware/obd_serial_compatibility.md) | ELM327 / STN compatibility matrix, PID decoding rules, and physical acceptance test protocol. |
+| [Contributing Guide](CONTRIBUTING.md) | Development prerequisites, required Rust and TypeScript test suite commands, and engineering invariants. |
+| [Changelog](CHANGELOG.md) | Version history and release summary starting from `v0.1.0`. |
 
 ## Safety Notice
 

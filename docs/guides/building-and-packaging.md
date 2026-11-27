@@ -17,12 +17,15 @@ Defined in [.github/workflows/build-desktop.yml](../../.github/workflows/build-d
 | `kivituner-macos-x64` | `macos-latest` / `x86_64-apple-darwin` | `.dmg`, `.app.tar.gz` | Intel x86_64 macOS build (`minimumSystemVersion: 10.15`). |
 
 ### Triggering a GitHub Actions Build
-- **Tagged release build (draft GitHub Release + downloadable artifacts):**
-  ```bash
-  git tag v0.1.0
-  git push origin v0.1.0
-  ```
-- **Manual on-demand build:** Open the **Actions** tab on GitHub -> **Build Desktop Installers** -> **Run workflow**.
+
+Regular commits pushed to `main` or feature branches do not run installer builds.
+
+| Action | Trigger | Result |
+|---|---|---|
+| Release tag build | `git tag -a vX.Y.Z -m "kiviTuner vX.Y.Z" && git push origin vX.Y.Z` | Builds all 5 OS targets and auto-publishes the release via `publish-release` once all 5 pass. |
+| Manual on-demand build | GitHub **Actions** -> **Build Desktop Installers** -> **Run workflow** | Builds all 5 OS targets and leaves artifacts on a Draft Release for inspection. |
+
+See [releasing.md](releasing.md) for the full manifest version-bump checklist.
 
 ---
 

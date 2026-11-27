@@ -1,0 +1,73 @@
+# Getting Started with kiviTuner
+
+This guide walks through a complete calibration workflow in kiviTuner: opening a ROM image, loading or discovering map definitions, editing 2D/1D/3D and scalar tables safely against a stock baseline, inspecting binary differences, verifying checksums, and saving your modified image.
+
+## 1. Install or Launch kiviTuner
+
+Download the native desktop installer for Windows (`.exe` / `.msi`), Linux (`.deb` / `.rpm` / `.AppImage`), or macOS (`.dmg`) from [GitHub Releases](https://github.com/kaivyy/kiviTuner/releases), or run the browser preview locally with `npm ci && npm run dev`.
+
+Native hardware adapters (SAE J2534, Tactrix OpenPort 2.0 USB-CDC, SocketCAN, ELM327 serial, DoIP, Ostrich 2.0, Speeduino/MegaSquirt INI serial) and `blind_v2` multi-brand scanning run in the desktop application. The browser preview supports offline `.bin`/`.rom`/`.hex`/`.s19` editing, Keihin 8-bit checksum repair, heuristic scanning, and project export.
+
+## 2. Open a ROM and Load Map Definitions
+
+1. Press `Ctrl+O` or open `File -> Open ROM...` to load a firmware image (`.bin`, `.rom`, Intel `.hex`, Motorola `.s19`, or `.vbf`).
+2. Press `Ctrl+D` or open `Definition (XDF) -> Load XDF...` to import an existing definition file (`.xdf`, `.a2l`, `.kp`, `.ini`, or `.kivi.json`).
+3. Confirm the checksum indicator in the top menu bar reads green before making calibration edits.
+4. Open the Command Palette (`Ctrl+K`) at any time to run menu actions without searching through submenus.
+
+When a ROM loads, kiviTuner keeps an immutable snapshot of the original bytes (`original_memory` on desktop, `originalRomData` in browser mode) separate from the editable working buffer.
+
+## 3. Browse and Organize Maps in Map Explorer
+
+Use the `Map Explorer` sidebar on the left to locate tables inside your loaded definition:
+
+| Control | Purpose |
+|---|---|
+| Search box | Filters tables by parameter name or category |
+| `All` / `2D` / `1D` / `1x1` pills | Narrows the tree to 2D matrices, 1D curves, or single-value scalars/flags |
+| `+` button or `Definition (XDF) -> Create New...` | Creates a `Table 2D/3D`, `Axis 1D`, `1x1 Scalar`, or `Bitmask Flag` manually |
+| `Potential Maps` folder | Lists map candidates discovered by heuristic or `blind_v2` scans for review |
+
+Right-click a map in `Map Explorer` (or toggle Split View in `WorkspaceTabBar`) to place two maps side by side.
+
+## 4. Discover Maps Without a Definition
+
+If you open an undefined binary image, combine `Discovery Scanner`, `Hexdump Pro`, and `KiviWaveform`:
+
+1. Open `Discovery Scanner` from the left `ActivityRail` (`Ctrl+F`) to run `blind_v2` structural 2D/1D discovery (desktop), Heuristic scan, or the 16-bit Window scanner. Candidate addresses populate `Potential Maps`.
+2. Switch to the `Hex` tab from `WorkspaceTabBar` or `ActivityRail`.
+3. Toggle `8b` / `16b` word width and `Hex` / `Dec` display, then adjust column alignment with `-` / `+` (or `W` / `M`) until repeating row patterns line up vertically.
+4. Enable `Diff` to highlight bytes changed relative to stock in green, and press `F` / `Shift+F` to jump across amber `Potential Maps` blocks.
+5. Drag a byte range in the hex view (or click a candidate block) and click `Promote Map` to turn that region into an editable table definition. Check the bottom Data Inspector bar to read `u8`, `i8`, `u16`, `i16`, `u32`, `i32`, and `f32` values in both Big Endian and Little Endian at the cursor.
+
+## 5. Edit Tables, 1D Curves, 3D Surfaces, and Scalars
+
+### 2D Matrices and 1D / 3D Views
+
+1. Select any 2D map or `1xN` / `Nx1` curve from `Map Explorer`.
+2. Drag across cells (or use `Arrows` / `Shift+Arrows`) to select a working range.
+3. Modify values with `Enter`, `+` / `-` (step increment), `=` (set constant), or `%` / `*` (percentage/factor scale), or use `Edit & Table Math` in the top menu bar.
+4. Smooth transitions with `S` (3x3 Gaussian smooth) or fill between boundary cells with `I` (bilinear), `H` (horizontal), or `V` (vertical).
+5. Switch display modes between `Engineering`, `Raw Hex`, `Raw Dec`, `Delta`, and `% Delta` against the immutable stock baseline.
+6. Press `Ctrl+\` (or `View & Workspace -> Layout Presets -> Split 2D+3D`) to inspect a 3D surface mesh alongside the 2D grid. Maps sized `1xN` or `Nx1` automatically display the draggable `CurveProfileChart` with a dashed stock reference curve.
+
+### 1x1 Scalars and Bitmask Flags
+
+Select a `1x1` scalar or bitmask entry to open `ScalarFlagEditor`, which keeps calibrated Engineering units, Raw Hex, and Binary bit switches (`Bit 0..Bit 7` or `16-bit`) synchronized. Click `Grid View` in the upper-right corner of the card if you prefer editing in single-cell table mode.
+
+### Undo, Redo, and Revert to Stock
+
+Use `Ctrl+Z` / `Ctrl+Y` to step through edit history. Press `Backspace` or `Delete` inside a selection to revert selected cells to their original stock values, or click `Revert Map to Stock` inside the `Inspector` sidebar to reset an entire map cleanly.
+
+## 6. Inspect Diffs, Repair Checksums, and Save
+
+1. Open `InspectorSidebar` and review `Change Ledger (vs Original)` to inspect clustered modified byte ranges; click any ledger entry to jump straight to that address in Hex.
+2. Press `Ctrl+B` or open `Reverse Engineer -> Binary Diff Engine -> Open Diff Modal` to compare modified vs reference images and extract changed blocks as new definitions.
+3. Verify and repair integrity blocks from the top status pill or `Reverse Engineer -> Checksum & Integrity -> Verify Checksum & Auto-Fix Checksum` (see [Checksum Engines & JSON Plugins](checksum-plugins.md)).
+4. Press `Ctrl+Shift+S` (`File -> Save As...`) to write your tuned file to a separate path so the original stock backup stays untouched.
+
+## 7. Next Steps for Live Telemetry and Hardware Flashing
+
+1. Open `Acquisition & ECU -> Live Telemetry & Auto-Tune -> Telemetry Dashboard (20Hz)` (press `F9` to record datalogs or load a CSV replay log to test gauges and Auto-Tune review).
+2. Open `Acquisition & ECU -> Flash ECU -> Diagnostics (ELM327 / OBD)` for Mode 03/04 DTCs or ECU reset.
+3. Before writing any tuned image to physical hardware, install the required interface driver from [Drivers and Hardware Interfaces](../hardware/drivers-and-interfaces.md) and complete every item in [Hardware Bench Validation Guide](hardware-bench-validation.md).
