@@ -255,3 +255,19 @@ To protect owner privacy, vehicle identity, and hardware credentials while maint
    - **Operator & Location Identifiers:** Any internal host usernames, private IP addresses, or vehicle registration/license plate data must be removed.
 
 **Final Gate Policy:** Simulated tests and Linux PTY loopback tests verify software architecture and contract compliance, but **do not** satisfy the Milestone 3D hardware acceptance gate. Milestone 3D cannot be marked complete until the above physical evidence bundle is produced on verified hardware.
+
+---
+
+## 5. Multi-Transport, Extended OBD/UDS & Motorcycle Diagnostic Updates
+
+In addition to the strict read-only telemetry boundary enforced in `crates/kivi-protocol` (`Obd2Driver`), kiviTuner now includes expanded multi-transport hardware support and workshop diagnostics across `crates/kivi-protocol` and `crates/kivi-flashing`:
+
+- **Transport & Clone Resilience (`kivi-protocol`, `kivi-flashing`):**
+  - Automatic baud probing across `38,400`, `115,200`, `9,600`, `230,400`, and `500,000` bps for USB VCP and Bluetooth SPP (`/dev/rfcomm*` / BT COM) ELM327 adapters.
+  - Wi-Fi TCP ELM327 support (`WifiObdTransport` and `WifiElmDevice`, default `192.168.0.10:35000`).
+  - Raw K-Line USB-UART FTDI/CH340 driver (`RawKLineDevice`) supporting `10,400`, `15,625`, and `62,500` bps plus break wake-up pulses (`70 ms / 120 ms`), alongside OpenPort 2.0 / J2534 `ISO9141_NO_CHECKSUM` and SocketCAN ISO 15765-2 codecs.
+  - Clone resilience: NUL byte (`0x00`) stripping during UART reset, echo tolerance, `ATS0`/`ATCAF1` fallbacks, and live AT capability probing (`probe_elm_capabilities`).
+- **Expanded OBD-II Read-Only Codecs & Diagnostic Cockpit:**
+  - `Mode01Pid` expanded to 54+ SAE J1979 sensor PIDs (`0x01..=0x63`) plus `SupportedPids61_80` (`0x60`), while remaining strictly read-only in `kivi-protocol`.
+  - Workshop diagnostics in `crates/kivi-flashing` (`quick_diag`, `uds_diagnostics`, `dtc_dictionary`, `moto_diag`) cover Mode `02` Freeze Frames, Mode `03`/`07`/`0A` DTCs with offline lookup, Mode `06` monitors, Multi-ECU CAN scan (`0x7E0..=0x7E7` + 29-bit), UDS `0x10`/`0x11`/`0x14`/`0x19`/`0x22`/`0x2F`/`0x31`, Honda PGM-FI K-Line (`Table 0x11/0x73/0x74/0x60`), Yamaha K-Line & Euro 5, Kawasaki KDS, and Suzuki SDS.
+- **Safety Posture Remains Unchanged:** All physical transports and new diagnostic modules remain classified `ExperimentalUntested` in `hardware_matrix.rs` until verified with captured hardware traces; ELM327 adapters cannot flash ECU ROMs (`supports_flashing() == false`).
