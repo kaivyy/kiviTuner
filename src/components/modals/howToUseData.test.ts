@@ -10,8 +10,8 @@ const EMOJI_RE = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u;
 const PROPRIETARY_BRAND_RE =
   /\b(winols|tunerpro|tunerstudio|pcmflash|romraider|ecuflash|haltech|motec|mmcflash|alientech|hptuners|efilive|dimsport|swiftec|bflash|cmdflash|bootmod3)\b/i;
 
-test('howToUseData exposes 7 ordered chapters with clean copy and sequential callouts', () => {
-  assert.equal(TUTORIAL_CHAPTERS.length, 7);
+test('howToUseData exposes 8 ordered chapters with clean copy and sequential callouts', () => {
+  assert.equal(TUTORIAL_CHAPTERS.length, 8);
 
   const seenIds = new Set<string>();
   TUTORIAL_CHAPTERS.forEach((chapter, idx) => {
@@ -58,11 +58,16 @@ test('howToUseData exposes 7 ordered chapters with clean copy and sequential cal
 });
 
 test('filterTutorialChapters matches real workflows and handles empty/missing queries', () => {
-  assert.equal(filterTutorialChapters(TUTORIAL_CHAPTERS, '').length, 7);
-  assert.equal(filterTutorialChapters(TUTORIAL_CHAPTERS, '   ').length, 7);
+  assert.equal(filterTutorialChapters(TUTORIAL_CHAPTERS, '').length, 8);
+  assert.equal(filterTutorialChapters(TUTORIAL_CHAPTERS, '   ').length, 8);
 
   const elm = filterTutorialChapters(TUTORIAL_CHAPTERS, 'ELM327');
   assert.ok(elm.some((c) => c.id === 'telemetry-ecu'));
+
+  const moto = filterTutorialChapters(TUTORIAL_CHAPTERS, 'pinout');
+  assert.ok(moto.some((c) => c.id === 'diag-moto-uds'));
+  assert.ok(filterTutorialChapters(TUTORIAL_CHAPTERS, 'honda').some((c) => c.id === 'diag-moto-uds'));
+  assert.ok(filterTutorialChapters(TUTORIAL_CHAPTERS, 'wifi').some((c) => c.id === 'telemetry-ecu'));
 
   const bitmask = filterTutorialChapters(TUTORIAL_CHAPTERS, 'bitmask');
   assert.ok(bitmask.some((c) => c.id === 'scalar-flag'));
@@ -85,5 +90,6 @@ test('resolveAdjacentChapterId navigates smoothly and stops cleanly at boundarie
   assert.equal(resolveAdjacentChapterId(TUTORIAL_CHAPTERS, 'workspace', 1), 'explorer');
   assert.equal(resolveAdjacentChapterId(TUTORIAL_CHAPTERS, 'hex-reverse', -1), 'scalar-flag');
   assert.equal(resolveAdjacentChapterId(TUTORIAL_CHAPTERS, 'hex-reverse', 1), 'diff-checksum');
-  assert.equal(resolveAdjacentChapterId(TUTORIAL_CHAPTERS, 'telemetry-ecu', 1), null);
+  assert.equal(resolveAdjacentChapterId(TUTORIAL_CHAPTERS, 'telemetry-ecu', 1), 'diag-moto-uds');
+  assert.equal(resolveAdjacentChapterId(TUTORIAL_CHAPTERS, 'diag-moto-uds', 1), null);
 });

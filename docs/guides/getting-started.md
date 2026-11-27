@@ -6,7 +6,7 @@ This guide walks through a complete calibration workflow in kiviTuner: opening a
 
 Download the native desktop installer for Windows (`.exe` / `.msi`), Linux (`.deb` / `.rpm` / `.AppImage`), or macOS (`.dmg`) from [GitHub Releases](https://github.com/kaivyy/kiviTuner/releases), or run the browser preview locally with `npm ci && npm run dev`.
 
-Native hardware adapters (SAE J2534, Tactrix OpenPort 2.0 USB-CDC, SocketCAN, ELM327 serial, DoIP, Ostrich 2.0, Speeduino/MegaSquirt INI serial) and `blind_v2` multi-brand scanning run in the desktop application. The browser preview supports offline `.bin`/`.rom`/`.hex`/`.s19` editing, Keihin 8-bit checksum repair, heuristic scanning, and project export.
+Native hardware adapters (SAE J2534 with automatic Win64-to-Win32 bridging, Tactrix OpenPort 2.0 USB-CDC, SocketCAN with software ISO 15765-2 segmentation, ELM327 USB/Bluetooth SPP/Wi-Fi TCP, Raw K-Line USB FTDI/CH340, DoIP Ethernet, Ostrich 2.0, Speeduino/MegaSquirt INI serial) and `blind_v2` multi-brand scanning run in the desktop application. The browser preview supports offline `.bin`/`.rom`/`.hex`/`.s19` editing, Keihin 8-bit checksum repair, heuristic scanning, and project export.
 
 ## 2. Open a ROM and Load Map Definitions
 
@@ -66,8 +66,14 @@ Use `Ctrl+Z` / `Ctrl+Y` to step through edit history. Press `Backspace` or `Dele
 3. Verify and repair integrity blocks from the top status pill or `Reverse Engineer -> Checksum & Integrity -> Verify Checksum & Auto-Fix Checksum` (see [Checksum Engines & JSON Plugins](checksum-plugins.md)).
 4. Press `Ctrl+Shift+S` (`File -> Save As...`) to write your tuned file to a separate path so the original stock backup stays untouched.
 
-## 7. Next Steps for Live Telemetry and Hardware Flashing
+## 7. Next Steps for Live Telemetry, Diagnostics & Hardware Flashing
 
-1. Open `Acquisition & ECU -> Live Telemetry & Auto-Tune -> Telemetry Dashboard (20Hz)` (press `F9` to record datalogs or load a CSV replay log to test gauges and Auto-Tune review).
-2. Open `Acquisition & ECU -> Flash ECU -> Diagnostics (ELM327 / OBD)` for Mode 03/04 DTCs or ECU reset.
-3. Before writing any tuned image to physical hardware, install the required interface driver from [Drivers and Hardware Interfaces](../hardware/drivers-and-interfaces.md) and complete every item in [Hardware Bench Validation Guide](hardware-bench-validation.md).
+1. Open `Acquisition & ECU -> Live Telemetry & Auto-Tune -> Telemetry Dashboard (20Hz)` (press `F9` to record datalogs or load a CSV replay log, or pick `obd2:` serial / Bluetooth SPP `/ obd2_wifi:192.168.0.10:35000` with auto-baud probing).
+2. Open `Acquisition & ECU -> Flash ECU` and attach an interface (auto-detect or manual ELM327 USB/BT/Wi-Fi, Raw K-Line FTDI, OpenPort 2.0, SAE J2534, DoIP, or SocketCAN), then use **Probe Clone** on low-cost ELM327 dongles to verify `ATSH`/`ATCAF0`/`ATTP5` support.
+3. Inside the **Diagnostics** tab, switch across the 5 sub-tabs:
+   - **Overview & DTCs**: Scan multi-ECU addresses (`0x7E0..0x7E7` + 29-bit), read/clear DTCs with offline lookup descriptions, inspect I/M Readiness + Mode `0A` Permanent DTCs + Mode `02` Freeze Frames, or send UDS `0x11` ECU resets.
+   - **Live OBD PIDs**: Poll 54+ supported SAE Mode `01` PIDs and Mode `06` on-board monitor tests.
+   - **UDS Service & Active Tests**: Switch `0x10` sessions, read `0x22` DIDs, execute `0x31` service resets/routines, or run `0x2F` actuator tests (always click **Return Control to ECU (0x00)** when done).
+   - **Motorcycle Lab**: Connect to Honda 4-pin PGM-FI K-Line (`0x72` Table `0x11`/`0x73`/`0x74`/`0x60`), Euro 5 CAN, Yamaha 3/4-pin K-Line, Kawasaki KDS, or Suzuki SDS using the built-in **Modified DLC Pinout Guide**.
+   - **Raw Terminal**: Send direct `AT`, OBD, or K-Line hex commands interactively.
+4. Before writing any tuned image to physical hardware, install the required interface driver from [Drivers and Hardware Interfaces](../hardware/drivers-and-interfaces.md) and complete every item in [Hardware Bench Validation Guide](hardware-bench-validation.md). Remember that ELM327 adapters are read/diagnostic-only and cannot flash ECU ROMs.

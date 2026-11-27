@@ -188,3 +188,108 @@ export const renderTelemetryEcuScene = (activePin: number | null, onSelectPin?: 
     <PinBadge x={526} y={166} pin={3} active={activePin === 3} onSelect={onSelectPin} />
   </>
 );
+
+export const renderDiagMotoUdsScene = (activePin: number | null, onSelectPin?: (p: number) => void) => (
+  <>
+    <g>
+      <rect x={20} y={16} width={520} height={30} rx={7} fill="var(--kivi-elevated)" {...focusStroke(activePin, 1)} />
+      {[
+        { label: 'Overview', x: 26, w: 92, active: true },
+        { label: 'Live PIDs', x: 124, w: 92, active: false },
+        { label: 'UDS 0x31/2F', x: 222, w: 98, active: false },
+        { label: 'Moto Lab', x: 326, w: 96, active: false },
+        { label: 'Terminal', x: 428, w: 104, active: false },
+      ].map((tab) => (
+        <g key={tab.label}>
+          <rect
+            x={tab.x}
+            y={21}
+            width={tab.w}
+            height={20}
+            rx={4}
+            fill={tab.active ? 'var(--kivi-accent)' : 'var(--kivi-surface)'}
+            fillOpacity={tab.active ? 0.18 : 1}
+            stroke={tab.active ? 'var(--kivi-accent)' : 'var(--kivi-border)'}
+          />
+          <text
+            x={tab.x + tab.w / 2}
+            y={34}
+            textAnchor="middle"
+            fontFamily={MONO}
+            fontSize={7.8}
+            fontWeight={700}
+            fill={tab.active ? 'var(--kivi-accent)' : 'var(--kivi-secondary)'}
+          >
+            {tab.label}
+          </text>
+        </g>
+      ))}
+    </g>
+
+    <g>
+      <rect x={20} y={54} width={250} height={96} rx={9} fill="var(--kivi-surface)" {...focusStroke(activePin, 1)} />
+      <text x={32} y={72} fontFamily={MONO} fontSize={8.2} fontWeight={700} fill="var(--kivi-ink)">
+        Multi-ECU &amp; 54+ OBD PIDs
+      </text>
+      <text x={32} y={90} fontFamily={MONO} fontSize={8} fill="var(--kivi-ok)">
+        0x7E0 ECM | 0x7E1 TCM | 29-bit
+      </text>
+      <text x={32} y={108} fontFamily={MONO} fontSize={8} fill="var(--kivi-warn)">
+        P0171 Lean B1 + Freeze Frame
+      </text>
+      <text x={32} y={126} fontFamily={MONO} fontSize={7.8} fill="var(--kivi-secondary)">
+        I/M Readiness + Mode 06 / 0A
+      </text>
+    </g>
+
+    <g>
+      <rect x={20} y={158} width={250} height={92} rx={9} fill="var(--kivi-surface)" {...focusStroke(activePin, 2)} />
+      <text x={32} y={176} fontFamily={MONO} fontSize={8.2} fontWeight={700} fill="var(--kivi-ink)">
+        UDS Service &amp; Active Tests
+      </text>
+      <rect x={32} y={186} width={104} height={20} rx={4} fill="var(--kivi-warn)" fillOpacity={0.14} stroke="var(--kivi-warn)" />
+      <text x={84} y={199} textAnchor="middle" fontFamily={MONO} fontSize={7.8} fontWeight={700} fill="var(--kivi-warn)">
+        0x31 Routine Reset
+      </text>
+      <rect x={144} y={186} width={114} height={20} rx={4} fill="var(--kivi-ok)" fillOpacity={0.14} stroke="var(--kivi-ok)" />
+      <text x={201} y={199} textAnchor="middle" fontFamily={MONO} fontSize={7.6} fontWeight={700} fill="var(--kivi-ok)">
+        Return Control 0x00
+      </text>
+      <text x={32} y={228} fontFamily={MONO} fontSize={7.8} fill="var(--kivi-muted)">
+        Session 0x10 | DID 0x22 | IO 0x2F
+      </text>
+    </g>
+
+    <g>
+      <rect x={282} y={54} width={258} height={196} rx={9} fill="var(--kivi-surface)" {...focusStroke(activePin, 3)} />
+      <text x={294} y={73} fontFamily={MONO} fontSize={8.4} fontWeight={700} fill="var(--kivi-ink)">
+        Motorcycle Lab &amp; Raw Terminal
+      </text>
+      <rect x={294} y={84} width={234} height={48} rx={6} fill="var(--kivi-bg)" stroke="var(--kivi-border)" />
+      <text x={304} y={100} fontFamily={MONO} fontSize={8} fill="var(--kivi-accent)">
+        Honda 4-Pin (0x72) | Euro 5 CAN
+      </text>
+      <text x={304} y={118} fontFamily={MONO} fontSize={7.8} fill="var(--kivi-secondary)">
+        Yamaha 3/4P | KDS | SDS (10.4k)
+      </text>
+      <rect x={294} y={140} width={234} height={50} rx={6} fill="var(--kivi-bg)" stroke="var(--kivi-border)" />
+      <text x={304} y={156} fontFamily={MONO} fontSize={7.8} fill="var(--kivi-ok)">
+        Pinout: P4/5 GND | P7 K-Line | P16 +12V
+      </text>
+      <text x={304} y={174} fontFamily={MONO} fontSize={7.6} fill="var(--kivi-muted)">
+        KKL FTDI / OpenPort 2.0 / ELM v1.5
+      </text>
+      <rect x={294} y={198} width={234} height={40} rx={6} fill="var(--kivi-elevated)" stroke="var(--kivi-borderStrong)" />
+      <text x={304} y={214} fontFamily={MONO} fontSize={8} fill="var(--kivi-ink)">
+        &gt; ATI -&gt; ELM327 v1.5 [pic18]
+      </text>
+      <text x={304} y={229} fontFamily={MONO} fontSize={7.6} fill="var(--kivi-secondary)">
+        Wi-Fi 192.168.0.10:35000 / BT SPP
+      </text>
+    </g>
+
+    <PinBadge x={260} y={66} pin={1} active={activePin === 1} onSelect={onSelectPin} />
+    <PinBadge x={260} y={170} pin={2} active={activePin === 2} onSelect={onSelectPin} />
+    <PinBadge x={530} y={66} pin={3} active={activePin === 3} onSelect={onSelectPin} />
+  </>
+);

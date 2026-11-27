@@ -10,7 +10,8 @@ export type TutorialSceneId =
   | 'scalar-flag'
   | 'hex-reverse'
   | 'diff-checksum'
-  | 'telemetry-ecu';
+  | 'telemetry-ecu'
+  | 'diag-moto-uds';
 
 export interface TutorialCallout {
   pin: number;
@@ -288,13 +289,13 @@ export const TUTORIAL_CHAPTERS: readonly TutorialChapter[] = [
   {
     id: 'telemetry-ecu',
     index: 7,
-    shortTitle: 'Telemetry & ELM327',
-    title: 'Live Telemetry RPM, ELM327 & Flash ECU',
-    subtitle: 'Pantau RPM bergaya cockpit, baca/hapus kode DTC ELM327, serta read/write ECU ROM.',
+    shortTitle: 'Telemetry & Kabel',
+    title: 'Live Telemetry RPM, Adapter Multi-Transport & Flash ECU',
+    subtitle: 'Pantau RPM bergaya cockpit, pilih koneksi USB/Bluetooth/Wi-Fi/K-Line/OpenPort2/J2534, serta read/flash ECU ROM.',
     menuPath: 'Acquisition & ECU -> Live Telemetry & Auto-Tune / Flash ECU',
-    figureCaption: 'Potongan panel Telemetry Dashboard (ARC/TRACK) bersama tab ECU Read & Flash dan Diagnostics ELM327.',
+    figureCaption: 'Potongan panel Telemetry Dashboard (ARC/TRACK), koneksi Auto-Baud/Wi-Fi/K-Line, serta Read & Flash ROM.',
     figureAriaLabel:
-      'Ilustrasi potongan kluster RPM Live Telemetry dan panel Read Flash serta Diagnostics ELM327 OBD.',
+      'Ilustrasi potongan kluster RPM Live Telemetry dan panel koneksi ELM327 USB Bluetooth Wi-Fi, OpenPort 2.0, dan Read Flash ECU.',
     shortcuts: [
       { keys: ['F9'], action: 'Mulai rekaman Datalog' },
       { keys: ['Esc'], action: 'Tutup jendela aktif teratas' },
@@ -303,27 +304,66 @@ export const TUTORIAL_CHAPTERS: readonly TutorialChapter[] = [
       {
         pin: 1,
         label: 'Supercar Cluster (ARC / TRACK)',
-        detail: 'Menampilkan RPM, shift LED bar, gear, kecepatan, TPS, dan status AFR tanpa pergeseran kotak.',
+        detail: 'Menampilkan RPM, shift LED bar, gear, kecepatan, TPS, dan status AFR lewat ELM327 USB, Bluetooth SPP, atau Wi-Fi.',
       },
       {
         pin: 2,
-        label: 'Diagnostics (ELM327 / OBD)',
-        detail: 'Menjalankan Read DTCs, Clear DTCs, dan Reset ECU lengkap dengan konfirmasi keamanan.',
+        label: 'Multi-Transport & Probe Clone',
+        detail: 'Auto-baud 38400/115200/9600 bps, 13 profil bus mobil dan motor, Wi-Fi TCP 192.168.0.10:35000, serta Raw K-Line FTDI.',
       },
       {
         pin: 3,
         label: 'Floating Multi-Window & Read/Flash',
-        detail: 'Geser, ubah ukuran dari 8 sisi, sematkan ke atas (Pin), atau buka sebagai jendela desktop terpisah.',
+        detail: 'Read dan Flash ROM lewat OpenPort 2.0, SAE J2534 (+ bridge 32-bit), SocketCAN ISO-TP, DoIP, atau Raw K-Line.',
       },
     ],
     steps: [
-      'Buka Acquisition & ECU -> Live Telemetry & Auto-Tune -> Telemetry Dashboard (20Hz) untuk melihat meteran RPM dan metrik mesin.',
-      'Gunakan mode ARC atau TRACK, serta muat sample/CSV datalog jika ingin menguji replay grafik sebelum terhubung ke kendaraan.',
-      'Buka Acquisition & ECU -> Flash ECU -> Read Flash / Write Flash lalu pilih tab Diagnostics (ELM327 / OBD) untuk Read DTCs, Clear DTCs, atau Reset ECU.',
-      'Untuk membaca dan menulis ROM ECU lewat adaptor K-Line/J2534, gunakan tab Read & Flash ROM dan pastikan tegangan aki serta preset ECU sesuai.',
+      'Buka Acquisition & ECU -> Live Telemetry & Auto-Tune -> Telemetry Dashboard (20Hz), lalu pilih adapter serial/Bluetooth SPP (/dev/rfcomm* atau COM*) atau target obd2_wifi:192.168.0.10:35000.',
+      'Gunakan mode ARC atau TRACK dan muat sample/CSV datalog untuk menguji replay grafik serta review Auto-Tune sebelum menyambung kendaraan.',
+      'Buka Acquisition & ECU -> Flash ECU -> klik Auto-Detect & Connect Cable atau pilih ELM327 Serial / ELM327 Wi-Fi (Auto Baud) / Raw K-Line USB / OpenPort 2.0 / J2534.',
+      'Jika memakai dongle ELM327 murah, tekan Probe Clone untuk memeriksa dukungan perintah ATSH, ATCAF0, dan ATTP5 sebelum membaca atau meriset ECU.',
     ],
-    tip: 'Setiap popup penting (Telemetry, Flash, Engineering Toolkit, dan tutorial ini) bebas digeser dan diubah ukurannya hingga batas aman agar tidak saling menutupi.',
-    keywords: ['telemetry', 'rpm', 'arc', 'track', 'elm327', 'obd', 'dtc', 'reset ecu', 'flash', 'read', 'write', 'window'],
+    tip: 'Adapter ELM327 (USB, Bluetooth SPP, maupun Wi-Fi) dikunci hanya untuk diagnosa & telemetry. Penulisan ROM ECU hanya aktif melalui OpenPort 2.0, SAE J2534, SocketCAN, DoIP, atau Raw K-Line.',
+    keywords: ['telemetry', 'rpm', 'arc', 'track', 'elm327', 'bluetooth', 'wifi', 'auto-baud', 'probe', 'flash', 'openport', 'j2534', 'socketcan', 'k-line', 'window'],
+  },
+  {
+    id: 'diag-moto-uds',
+    index: 8,
+    shortTitle: 'Diagnostik & Motor',
+    title: 'Kokpit Diagnostik Multi-ECU, UDS Active Test & Motor',
+    subtitle: 'Scan 54+ PID OBD-II, kamus DTC, scanner multi-ECU, servis UDS 0x10/0x22/0x31/0x2F, serta kabel modifikasi Honda/Yamaha/Kawasaki/Suzuki.',
+    menuPath: 'Acquisition & ECU -> Flash ECU -> Tab Diagnostics (5 Sub-Tab)',
+    figureCaption: 'Potongan 5 sub-tab Diagnostics Cockpit: Overview & DTCs, Live PIDs, UDS Service/Active Test, Motorcycle Lab, dan Raw Terminal.',
+    figureAriaLabel:
+      'Ilustrasi kokpit diagnostik 5 sub-tab menampilkan Multi-ECU Scanner, UDS Routine dan IOControl, Motorcycle Lab beserta panduan pinout kabel modifikasi, dan Raw Terminal.',
+    shortcuts: [
+      { keys: ['Enter'], action: 'Kirim perintah di Raw Terminal' },
+    ],
+    callouts: [
+      {
+        pin: 1,
+        label: 'Overview, Multi-ECU & 54+ Live PIDs',
+        detail: 'Scan 0x7E0 sampai 0x7E7 dan CAN 29-bit, baca Mode 02 Freeze Frame, I/M Readiness, Mode 0A/06, serta lookup kamus DTC offline.',
+      },
+      {
+        pin: 2,
+        label: 'UDS Session, Reset & Active Tests',
+        detail: 'Masuk Session 0x10, baca DID 0x22, jalankan RoutineControl 0x31 dan IOControl 0x2F lengkap tombol Return Control to ECU (0x00).',
+      },
+      {
+        pin: 3,
+        label: 'Motorcycle Lab, Pinout & Raw Terminal',
+        detail: 'Baca live sensor, kode kedip Honda 4-pin (Table 11/73/74/60), Yamaha/KDS/SDS, panduan pinout DLC modifikasi, dan konsol AT/OBD hex.',
+      },
+    ],
+    steps: [
+      'Masuk ke tab Diagnostics di panel Flash ECU, lalu tekan Scan All ECUs (0x7E0-0x7E7) di sub-tab Overview & DTCs untuk memilih ECU target, membaca baterai/VIN, DTC, Readiness, serta Freeze Frame.',
+      'Buka sub-tab Live OBD PIDs untuk memindai seluruh sensor Mode 01 yang didukung ECU dan memantau hasil tes monitor Mode 06.',
+      'Gunakan sub-tab UDS Service & Active Tests untuk berpindah sesi 0x10, membaca DID 0x22, atau menjalankan adaptasi 0x31 / aktuator 0x2F (selalu klik Return Control to ECU 0x00 setelah uji selesai).',
+      'Untuk motor, buka sub-tab Motorcycle Lab, pilih Honda 4-pin K-Line, Euro 5 CAN, Yamaha, KDS, atau SDS, cocokkan pengkabelan modifikasi dengan Modified DLC Pinout Guide, lalu cek respon mentah lewat sub-tab Raw Terminal jika diperlukan.',
+    ],
+    tip: 'Dongle ELM327 v2.1 murah yang gagal Probe ATTP5 tetap berjalan di mobil/motor Euro 5 CAN, sedangkan motor Honda 4-pin (wakeup 70ms/120ms) dan Yamaha/KDS/SDS K-Line sebaiknya memakai kabel Raw K-Line FTDI KKL 409.1 atau Tactrix OpenPort 2.0.',
+    keywords: ['diagnostik', 'multi-ecu', 'dtc', 'freeze frame', 'readiness', 'pid', 'uds', '0x31', '0x2f', 'active test', 'motor', 'honda', 'yamaha', 'kawasaki', 'kds', 'suzuki', 'sds', 'pinout', 'kabel modifikasi', 'terminal', 'raw', 'euro5'],
   },
 ];
 

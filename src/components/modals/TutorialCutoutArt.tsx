@@ -10,6 +10,7 @@ import {
   renderHexReverseScene,
   renderDiffChecksumScene,
   renderTelemetryEcuScene,
+  renderDiagMotoUdsScene,
 } from './tutorialScenesTools';
 
 export interface TutorialCutoutArtProps {
@@ -56,6 +57,7 @@ export const TutorialCutoutArt: React.FC<TutorialCutoutArtProps> = ({
       {sceneId === 'hex-reverse' && renderHexReverseScene(activePin, onSelectPin)}
       {sceneId === 'diff-checksum' && renderDiffChecksumScene(activePin, onSelectPin)}
       {sceneId === 'telemetry-ecu' && renderTelemetryEcuScene(activePin, onSelectPin)}
+      {sceneId === 'diag-moto-uds' && renderDiagMotoUdsScene(activePin, onSelectPin)}
     </svg>
   );
 };
