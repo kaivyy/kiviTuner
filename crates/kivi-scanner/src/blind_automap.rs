@@ -299,7 +299,17 @@ fn from_full_table(t: &DiscoveredFullTable, axes: &[AxisCandidate]) -> BlindTabl
         x_axis: pick(t.cols),
         y_axis: pick(t.rows),
         suggested_scaling: suggest_scaling(raw_min, raw_max, t.rows, t.cols),
-        label: format!("Table 0x{:06X} ({}x{})", t.z_address, t.rows, t.cols),
+        label: if t.rows <= 1 {
+            format!(
+                "{}-pt U{} Curve (0x{:05X})",
+                t.cols, cell_bits, t.z_address
+            )
+        } else {
+            format!(
+                "{}x{} U{} Map (0x{:05X})",
+                t.rows, t.cols, cell_bits, t.z_address
+            )
+        },
         is_signed: false,
         is_float: false,
         is_curve: t.rows <= 1,
@@ -311,11 +321,12 @@ fn from_full_table(t: &DiscoveredFullTable, axes: &[AxisCandidate]) -> BlindTabl
 fn from_curve(c: &crate::curve_scan::DiscoveredCurve) -> BlindTable {
     let raw_min = c.min_value;
     let raw_max = c.max_value;
+    let bits = (c.cell_bytes * 8) as u16;
     BlindTable {
         address: c.address,
         rows: 1,
         cols: c.points,
-        cell_bits: (c.cell_bytes * 8) as u16,
+        cell_bits: bits,
         little_endian: matches!(c.endian, Endian::Little),
         major_stride_bits: 0,
         minor_stride_bits: 0,
@@ -325,7 +336,7 @@ fn from_curve(c: &crate::curve_scan::DiscoveredCurve) -> BlindTable {
         x_axis: None,
         y_axis: None,
         suggested_scaling: suggest_scaling(raw_min, raw_max, 1, c.points),
-        label: format!("Curve 0x{:06X} ({} points)", c.address, c.points),
+        label: format!("{}-pt U{} Curve (0x{:05X})", c.points, bits, c.address),
         is_signed: false,
         is_float: false,
         is_curve: true,
@@ -556,10 +567,14 @@ pub fn blind_v2_candidates_to_tables(
         }
 
         let is_curve = cand.is_curve || (cand.rows <= 1 && cand.cols >= 2);
+        let dtype_upper = cand.dtype_label.to_uppercase();
         let default_label = if is_curve {
-            format!("Curve 0x{:06X} ({} points)", cand.address, cand.cols)
+            format!("{}-pt {} Curve (0x{:05X})", cand.cols, dtype_upper, cand.address)
         } else {
-            format!("Table 0x{:06X} ({}x{})", cand.address, cand.rows, cand.cols)
+            format!(
+                "{}x{} {} Map (0x{:05X})",
+                cand.rows, cand.cols, dtype_upper, cand.address
+            )
         };
 
         let mut table = BlindTable {

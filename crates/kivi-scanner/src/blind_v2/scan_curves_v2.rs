@@ -14,7 +14,8 @@ use super::gates::{passes_anchored_curve_gates, passes_statistical_curve_gates};
 use super::prefix::{F32PrefixIndex, IntKind, IntPrefixIndex};
 use super::scan_oem_structs::{
     count_turning_points, read_monotonic_i16_axis, read_monotonic_u16_axis,
-    read_monotonic_u8_axis, scan_denso_sh_curves_v2, scan_f32_curves_in_ranges,
+    read_monotonic_u8_axis, scan_denso_rh850_le_curves_v2, scan_denso_sh_curves_v2,
+    scan_f32_curves_in_ranges,
 };
 use super::{BlindV2Axis, BlindV2Candidate, DiscoveryStatus};
 
@@ -62,14 +63,14 @@ fn fast_3_mono_16_1d(rom: &[u8], off: usize, le: bool) -> bool {
     ) else {
         return false;
     };
-    let u_ok = (b > a && c > b && (b - a) <= 16_384 && (c - b) <= 16_384)
-        || (a > b && b > c && (a - b) <= 16_384 && (b - c) <= 16_384);
+    let u_ok = (b > a && c > b && (b - a) <= 24_576 && (c - b) <= 24_576)
+        || (a > b && b > c && (a - b) <= 24_576 && (b - c) <= 24_576);
     if u_ok {
         return true;
     }
     let (sa, sb, sc) = (a as i16 as i32, b as i16 as i32, c as i16 as i32);
-    (sb > sa && sc > sb && (sb - sa) <= 16_384 && (sc - sb) <= 16_384)
-        || (sa > sb && sb > sc && (sa - sb) <= 16_384 && (sb - sc) <= 16_384)
+    (sb > sa && sc > sb && (sb - sa) <= 24_576 && (sc - sb) <= 24_576)
+        || (sa > sb && sb > sc && (sa - sb) <= 24_576 && (sb - sc) <= 24_576)
 }
 
 fn decode_z_1d_slice(
@@ -757,7 +758,7 @@ fn scan_signed_i16_curves_v2(
                     let v = idx.vals[k];
                     if v < 0 {
                         has_neg = true;
-                    } else if v > 0 {
+                    } else if v >= 0 {
                         has_pos = true;
                     }
                     let vf = v as f64;
@@ -842,9 +843,14 @@ pub(super) fn attach_curves_v2_in_ranges(
     let mut out = Vec::new();
 
     // Layer 1 (Tier 3): OEM structural 1-D descriptors
-    if include_f32 && (65_536..=2_100_000).contains(&rom.len()) {
+    if include_f32 && (65_536..=8_500_000).contains(&rom.len()) {
         out.extend(scan_denso_sh_curves_v2(rom, include_8bit, &mut occupied));
     }
+    out.extend(scan_denso_rh850_le_curves_v2(
+        rom,
+        include_8bit,
+        &mut occupied,
+    ));
     out.extend(scan_bosch_siemens_1d_structs(
         rom,
         kept_ranges,

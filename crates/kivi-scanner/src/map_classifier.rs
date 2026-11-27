@@ -523,6 +523,87 @@ impl MapClassifierDb {
                             priority: 50,
                         },
                     },
+                    MapRule {
+                        id: "calibration_curve_short_1d".to_string(),
+                        description: "Short 3..7 point 1-D compensation or axis-compensation curve".to_string(),
+                        condition_groups: vec![
+                            ConditionGroup { any_of: vec![MapCondition::IsCurve(true)] },
+                            ConditionGroup {
+                                any_of: vec![MapCondition::Dimensions {
+                                    min_rows: Some(1),
+                                    max_rows: Some(1),
+                                    min_cols: Some(3),
+                                    max_cols: Some(7),
+                                }],
+                            },
+                        ],
+                        proposal: ClassificationProposal {
+                            role_name: "Suspected Short 1-D Calibration Curve".to_string(),
+                            category: "Curves & Compensation".to_string(),
+                            unit: String::new(),
+                            factor: 1.0,
+                            offset: 0.0,
+                            decimals: 1,
+                            priority: 45,
+                        },
+                    },
+                    MapRule {
+                        id: "boost_torque_target_16bit".to_string(),
+                        description: "High-range 16-bit >=6x6 boost pressure or torque limit surface".to_string(),
+                        condition_groups: vec![
+                            ConditionGroup { any_of: vec![MapCondition::IsCurve(false)] },
+                            ConditionGroup { any_of: vec![MapCondition::CellBits(vec![16])] },
+                            ConditionGroup {
+                                any_of: vec![MapCondition::Dimensions {
+                                    min_rows: Some(6),
+                                    max_rows: None,
+                                    min_cols: Some(6),
+                                    max_cols: None,
+                                }],
+                            },
+                            ConditionGroup {
+                                any_of: vec![MapCondition::RawRange {
+                                    min_lo: Some(4500.0),
+                                    min_hi: None,
+                                    max_lo: Some(8000.0),
+                                    max_hi: None,
+                                }],
+                            },
+                        ],
+                        proposal: ClassificationProposal {
+                            role_name: "Suspected Torque / Boost Target Map".to_string(),
+                            category: "Boost & Torque".to_string(),
+                            unit: String::new(),
+                            factor: 1.0,
+                            offset: 0.0,
+                            decimals: 1,
+                            priority: 82,
+                        },
+                    },
+                    MapRule {
+                        id: "signed_timing_correction".to_string(),
+                        description: "Signed 2-D surface crossing below zero for knock or timing correction".to_string(),
+                        condition_groups: vec![
+                            ConditionGroup { any_of: vec![MapCondition::IsCurve(false)] },
+                            ConditionGroup {
+                                any_of: vec![MapCondition::RawRange {
+                                    min_lo: None,
+                                    min_hi: Some(-1.0),
+                                    max_lo: None,
+                                    max_hi: None,
+                                }],
+                            },
+                        ],
+                        proposal: ClassificationProposal {
+                            role_name: "Suspected Signed Timing / Correction Map".to_string(),
+                            category: "Ignition & Timing".to_string(),
+                            unit: "deg".to_string(),
+                            factor: 1.0,
+                            offset: 0.0,
+                            decimals: 1,
+                            priority: 88,
+                        },
+                    },
                 ],
             }],
         }

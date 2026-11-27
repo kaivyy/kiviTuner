@@ -180,15 +180,16 @@ pub(super) fn read_monotonic_u16_axis(
     for i in 0..len {
         vals.push(read_u16(rom, offset + i * 2, le)? as f64);
     }
-    let inc = vals.windows(2).all(|w| w[1] > w[0] && (w[1] - w[0]) <= 16_384.0);
-    let dec = vals.windows(2).all(|w| w[0] > w[1] && (w[0] - w[1]) <= 16_384.0);
+    let max_step = if len >= 6 { 24_576.0 } else { 16_384.0 };
+    let inc = vals.windows(2).all(|w| w[1] > w[0] && (w[1] - w[0]) <= max_step);
+    let dec = vals.windows(2).all(|w| w[0] > w[1] && (w[0] - w[1]) <= max_step);
     if !inc && !dec {
         return None;
     }
     let lo = vals.iter().copied().fold(f64::INFINITY, f64::min);
     let hi = vals.iter().copied().fold(f64::NEG_INFINITY, f64::max);
     let span = hi - lo;
-    if hi >= 65_535.0 || span < 8.0 {
+    if lo >= 65_535.0 || span < 8.0 {
         return None;
     }
     if lo > 0.0 && span / lo.abs() < 0.05 {
@@ -475,14 +476,14 @@ fn fast_3_mono_16(rom: &[u8], off: usize, le: bool) -> bool {
     ) else {
         return false;
     };
-    let u_ok = (b > a && c > b && (b - a) <= 16_384 && (c - b) <= 16_384)
-        || (a > b && b > c && (a - b) <= 16_384 && (b - c) <= 16_384);
+    let u_ok = (b > a && c > b && (b - a) <= 24_576 && (c - b) <= 24_576)
+        || (a > b && b > c && (a - b) <= 24_576 && (b - c) <= 24_576);
     if u_ok {
         return true;
     }
     let (sa, sb, sc) = (a as i16 as i32, b as i16 as i32, c as i16 as i32);
-    (sb > sa && sc > sb && (sb - sa) <= 16_384 && (sc - sb) <= 16_384)
-        || (sa > sb && sb > sc && (sa - sb) <= 16_384 && (sb - sc) <= 16_384)
+    (sb > sa && sc > sb && (sb - sa) <= 24_576 && (sc - sb) <= 24_576)
+        || (sa > sb && sb > sc && (sa - sb) <= 24_576 && (sb - sc) <= 24_576)
 }
 
 /// Scans kept ranges for inline OEM length-prefixed structs:
@@ -604,16 +605,25 @@ pub(super) fn scan_bosch_siemens_structs(
                                     read_monotonic_u16_axis(rom, ax2_off, d2, le)
                                         .or_else(|| read_monotonic_i16_axis(rom, ax2_off, d2, le)),
                                 ) {
-                                    // Reject when the 2 header bytes [d1, d2] are actually an axis word continuing smoothly into ax1.
-                                    let hdr_is_prev_word = read_u16(rom, off8, le).is_some_and(|pu| {
-                                        let prev = if ax1.values[0] < 0.0 { (pu as i16) as f64 } else { pu as f64 };
-                                        let step = ax1.values[1] - ax1.values[0];
-                                        let dp = ax1.values[0] - prev;
-                                        step.abs() > 1e-9
-                                            && (dp > 0.0) == (step > 0.0)
-                                            && dp.abs() <= step.abs() * 4.0
-                                            && dp.abs() * 4.0 >= step.abs()
-                                    });
+                                    // Reject only when [d1, d2] AND the preceding word continue monotonically into ax1.
+                                    let hdr_is_prev_word = off8 >= 2
+                                        && read_u16(rom, off8, le)
+                                            .zip(read_u16(rom, off8 - 2, le))
+                                            .is_some_and(|(pu, pu_prev)| {
+                                                let signed_ax = ax1.values[0] < 0.0;
+                                                let to_v = |u: u16| if signed_ax { (u as i16) as f64 } else { u as f64 };
+                                                let prev = to_v(pu);
+                                                let prev2 = to_v(pu_prev);
+                                                let step = ax1.values[1] - ax1.values[0];
+                                                let dp = ax1.values[0] - prev;
+                                                let dp_prev = prev - prev2;
+                                                step.abs() > 1e-9
+                                                    && (dp > 0.0) == (step > 0.0)
+                                                    && (dp_prev > 0.0) == (step > 0.0)
+                                                    && dp.abs() <= step.abs() * 4.0
+                                                    && dp.abs() * 4.0 >= step.abs()
+                                                    && dp_prev.abs() <= step.abs() * 4.0
+                                            });
                                     if hdr_is_prev_word {
                                         continue;
                                     }
@@ -755,13 +765,13 @@ pub(super) fn scan_bosch_siemens_structs(
     per_tile.into_iter().flatten().collect()
 }
 
-/// Bridges SuperH Denso pointer descriptors (`u16_be`, `u8`, `i16_be`, and `f32_be` tables).
+/// Bridges SuperH Denso pointer descriptors (`u16_be`, `u8`, `i8`, `i16_be`, and `f32_be` tables).
 pub(super) fn scan_denso_sh_descriptors_v2(
     rom: &[u8],
     opts: &BlindV2Options,
 ) -> Vec<BlindV2Candidate> {
     let len = rom.len();
-    if !(65_536..=2_100_000).contains(&len) {
+    if !(65_536..=8_500_000).contains(&len) {
         return Vec::new();
     }
 
@@ -858,20 +868,21 @@ pub(super) fn scan_denso_sh_descriptors_v2(
                             && sx * sy >= 12
                             && px.is_multiple_of(4)
                             && py.is_multiple_of(4)
-                            && pz.is_multiple_of(4)
                         {
                             match rom.get(off + 16).copied() {
-                                Some(t @ (0x00 | 0x04 | 0x08 | 0x10)) => {
+                                Some(t @ (0x00 | 0x04 | 0x08 | 0x0C | 0x10)) => {
                                     let type_info = match t {
                                         0x04 => opts.include_8bit.then_some((1usize, false, false, "u8")),
                                         0x08 => Some((2usize, false, false, "u16_be")),
+                                        0x0C => opts.include_8bit.then_some((1usize, true, false, "i8")),
                                         0x10 => Some((2usize, true, false, "i16_be")),
                                         _ => Some((4usize, false, true, "f32_be")),
                                     };
                                     if let Some((eb, is_signed, is_float, label)) = type_info {
                                         let cells = sy * sx;
                                         let byte_len = cells * eb;
-                                        if pz.checked_add(byte_len).is_some_and(|e| e <= len)
+                                        if (eb == 1 || pz.is_multiple_of(eb))
+                                            && pz.checked_add(byte_len).is_some_and(|e| e <= len)
                                             && !rom[pz..pz + byte_len].iter().all(|&b| b == 0xFF)
                                         {
                                             if let (Some(x_ax), Some(y_ax)) = (
@@ -896,6 +907,8 @@ pub(super) fn scan_denso_sh_descriptors_v2(
                                                         i16::from_be_bytes([rom[o], rom[o + 1]]) as f64
                                                     } else if eb == 2 {
                                                         read_u16(rom, o, false).unwrap_or(0) as f64
+                                                    } else if is_signed {
+                                                        (rom[o] as i8) as f64
                                                     } else {
                                                         rom[o] as f64
                                                     };
@@ -963,10 +976,11 @@ pub(super) fn scan_denso_sh_descriptors_v2(
                                     }
                                 }
                                 _ => {
-                                    if let (Some(x_ax), Some(y_ax)) = (
-                                        read_monotonic_f32_axis(rom, px, sx, false),
-                                        read_monotonic_f32_axis(rom, py, sy, false),
-                                    ) {
+                                    if pz.is_multiple_of(4) {
+                                        if let (Some(x_ax), Some(y_ax)) = (
+                                            read_monotonic_f32_axis(rom, px, sx, false),
+                                            read_monotonic_f32_axis(rom, py, sy, false),
+                                        ) {
                                         if let Some(decoded) = try_decode_z_surface(
                                             rom,
                                             ZSurfaceSpec {
@@ -1009,6 +1023,7 @@ pub(super) fn scan_denso_sh_descriptors_v2(
                                             });
                                         }
                                     }
+                                    }
                                 }
                             }
                         }
@@ -1032,14 +1047,14 @@ pub(super) fn scan_denso_sh_descriptors_v2(
 }
 
 /// Scans SuperH Denso 1-D curve pointer descriptors `[len:u16_be][flags:u16_be][px:u32_be][pz:u32_be]`
-/// where `px` references a monotonic `f32_be` axis and `pz` stores unoccupied `f32_be`, `u8`, or `u16_be` values.
+/// where `px` references a monotonic `f32_be` axis and `pz` stores unoccupied `f32_be`, `u8`, `i8`, `u16_be`, or `i16_be` values.
 pub(super) fn scan_denso_sh_curves_v2(
     rom: &[u8],
     include_8bit: bool,
     occupied: &mut [bool],
 ) -> Vec<BlindV2Candidate> {
     let len = rom.len();
-    if !(65_536..=2_100_000).contains(&len) {
+    if !(65_536..=8_500_000).contains(&len) {
         return Vec::new();
     }
 
@@ -1058,19 +1073,28 @@ pub(super) fn scan_denso_sh_curves_v2(
             while off < t_end {
                 let pts = u16::from_be_bytes([rom[off], rom[off + 1]]) as usize;
                 let flags = u16::from_be_bytes([rom[off + 2], rom[off + 3]]);
-                if (4..=64).contains(&pts) && (flags == 0 || flags == 0x0400 || flags == 0x0800 || flags <= 2) {
+                if (4..=64).contains(&pts)
+                    && (flags == 0
+                        || flags == 0x0400
+                        || flags == 0x0800
+                        || flags == 0x0C00
+                        || flags == 0x1000
+                        || flags <= 2)
+                {
                     let px = read_u32(rom, off + 4, false).unwrap_or(0) as usize;
                     let pz = read_u32(rom, off + 8, false).unwrap_or(0) as usize;
                     let mut matched_f32_ax = false;
 
                     if (flags & 0xFF) == 0 && px != 0 && pz != 0 && px != pz && px.is_multiple_of(4) && px < len {
                         let type_spec = match flags >> 8 {
-                            0x00 => Some((4usize, true, "f32_be")),
-                            0x04 if include_8bit => Some((1usize, false, "u8")),
-                            0x08 => Some((2usize, false, "u16_be")),
+                            0x00 => Some((4usize, false, true, "f32_be")),
+                            0x04 if include_8bit => Some((1usize, false, false, "u8")),
+                            0x08 => Some((2usize, false, false, "u16_be")),
+                            0x0C if include_8bit => Some((1usize, true, false, "i8")),
+                            0x10 => Some((2usize, true, false, "i16_be")),
                             _ => None,
                         };
-                        if let Some((eb, is_float, label)) = type_spec {
+                        if let Some((eb, is_signed, is_float, label)) = type_spec {
                             let span = pts * eb;
                             if (eb == 1 || pz.is_multiple_of(eb))
                                 && pz.checked_add(span).is_some_and(|e| e <= occupied.len() && e <= len)
@@ -1092,8 +1116,12 @@ pub(super) fn scan_denso_sh_curves_v2(
                                                 break;
                                             }
                                             fv as f64
+                                        } else if eb == 2 && is_signed {
+                                            i16::from_be_bytes([rom[o], rom[o + 1]]) as f64
                                         } else if eb == 2 {
                                             read_u16(rom, o, false).unwrap_or(0) as f64
+                                        } else if is_signed {
+                                            (rom[o] as i8) as f64
                                         } else {
                                             rom[o] as f64
                                         };
@@ -1368,6 +1396,356 @@ pub(super) fn scan_f32_curves_in_ranges(
         }
     }
     out
+}
+
+/// Validates an axis referenced by a Denso RH850/V850E3 little-endian pointer descriptor.
+fn read_denso_rh850_le_axis(
+    rom: &[u8],
+    offset: usize,
+    len: usize,
+    elem_bytes: usize,
+) -> Option<BlindV2Axis> {
+    if !(2..=64).contains(&len)
+        || !matches!(elem_bytes, 1 | 2)
+        || !offset.is_multiple_of(elem_bytes)
+        || offset.checked_add(len * elem_bytes)? > rom.len()
+    {
+        return None;
+    }
+    let slice = &rom[offset..offset + len * elem_bytes];
+    if slice.iter().all(|&b| b == 0xFF) || slice.iter().all(|&b| b == 0x00) {
+        return None;
+    }
+    let vals: Vec<f64> = if elem_bytes == 1 {
+        slice.iter().map(|&b| b as f64).collect()
+    } else {
+        slice
+            .as_chunks::<2>()
+            .0
+            .iter()
+            .map(|&c| u16::from_le_bytes(c) as f64)
+            .collect()
+    };
+    let max_step = if elem_bytes == 1 { 96.0 } else { 32_768.0 };
+    let inc = vals
+        .windows(2)
+        .all(|w| w[1] >= w[0] && (w[1] - w[0]) <= max_step);
+    let dec = vals
+        .windows(2)
+        .all(|w| w[0] >= w[1] && (w[0] - w[1]) <= max_step);
+    if !inc && !dec {
+        return None;
+    }
+    let lo = vals.iter().copied().fold(f64::INFINITY, f64::min);
+    let hi = vals.iter().copied().fold(f64::NEG_INFINITY, f64::max);
+    let span = hi - lo;
+    if span < 3.0 {
+        return None;
+    }
+    let mut distinct = 1usize;
+    for w in vals.windows(2) {
+        if (w[1] - w[0]).abs() > 1e-9 {
+            distinct += 1;
+        }
+    }
+    let min_distinct = if len == 2 { 2 } else { len.min(3) };
+    if distinct < min_distinct {
+        return None;
+    }
+    let dir = if vals[len - 1] >= vals[0] {
+        AxisDirection::Increasing
+    } else {
+        AxisDirection::Decreasing
+    };
+    let kind = if (200.0..=3000.0).contains(&lo) && (4000.0..=20000.0).contains(&hi) {
+        AxisKind::Rpm
+    } else {
+        AxisKind::Load
+    };
+    Some(BlindV2Axis {
+        offset,
+        length: len,
+        elem_bytes,
+        little_endian: elem_bytes > 1,
+        direction: dir,
+        kind,
+        values: vals,
+    })
+}
+
+/// Scans Denso RH850/V850E3 little-endian 2-D pointer descriptors:
+/// `[type_byte][cols:u8][rows:u8][0][px:u32_le][py:u32_le][pz:u32_le][0:u32]`.
+pub(super) fn scan_denso_rh850_le_descriptors_v2(
+    rom: &[u8],
+    opts: &BlindV2Options,
+) -> Vec<BlindV2Candidate> {
+    let len = rom.len();
+    if !(65_536..=8_500_000).contains(&len) {
+        return Vec::new();
+    }
+
+    const DESC_TILE: usize = 128 * 1024;
+    let max_off = len.saturating_sub(19);
+    let tiles: Vec<(usize, usize)> = (0..max_off)
+        .step_by(DESC_TILE)
+        .map(|s| (s, (s + DESC_TILE).min(max_off)))
+        .collect();
+
+    let mut out: Vec<BlindV2Candidate> = tiles
+        .par_iter()
+        .flat_map_iter(|&(t_start, t_end)| {
+            let mut local = Vec::new();
+            let mut off = (t_start + 3) & !3;
+            while off < t_end {
+                let b0 = rom[off];
+                let cols = rom[off + 1] as usize;
+                let rows = rom[off + 2] as usize;
+                let b3 = rom[off + 3];
+                if b3 == 0 && (b0 >> 6) == 0 && (2..=64).contains(&cols) && (2..=64).contains(&rows) && rows * cols >= 6 {
+                    let z_eb = (b0 & 0x03) as usize;
+                    let x_eb = ((b0 >> 2) & 0x03) as usize;
+                    let y_eb = ((b0 >> 4) & 0x03) as usize;
+                    if matches!(x_eb, 1 | 2)
+                        && matches!(y_eb, 1 | 2)
+                        && matches!(z_eb, 1 | 2)
+                        && (z_eb != 1 || opts.include_8bit)
+                    {
+                        let px = read_u32(rom, off + 4, true).unwrap_or(0) as usize;
+                        let py = read_u32(rom, off + 8, true).unwrap_or(0) as usize;
+                        let pz = read_u32(rom, off + 12, true).unwrap_or(0) as usize;
+                        let pad0 = read_u32(rom, off + 16, true).unwrap_or(1);
+                        let cells = rows * cols;
+                        let byte_len = cells * z_eb;
+                        if pad0 == 0
+                            && px >= 0x1000
+                            && py >= 0x1000
+                            && pz >= 0x1000
+                            && px < len
+                            && py < len
+                            && pz < len
+                            && px != py
+                            && py != pz
+                            && px != pz
+                            && px.is_multiple_of(x_eb)
+                            && py.is_multiple_of(y_eb)
+                            && pz.is_multiple_of(z_eb)
+                            && pz.checked_add(byte_len).is_some_and(|e| e <= len)
+                            && !rom[pz..pz + byte_len].iter().all(|&b| b == 0xFF)
+                        {
+                            if let (Some(x_ax), Some(y_ax)) = (
+                                read_denso_rh850_le_axis(rom, px, cols, x_eb),
+                                read_denso_rh850_le_axis(rom, py, rows, y_eb),
+                            ) {
+                                let mut flat = Vec::with_capacity(cells);
+                                for k in 0..cells {
+                                    let o = pz + k * z_eb;
+                                    let v = if z_eb == 1 {
+                                        rom[o] as f64
+                                    } else {
+                                        read_u16(rom, o, true).unwrap_or(0) as f64
+                                    };
+                                    flat.push(v);
+                                }
+                                let n = cells as f64;
+                                let mean = flat.iter().sum::<f64>() / n;
+                                let sd = (flat.iter().map(|v| (v - mean) * (v - mean)).sum::<f64>() / n).sqrt();
+                                let mdsd = if !sd.is_finite() || sd < 1e-9 {
+                                    0.0
+                                } else {
+                                    let mut tot_d = 0.0f64;
+                                    for r in 0..rows {
+                                        let b = r * cols;
+                                        for c in 0..cols - 1 {
+                                            tot_d += (flat[b + c + 1] - flat[b + c]).abs();
+                                        }
+                                    }
+                                    for r in 0..rows - 1 {
+                                        let b = r * cols;
+                                        let nxt = b + cols;
+                                        for c in 0..cols {
+                                            tot_d += (flat[nxt + c] - flat[b + c]).abs();
+                                        }
+                                    }
+                                    let edges = (rows * (cols - 1) + (rows - 1) * cols) as f64;
+                                    ((tot_d / edges) / sd).min(1.0)
+                                };
+                                let label = if z_eb == 1 { "u8" } else { "u16_le" };
+                                let score = composite_quality_score(&ScoreInputs {
+                                    rows,
+                                    cols,
+                                    z_address: pz,
+                                    smoothness: mdsd,
+                                    confidence_score: (1.0 - mdsd.min(0.9)) * 0.95,
+                                    has_x_axis: true,
+                                    has_y_axis: true,
+                                    axes_contiguous: false,
+                                    first_row_is_flat: false,
+                                }) + 0.25;
+                                local.push(BlindV2Candidate {
+                                    address: pz,
+                                    rows,
+                                    cols,
+                                    elem_bytes: z_eb,
+                                    little_endian: z_eb > 1,
+                                    dtype_label: label.to_string(),
+                                    is_curve: false,
+                                    x_axis: Some(x_ax),
+                                    y_axis: Some(y_ax),
+                                    smoothness: mdsd,
+                                    p23: None,
+                                    quality_score: score,
+                                    status: DiscoveryStatus::StructurallySupported,
+                                    detection_source: format!("denso_rh850_descriptor({label})"),
+                                });
+                            }
+                        }
+                    }
+                }
+                off += 4;
+            }
+            local
+        })
+        .collect();
+
+    out.sort_by(|a, b| {
+        a.address
+            .cmp(&b.address)
+            .then_with(|| b.quality_score.total_cmp(&a.quality_score))
+            .then(b.rows.cmp(&a.rows))
+            .then(b.cols.cmp(&a.cols))
+            .then(a.elem_bytes.cmp(&b.elem_bytes))
+            .then_with(|| a.dtype_label.cmp(&b.dtype_label))
+    });
+    out.dedup_by_key(|c| c.address);
+    out
+}
+
+/// Scans Denso RH850/V850E3 little-endian 1-D curve pointer descriptors:
+/// `[type_byte][pts:u8][0][0][px:u32_le][pz:u32_le][0:u32]`.
+pub(super) fn scan_denso_rh850_le_curves_v2(
+    rom: &[u8],
+    include_8bit: bool,
+    occupied: &mut [bool],
+) -> Vec<BlindV2Candidate> {
+    let len = rom.len();
+    if !(65_536..=8_500_000).contains(&len) {
+        return Vec::new();
+    }
+
+    const DESC_TILE: usize = 128 * 1024;
+    let max_off = len.saturating_sub(15);
+    let tiles: Vec<(usize, usize)> = (0..max_off)
+        .step_by(DESC_TILE)
+        .map(|s| (s, (s + DESC_TILE).min(max_off)))
+        .collect();
+
+    let mut raw_hits: Vec<BlindV2Candidate> = tiles
+        .par_iter()
+        .flat_map_iter(|&(t_start, t_end)| {
+            let mut local = Vec::new();
+            let mut off = (t_start + 3) & !3;
+            while off < t_end {
+                let b0 = rom[off];
+                let pts = rom[off + 1] as usize;
+                if rom[off + 2] == 0 && rom[off + 3] == 0 && (b0 >> 4) == 0 && (2..=64).contains(&pts) {
+                    let x_eb = ((b0 >> 2) & 0x03) as usize;
+                    let z_eb = (b0 & 0x03) as usize;
+                    if matches!(x_eb, 1 | 2)
+                        && matches!(z_eb, 1 | 2)
+                        && (z_eb != 1 || include_8bit)
+                    {
+                        let short_trail_ok = if pts <= 3 {
+                            read_u32(rom, off + 16, true).is_some_and(|trail| {
+                                let hdr_ok = rom[off + 19] == 0
+                                    && (rom[off + 16] >> 6) == 0
+                                    && rom[off + 17] >= 2;
+                                trail >= 0xFE00_0000 || hdr_ok
+                            })
+                        } else {
+                            true
+                        };
+                        let px = read_u32(rom, off + 4, true).unwrap_or(0) as usize;
+                        let pz = read_u32(rom, off + 8, true).unwrap_or(0) as usize;
+                        let pad0 = read_u32(rom, off + 12, true).unwrap_or(1);
+                        let span = pts * z_eb;
+                        if short_trail_ok
+                            && pad0 == 0
+                            && px >= 0x1000
+                            && pz >= 0x1000
+                            && px < len
+                            && pz < len
+                            && px != pz
+                            && px.is_multiple_of(x_eb)
+                            && pz.is_multiple_of(z_eb)
+                            && pz.checked_add(span).is_some_and(|e| e <= occupied.len() && e <= len)
+                            && !occupied[pz..pz + span].iter().any(|&b| b)
+                            && !rom[pz..pz + span].iter().all(|&b| b == 0xFF)
+                        {
+                            if let Some(x_ax) = read_denso_rh850_le_axis(rom, px, pts, x_eb) {
+                                let mut vals = Vec::with_capacity(pts);
+                                for k in 0..pts {
+                                    let o = pz + k * z_eb;
+                                    let v = if z_eb == 1 {
+                                        rom[o] as f64
+                                    } else {
+                                        read_u16(rom, o, true).unwrap_or(0) as f64
+                                    };
+                                    vals.push(v);
+                                }
+                                let n = pts as f64;
+                                let mean = vals.iter().sum::<f64>() / n;
+                                let var = vals.iter().map(|v| (v - mean) * (v - mean)).sum::<f64>() / n;
+                                let sd = var.sqrt();
+                                let smooth = if !sd.is_finite() || sd < 1e-9 || pts < 2 {
+                                    0.0
+                                } else {
+                                    let delta_sum: f64 = vals.windows(2).map(|w| (w[1] - w[0]).abs()).sum();
+                                    (delta_sum / (pts - 1) as f64) / sd
+                                };
+                                let label = if z_eb == 1 { "u8" } else { "u16_le" };
+                                local.push(BlindV2Candidate {
+                                    address: pz,
+                                    rows: 1,
+                                    cols: pts,
+                                    elem_bytes: z_eb,
+                                    little_endian: z_eb > 1,
+                                    dtype_label: label.to_string(),
+                                    is_curve: true,
+                                    x_axis: Some(x_ax),
+                                    y_axis: None,
+                                    smoothness: smooth,
+                                    p23: None,
+                                    quality_score: (pts as f64) / (smooth + 0.05) + 12.0,
+                                    status: DiscoveryStatus::StructurallySupported,
+                                    detection_source: format!("denso_rh850_curve_descriptor({label})"),
+                                });
+                            }
+                        }
+                    }
+                }
+                off += 4;
+            }
+            local
+        })
+        .collect();
+
+    raw_hits.sort_by(|a, b| {
+        b.quality_score
+            .total_cmp(&a.quality_score)
+            .then(a.address.cmp(&b.address))
+            .then(a.elem_bytes.cmp(&b.elem_bytes))
+    });
+
+    let mut accepted = Vec::new();
+    for cand in raw_hits {
+        let s = cand.address;
+        let e = s + cand.cols * cand.elem_bytes;
+        if e <= occupied.len() && !occupied[s..e].iter().any(|&b| b) {
+            occupied[s..e].fill(true);
+            accepted.push(cand);
+        }
+    }
+    accepted
 }
 
 pub(super) fn count_turning_points(values: &[f64]) -> usize {

@@ -339,3 +339,244 @@ fn constant_stride_pointer_array_discovers_nonstandard_35x25_table() {
         assert!(hit.detection_source.starts_with("pointer_stride_2d"));
     }
 }
+
+fn write_le32(buf: &mut [u8], off: usize, v: u32) {
+    buf[off..off + 4].copy_from_slice(&v.to_le_bytes());
+}
+
+#[test]
+fn denso_rh850_le_2d_and_1d_descriptors_are_discovered() {
+    let mut rom = vec![0xFFu8; 131_072];
+    fill_cal_texture(&mut rom[0x4000..0x18000]);
+
+    // 1. RH850 0x2A 2-D u16_le descriptor (10 rows x 14 cols)
+    let px_2d = 0x5000usize;
+    let py_2d = 0x5100usize;
+    let pz_2d = 0x6000usize;
+    for c in 0..14usize {
+        write_le16(&mut rom, px_2d + c * 2, (800 + c * 650) as u16);
+    }
+    for r in 0..10usize {
+        write_le16(&mut rom, py_2d + r * 2, (120 + r * 140) as u16);
+    }
+    for r in 0..10usize {
+        for c in 0..14usize {
+            write_le16(&mut rom, pz_2d + (r * 14 + c) * 2, (900 + r * 80 + c * 55) as u16);
+        }
+    }
+    let desc_2a = 0x4200usize;
+    rom[desc_2a] = 0x2A;
+    rom[desc_2a + 1] = 14;
+    rom[desc_2a + 2] = 10;
+    rom[desc_2a + 3] = 0;
+    write_le32(&mut rom, desc_2a + 4, px_2d as u32);
+    write_le32(&mut rom, desc_2a + 8, py_2d as u32);
+    write_le32(&mut rom, desc_2a + 12, pz_2d as u32);
+    write_le32(&mut rom, desc_2a + 16, 0);
+
+    // 2. RH850 0x29 2-D u8 descriptor (7 rows x 12 cols)
+    let px_29 = 0x5200usize;
+    let py_29 = 0x5300usize;
+    let pz_29 = 0x7000usize;
+    for c in 0..12usize {
+        write_le16(&mut rom, px_29 + c * 2, (1000 + c * 500) as u16);
+    }
+    for r in 0..7usize {
+        write_le16(&mut rom, py_29 + r * 2, (50 + r * 35) as u16);
+    }
+    for r in 0..7usize {
+        for c in 0..12usize {
+            rom[pz_29 + r * 12 + c] = (40 + r * 8 + c * 6) as u8;
+        }
+    }
+    let desc_29 = 0x4240usize;
+    rom[desc_29] = 0x29;
+    rom[desc_29 + 1] = 12;
+    rom[desc_29 + 2] = 7;
+    rom[desc_29 + 3] = 0;
+    write_le32(&mut rom, desc_29 + 4, px_29 as u32);
+    write_le32(&mut rom, desc_29 + 8, py_29 as u32);
+    write_le32(&mut rom, desc_29 + 12, pz_29 as u32);
+    write_le32(&mut rom, desc_29 + 16, 0);
+
+    // 3. RH850 0x0A 1-D u16_le descriptor (9 pts)
+    let px_1d = 0x5400usize;
+    let pz_1d = 0x8000usize;
+    for i in 0..9usize {
+        write_le16(&mut rom, px_1d + i * 2, (600 + i * 900) as u16);
+        write_le16(&mut rom, pz_1d + i * 2, (1200 + i * 220) as u16);
+    }
+    let desc_0a = 0x4280usize;
+    rom[desc_0a] = 0x0A;
+    rom[desc_0a + 1] = 9;
+    rom[desc_0a + 2] = 0;
+    rom[desc_0a + 3] = 0;
+    write_le32(&mut rom, desc_0a + 4, px_1d as u32);
+    write_le32(&mut rom, desc_0a + 8, pz_1d as u32);
+    write_le32(&mut rom, desc_0a + 12, 0);
+
+    // 4. RH850 0x06 1-D u16_le descriptor with 1-byte gear axis 1..7 (7 pts)
+    let px_gear = 0x5500usize;
+    let pz_gear = 0x8400usize;
+    for i in 0..7usize {
+        rom[px_gear + i] = (i + 1) as u8;
+        write_le16(&mut rom, pz_gear + i * 2, (11000 + i * 150) as u16);
+    }
+    let desc_06 = 0x42C0usize;
+    rom[desc_06] = 0x06;
+    rom[desc_06 + 1] = 7;
+    rom[desc_06 + 2] = 0;
+    rom[desc_06 + 3] = 0;
+    write_le32(&mut rom, desc_06 + 4, px_gear as u32);
+    write_le32(&mut rom, desc_06 + 8, pz_gear as u32);
+    write_le32(&mut rom, desc_06 + 12, 0);
+
+    let opts = BlindV2Options {
+        include_curves: true,
+        ..BlindV2Options::default()
+    };
+    let cands = blind_discover_v2(&rom, &opts);
+
+    let h2a = cands
+        .iter()
+        .find(|c| !c.is_curve && c.address == pz_2d)
+        .expect("must discover RH850 0x2A 2-D map");
+    assert_eq!((h2a.rows, h2a.cols), (10, 14));
+    assert_eq!(h2a.dtype_label, "u16_le");
+    assert!(h2a.x_axis.is_some() && h2a.y_axis.is_some());
+    assert!(h2a.detection_source.starts_with("denso_rh850_descriptor"));
+
+    let h29 = cands
+        .iter()
+        .find(|c| !c.is_curve && c.address == pz_29)
+        .expect("must discover RH850 0x29 2-D u8 map");
+    assert_eq!((h29.rows, h29.cols), (7, 12));
+    assert_eq!(h29.dtype_label, "u8");
+    assert!(h29.x_axis.is_some() && h29.y_axis.is_some());
+    assert!(h29.detection_source.starts_with("denso_rh850_descriptor"));
+
+    let h0a = cands
+        .iter()
+        .find(|c| c.is_curve && c.address == pz_1d)
+        .expect("must discover RH850 0x0A 1-D u16_le curve");
+    assert_eq!(h0a.cols, 9);
+    assert_eq!(h0a.dtype_label, "u16_le");
+    assert!(h0a.x_axis.is_some());
+    assert!(h0a.detection_source.starts_with("denso_rh850_curve_descriptor"));
+
+    let h06 = cands
+        .iter()
+        .find(|c| c.is_curve && c.address == pz_gear)
+        .expect("must discover RH850 0x06 1-D u16_le gear curve");
+    assert_eq!(h06.cols, 7);
+    assert_eq!(h06.dtype_label, "u16_le");
+    assert!(h06.x_axis.is_some());
+    assert!(h06.detection_source.starts_with("denso_rh850_curve_descriptor"));
+}
+
+#[test]
+fn denso_sh_4mb_i8_odd_aligned_descriptor_is_discovered() {
+    let mut rom = vec![0xFFu8; 4 * 1024 * 1024];
+    fill_cal_texture(&mut rom[0x15_0000..0x24_0000]);
+
+    let desc = 0x15_5AF4usize;
+    let px = 0x18_0000usize;
+    let py = 0x18_0100usize;
+    let pz = 0x1F_7CA5usize; // Odd-aligned i8 matrix in 4 MiB ROM
+
+    write_be16(&mut rom, desc, 7);
+    write_be16(&mut rom, desc + 2, 5);
+    write_be32(&mut rom, desc + 4, px as u32);
+    write_be32(&mut rom, desc + 8, py as u32);
+    write_be32(&mut rom, desc + 12, pz as u32);
+    rom[desc + 16] = 0x0C;
+
+    for c in 0..7usize {
+        write_be_f32(&mut rom, px + c * 4, 800.0 + c as f32 * 750.0);
+    }
+    for r in 0..5usize {
+        write_be_f32(&mut rom, py + r * 4, -10.0 + r as f32 * 5.0);
+    }
+    for r in 0..5usize {
+        for c in 0..7usize {
+            let v = (-18i16 + (r as i16) * 4 + (c as i16) * 3) as i8;
+            rom[pz + r * 7 + c] = v as u8;
+        }
+    }
+
+    let cands = blind_discover_v2(&rom, &BlindV2Options::default());
+    let hit = cands
+        .iter()
+        .find(|c| !c.is_curve && c.address == pz)
+        .expect("must discover odd-aligned 0x0C i8 Denso SH descriptor in 4 MiB ROM");
+    assert_eq!((hit.rows, hit.cols), (5, 7));
+    assert_eq!(hit.dtype_label, "i8");
+    assert!(hit.detection_source.starts_with("denso_sh_descriptor(i8)"));
+}
+
+#[test]
+fn bosch_mg1_u8hdr_full_scale_axis_and_neg_to_zero_curve_are_discovered() {
+    let mut rom = vec![0xFFu8; 65_536];
+    fill_cal_texture(&mut rom[0x2000..0xA000]);
+
+    // 1. Bosch MG1 [06][06] 2-D table with full-scale Y-axis ending at 65535
+    let hdr = 0x3000usize;
+    rom[hdr] = 6;
+    rom[hdr + 1] = 6;
+    let x_vals = [1700u16, 2000, 3000, 4000, 4500, 5500];
+    let y_vals = [0u16, 13107, 29491, 32768, 42598, 65535];
+    for (i, &v) in x_vals.iter().enumerate() {
+        write_le16(&mut rom, hdr + 2 + i * 2, v);
+    }
+    let y_off = hdr + 2 + 12;
+    for (i, &v) in y_vals.iter().enumerate() {
+        write_le16(&mut rom, y_off + i * 2, v);
+    }
+    let z_off = y_off + 12;
+    for r in 0..6usize {
+        for c in 0..6usize {
+            let v = (1200 + r * 180 + c * 110) as u16;
+            write_le16(&mut rom, z_off + (r * 6 + c) * 2, v);
+        }
+    }
+
+    // 2. Negative-to-zero i16_le knock-retard curve (-500 .. 0 across 12 pts)
+    let curve_off = 0x6200usize;
+    for i in 0..12usize {
+        let sv = -500i16 + (i as i16) * 45 + if i == 11 { 5 } else { 0 };
+        write_le16(&mut rom, curve_off + i * 2, sv as u16);
+    }
+
+    let opts = BlindV2Options {
+        include_curves: true,
+        ..BlindV2Options::default()
+    };
+    let cands = blind_discover_v2(&rom, &opts);
+
+    let mg1_hit = cands
+        .iter()
+        .find(|c| !c.is_curve && c.address == z_off)
+        .unwrap_or_else(|| {
+            let summary: Vec<_> = cands
+                .iter()
+                .filter(|c| !c.is_curve)
+                .map(|c| (format!("0x{:X}", c.address), c.rows, c.cols, &c.detection_source))
+                .collect();
+            panic!("must discover Bosch MG1 [06][06] table at 0x{z_off:X}; got={summary:?}");
+        });
+    assert_eq!((mg1_hit.rows, mg1_hit.cols), (6, 6));
+    assert!(mg1_hit.detection_source.starts_with("bosch_siemens_struct_u8hdr"));
+
+    let neg_curve = cands
+        .iter()
+        .find(|c| c.is_curve && c.dtype_label == "i16_le" && c.address.abs_diff(curve_off) <= 2)
+        .unwrap_or_else(|| {
+            let summary: Vec<_> = cands
+                .iter()
+                .filter(|c| c.is_curve)
+                .map(|c| (format!("0x{:X}", c.address), c.cols, &c.dtype_label, &c.detection_source))
+                .collect();
+            panic!("must discover negative-to-zero i16_le curve at 0x{curve_off:X}; got={summary:?}");
+        });
+    assert!(neg_curve.cols >= 10);
+}

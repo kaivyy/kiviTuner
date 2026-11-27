@@ -218,7 +218,7 @@ pub(super) fn build_axis_pool_v2_in_ranges(
                             hi = v;
                         }
                     }
-                    // Signed i16 axes must strictly cross zero (positive & negative breakpoints).
+                    // Signed i16 axes must cross zero (-X..+Y).
                     if is_signed && !(lo < 0.0 && hi > 0.0) {
                         off += elem_bytes;
                         continue;

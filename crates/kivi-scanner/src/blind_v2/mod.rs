@@ -36,7 +36,9 @@ use scan_32bit::scan_32bit_tables_in_ranges;
 pub use scan_anchored::scan_axis_anchored_v2;
 use scan_anchored::scan_axis_anchored_v2_with_pool;
 use scan_curves_v2::attach_curves_v2_in_ranges;
-use scan_oem_structs::{scan_bosch_siemens_structs, scan_denso_sh_descriptors_v2};
+use scan_oem_structs::{
+    scan_bosch_siemens_structs, scan_denso_rh850_le_descriptors_v2, scan_denso_sh_descriptors_v2,
+};
 use scan_pointer_stride::{
     scan_pointer_stride_tables_with_anchors, snap_candidates_to_strong_anchors,
     strong_pointer_anchors_v2,
@@ -153,6 +155,7 @@ fn non_blank_ranges(rom: &[u8]) -> Vec<(usize, usize)> {
 #[inline]
 fn detector_tier(src: &str) -> u8 {
     if src.starts_with("denso_sh_descriptor")
+        || src.starts_with("denso_rh850_descriptor")
         || src.starts_with("bosch_siemens_struct")
         || src.starts_with("motronic_8bit_struct")
         || src.starts_with("pointer_stride_2d")
@@ -197,6 +200,7 @@ pub fn blind_discover_v2(rom: &[u8], opts: &BlindV2Options) -> Vec<BlindV2Candid
 
     all_2d.extend(scan_bosch_siemens_structs(rom, &kept_ranges, opts));
     all_2d.extend(scan_denso_sh_descriptors_v2(rom, opts));
+    all_2d.extend(scan_denso_rh850_le_descriptors_v2(rom, opts));
     all_2d.extend(scan_pointer_stride_tables_with_anchors(
         rom,
         &strong_anchors,
@@ -204,7 +208,22 @@ pub fn blind_discover_v2(rom: &[u8], opts: &BlindV2Options) -> Vec<BlindV2Candid
     ));
 
     let mut shapes = default_shapes();
-    for &(r, c) in &[(8, 12), (12, 8), (8, 16), (16, 8), (12, 16), (16, 12)] {
+    for &(r, c) in &[
+        (8, 12),
+        (12, 8),
+        (8, 16),
+        (16, 8),
+        (12, 16),
+        (16, 12),
+        (12, 20),
+        (20, 12),
+        (16, 15),
+        (15, 16),
+        (7, 12),
+        (12, 7),
+        (9, 16),
+        (16, 9),
+    ] {
         if !shapes.contains(&(r, c)) {
             shapes.push((r, c));
         }

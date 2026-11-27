@@ -27,6 +27,12 @@ const I16_CORE_SHAPES: &[(usize, usize)] = &[
     (8, 16),
     (16, 20),
     (20, 20),
+    (4, 16),
+    (16, 4),
+    (12, 20),
+    (16, 15),
+    (9, 16),
+    (16, 9),
 ];
 
 const I8_CORE_SHAPES: &[(usize, usize)] = &[
@@ -708,13 +714,7 @@ pub(super) fn scan_prefiltered_8_and_16_v2(
     } else {
         NON_DOM_U16_SHAPES.to_vec()
     };
-    let mut dom_i16_shapes: Vec<(usize, usize)> = if rom.len() >= 1_048_576 {
-        I16_CORE_SHAPES[..16].to_vec()
-    } else if large_rom {
-        I16_CORE_SHAPES[..18].to_vec()
-    } else {
-        I16_CORE_SHAPES.to_vec()
-    };
+    let mut dom_i16_shapes: Vec<(usize, usize)> = I16_CORE_SHAPES.to_vec();
     let mut u8_shapes: Vec<(usize, usize)> = if rom.len() < 131_072 {
         valid_shapes.clone()
     } else {
