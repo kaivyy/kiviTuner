@@ -1,0 +1,8 @@
+[package]
+name = "kivi-j2534-bridge"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+kivi-flashing = { path = "../kivi-flashing", features = ["j2534-ffi"] }

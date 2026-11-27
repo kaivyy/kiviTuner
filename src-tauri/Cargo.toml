@@ -1,0 +1,36 @@
+[package]
+name = "kivituner"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[build-dependencies]
+tauri-build = { version = "2.0", features = [] }
+
+[dependencies]
+kivi-core = { path = "../crates/kivi-core" }
+kivi-defs = { path = "../crates/kivi-defs" }
+kivi-checksum = { path = "../crates/kivi-checksum" }
+kivi-project = { path = "../crates/kivi-project" }
+kivi-diff = { path = "../crates/kivi-diff" }
+kivi-scanner = { path = "../crates/kivi-scanner" }
+kivi-formats = { path = "../crates/kivi-formats" }
+kivi-physics = { path = "../crates/kivi-physics" }
+kivi-telemetry = { path = "../crates/kivi-telemetry" }
+kivi-flashing = { path = "../crates/kivi-flashing" }
+kivi-protocol = { path = "../crates/kivi-protocol" }
+tauri = { version = "2.0", features = [] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "2.0"
+tokio = { version = "1.0", features = ["full"] }
+chrono = { version = "0.4", default-features = false, features = ["clock", "std"] }
+
+[dev-dependencies]
+kivi-flashing = { path = "../crates/kivi-flashing", features = ["test-doubles"] }
+kivi-protocol = { path = "../crates/kivi-protocol", features = ["test-doubles"] }
+
+[features]
+# Forward the real J2534 driver binding and native OpenPort2/DoIP/SocketCAN transports.
+default = ["j2534-ffi"]
+j2534-ffi = ["kivi-flashing/j2534-ffi"]

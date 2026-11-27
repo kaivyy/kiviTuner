@@ -1,0 +1,7 @@
+{
+  "bundle": {
+    "resources": {
+      "binaries/kivi-j2534-bridge-x86.exe": "binaries/kivi-j2534-bridge-x86.exe"
+    }
+  }
+}

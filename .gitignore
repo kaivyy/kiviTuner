@@ -1,0 +1,43 @@
+# Local third-party research references (never distributed)
+reposample/
+
+# Internal planning, research, and local knowledge graph (not distributed)
+PRD.md
+ROADMAP.md
+docs/migration/
+docs/superpowers/
+docs/guides/test-suite-report-*.md
+.superpowers/
+research/
+graphify-out/
+
+# Rust
+target/
+**/*.rs.bk
+
+# Node / frontend
+node_modules/
+dist/
+.vite/
+*.tsbuildinfo
+
+# Tauri
+src-tauri/target/
+src-tauri/gen/
+src-tauri/binaries/*.exe
+
+# ECU dumps, backups, and user datalogs (may contain private or customer data)
+backups/
+*.kiviproj/
+*.kivilog
+*.kivitrace
+
+# Environment & editor files
+.env
+.env.*
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.log

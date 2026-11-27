@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" fill="none">
+  <defs>
+    <clipPath id="kivi-chassis-clip">
+      <rect x="64" y="64" width="896" height="896" rx="196" />
+    </clipPath>
+  </defs>
+
+  <!-- Forged Carbon Instrument Chassis Plate -->
+  <g clip-path="url(#kivi-chassis-clip)">
+    <rect x="64" y="64" width="896" height="896" fill="#0A0D12" />
+    <path d="M64 760 L792 64 L960 64 L960 960 L64 960 Z" fill="#131A26" />
+    <path d="M64 252 L252 64 L64 64 Z" fill="#182030" />
+    <line x1="64" y1="760" x2="792" y2="64" stroke="#1E293B" stroke-width="6" />
+  </g>
+
+  <!-- Machined Metallic Rim -->
+  <rect
+    x="71"
+    y="71"
+    width="882"
+    height="882"
+    rx="189"
+    stroke="#243044"
+    stroke-width="14"
+  />
+
+  <!-- K Monogram (Titanium White, 11.3 deg Motorsport Forward Slant) -->
+  <polygon points="266,268 360,268 264,748 170,748" fill="#F1F5F9" />
+  <polygon points="314,484 444,268 550,268 368,538" fill="#F1F5F9" />
+  <polygon points="316,496 382,456 492,748 388,748" fill="#F1F5F9" />
+
+  <!-- T Monogram (Telemetry Cyan + Racing Redline Endplate) -->
+  <polygon points="588,268 774,268 756,356 570,356" fill="#38BDF8" />
+  <polygon points="792,268 858,268 840,356 774,356" fill="#EF4444" />
+  <polygon points="628,342 724,342 643,748 547,748" fill="#38BDF8" />
+
+  <!-- Lower Telemetry Calibration Baseline -->
+  <polygon points="164,790 648,790 645,806 161,806" fill="#243044" />
+  <polygon points="666,790 756,790 753,806 663,806" fill="#38BDF8" />
+  <polygon points="774,790 822,790 819,806 771,806" fill="#EF4444" />
+</svg>

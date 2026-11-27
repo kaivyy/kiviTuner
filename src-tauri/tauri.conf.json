@@ -1,0 +1,58 @@
+{
+  "$schema": "https://raw.githubusercontent.com/tauri-apps/tauri/dev/tooling/cli/schema.json",
+  "productName": "kiviTuner",
+  "version": "0.1.0",
+  "identifier": "com.kivituner.app",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:1420",
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "kiviTuner | Professional ECU Mapping Suite",
+        "width": 1280,
+        "height": 800,
+        "minWidth": 640,
+        "minHeight": 480,
+        "resizable": true,
+        "decorations": false,
+        "shadow": false
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "category": "DeveloperTool",
+    "shortDescription": "ECU Calibration Workbench and Diagnostic Suite",
+    "longDescription": "High-performance desktop ECU remapping, OEM checksum verification and repair, virtualized hex/table/3D editor, and hardware flashing workbench.",
+    "copyright": "Copyright (c) 2026 kiviTuner Community",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico",
+      "icons/icon.png"
+    ],
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser"
+      }
+    },
+    "linux": {
+      "deb": {
+        "section": "utils"
+      }
+    },
+    "macOS": {
+      "minimumSystemVersion": "10.15"
+    }
+  }
+}

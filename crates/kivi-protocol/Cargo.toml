@@ -1,0 +1,27 @@
+[package]
+name = "kivi-protocol"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "2.0"
+tokio = { version = "1.0", features = ["sync", "time", "rt", "io-util"] }
+tokio-serial = "5.4"
+async-trait = "0.1"
+kivi-defs = { path = "../kivi-defs" }
+kivi-core = { path = "../kivi-core" }
+
+[features]
+default = []
+test-doubles = []
+
+[dev-dependencies]
+kivi-protocol = { path = ".", features = ["test-doubles"] }
+tokio = { version = "1.0", features = ["full", "test-util"] }
+kivi-project = { path = "../kivi-project" }
+
+[target.'cfg(unix)'.dev-dependencies]
+libc = "0.2"

@@ -1,0 +1,15 @@
+[package]
+name = "kivi-scanner"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+kivi-core = { path = "../kivi-core" }
+kivi-defs = { path = "../kivi-defs" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "2.0"
+rayon = "1.12"
+miniz_oxide = "0.8"
+sha2 = "0.10"

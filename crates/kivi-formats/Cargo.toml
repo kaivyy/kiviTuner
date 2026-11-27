@@ -1,0 +1,10 @@
+[package]
+name = "kivi-formats"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+kivi-checksum = { path = "../kivi-checksum" }
+miniz_oxide = "0.8"
+thiserror = "2.0"

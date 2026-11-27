@@ -1,0 +1,32 @@
+[package]
+name = "kivi-flashing"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+kivi-core = { path = "../kivi-core" }
+kivi-checksum = { path = "../kivi-checksum" }
+kivi-scanner = { path = "../kivi-scanner" }
+thiserror = "2.0"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serialport = { version = "4.10.1", default-features = false }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+libc = "0.2"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+winreg = "0.56"
+
+[features]
+default = ["j2534-ffi"]
+j2534-ffi = ["dep:libloading"]
+test-doubles = []
+
+[dependencies.libloading]
+version = "0.7"
+optional = true
+
+[dev-dependencies]
+kivi-flashing = { path = ".", features = ["test-doubles"] }

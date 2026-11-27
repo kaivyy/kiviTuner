@@ -1,0 +1,9 @@
+[package]
+name = "kivi-physics"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+kivi-defs = { path = "../kivi-defs" }
+thiserror = "2.0"

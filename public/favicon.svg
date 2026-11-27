@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" fill="none">
+  <defs>
+    <clipPath id="kivi-fav-clip">
+      <rect x="24" y="24" width="976" height="976" rx="216" />
+    </clipPath>
+  </defs>
+
+  <!-- Full-bleed browser tab squircle -->
+  <g clip-path="url(#kivi-fav-clip)">
+    <rect x="24" y="24" width="976" height="976" fill="#0A0D12" />
+    <path d="M24 780 L812 24 L1000 24 L1000 1000 L24 1000 Z" fill="#131A26" />
+  </g>
+  <rect
+    x="34"
+    y="34"
+    width="956"
+    height="956"
+    rx="206"
+    stroke="#243044"
+    stroke-width="20"
+  />
+
+  <!-- Oversized legible KT racing monogram for 16px-32px tabs -->
+  <polygon points="236,240 338,240 232,764 130,764" fill="#F1F5F9" />
+  <polygon points="288,476 428,240 544,240 346,534" fill="#F1F5F9" />
+  <polygon points="290,488 362,446 480,764 368,764" fill="#F1F5F9" />
+
+  <polygon points="586,240 788,240 768,338 566,338" fill="#38BDF8" />
+  <polygon points="808,240 882,240 862,338 788,338" fill="#EF4444" />
+  <polygon points="628,322 732,322 643,764 539,764" fill="#38BDF8" />
+
+  <polygon points="124,812 648,812 644,832 120,832" fill="#243044" />
+  <polygon points="668,812 768,812 764,832 664,832" fill="#38BDF8" />
+  <polygon points="788,812 842,812 838,832 784,832" fill="#EF4444" />
+</svg>

@@ -1,0 +1,35 @@
+[workspace]
+members = [
+    "crates/*",
+    "src-tauri",
+]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["kiviTuner Community <dev@kivituner.org>"]
+license = "MIT"
+
+# ---------------------------------------------------------------------------
+# Build profile
+# ---------------------------------------------------------------------------
+# Measured on this machine: `target/` was 63 GB with 628 test binaries, each
+# 212 MB, because the dev profile embeds full debug info in every binary. With
+# 2 GB of RAM the linker ran out while linking them.
+#
+# `debug = 0` shrinks each binary dramatically; `codegen-units = 16` lowers the
+# peak memory per codegen unit (the dev default of 256 parallelises more but
+# multiplies peak memory). `opt-level` stays at 0 because raising it increases
+# compile time, and `incremental` stays on because turning it off slows rebuilds.
+#
+# Source: https://doc.rust-lang.org/cargo/reference/profiles.html
+[profile.dev]
+debug = 0
+codegen-units = 16
+
+# Test binaries are the ones that multiplied, so give them the same treatment
+# explicitly rather than relying on inheritance.
+[profile.test]
+debug = 0
+codegen-units = 16

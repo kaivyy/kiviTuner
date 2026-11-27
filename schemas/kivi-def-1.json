@@ -1,0 +1,129 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://kivituner.dev/schemas/kivi-def-1.json",
+  "title": "KiviDefinition",
+  "description": "Standard schema for kiviTuner calibration definition files (.kivi.json)",
+  "type": "object",
+  "required": ["schemaVersion", "maps"],
+  "properties": {
+    "schemaVersion": {
+      "type": "integer",
+      "minimum": 1,
+      "default": 1
+    },
+    "ecu": {
+      "type": "object",
+      "properties": {
+        "family": { "type": "string" },
+        "partNumber": { "type": "string" },
+        "calibrationId": { "type": "string" },
+        "softwareVersion": { "type": "string" },
+        "fileSize": { "type": "integer", "minimum": 0 },
+        "sha256": { "type": "string" }
+      }
+    },
+    "checksum": {
+      "type": "object",
+      "properties": {
+        "plugin": { "type": "string" },
+        "version": { "type": "string" }
+      }
+    },
+    "maps": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/MapDef"
+      }
+    },
+    "constants": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/ConstantDef"
+      },
+      "default": []
+    },
+    "flags": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/FlagDef"
+      },
+      "default": []
+    }
+  },
+  "$defs": {
+    "DType": {
+      "type": "string",
+      "enum": ["u8", "i8", "u16", "i16", "u32", "i32", "f32"]
+    },
+    "Endian": {
+      "type": "string",
+      "enum": ["big", "little"]
+    },
+    "Scaling": {
+      "type": "object",
+      "required": ["equation"],
+      "properties": {
+        "equation": { "type": "string" },
+        "invEquation": { "type": "string" },
+        "unit": { "type": "string", "default": "" },
+        "decimals": { "type": "integer", "minimum": 0, "default": 2 }
+      }
+    },
+    "AxisDef": {
+      "type": "object",
+      "required": ["address", "length", "dtype", "endian"],
+      "properties": {
+        "address": { "type": "integer", "minimum": 0 },
+        "length": { "type": "integer", "minimum": 1 },
+        "dtype": { "$ref": "#/$defs/DType" },
+        "endian": { "$ref": "#/$defs/Endian" },
+        "scaling": { "$ref": "#/$defs/Scaling" },
+        "values": {
+          "type": "array",
+          "items": { "type": "number" },
+          "default": []
+        }
+      }
+    },
+    "MapDef": {
+      "type": "object",
+      "required": ["id", "name", "category", "address", "rows", "cols", "dtype", "endian"],
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "category": { "type": "string" },
+        "address": { "type": "integer", "minimum": 0 },
+        "rows": { "type": "integer", "minimum": 1 },
+        "cols": { "type": "integer", "minimum": 1 },
+        "dtype": { "$ref": "#/$defs/DType" },
+        "endian": { "$ref": "#/$defs/Endian" },
+        "column_major": { "type": "boolean", "default": false },
+        "scaling": { "$ref": "#/$defs/Scaling" },
+        "x_axis": { "$ref": "#/$defs/AxisDef" },
+        "y_axis": { "$ref": "#/$defs/AxisDef" }
+      }
+    },
+    "ConstantDef": {
+      "type": "object",
+      "required": ["id", "name", "address", "dtype", "endian"],
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "address": { "type": "integer", "minimum": 0 },
+        "dtype": { "$ref": "#/$defs/DType" },
+        "endian": { "$ref": "#/$defs/Endian" },
+        "scaling": { "$ref": "#/$defs/Scaling" }
+      }
+    },
+    "FlagDef": {
+      "type": "object",
+      "required": ["id", "name", "address", "mask"],
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "address": { "type": "integer", "minimum": 0 },
+        "mask": { "type": "integer" }
+      }
+    }
+  }
+}
