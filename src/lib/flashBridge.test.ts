@@ -134,3 +134,39 @@ test('new Phase 1 ELM Wi-Fi, raw K-Line, and protocol override bridges behave cl
   assert.equal(await bridgeDiagProbeElmCapabilities(), null);
   assert.equal(await bridgeDiagSendRawCommand('ATI'), null);
 });
+
+test('Phase 2 and Phase 3 OBD, UDS, and motorcycle diagnostic bridges return null cleanly in browser', async () => {
+  const {
+    bridgeDiagLookupDtc,
+    bridgeDiagReadLivePids,
+    bridgeDiagReadImReadiness,
+    bridgeDiagReadFreezeFrame,
+    bridgeDiagReadMode06Monitors,
+    bridgeDiagScanEcuModules,
+    bridgeDiagUdsEnterSession,
+    bridgeDiagUdsReadDids,
+    bridgeDiagUdsRoutineControl,
+    bridgeDiagUdsIoControl,
+    bridgeDiagMotoListPinouts,
+    bridgeDiagMotoReadLiveSensors,
+    bridgeDiagMotoReadDtcs,
+    bridgeDiagMotoClearDtcs,
+    bridgeDiagMotoHondaEcmId,
+  } = await import('./flashBridge.ts');
+
+  assert.equal(await bridgeDiagLookupDtc('P0171'), null);
+  assert.equal(await bridgeDiagReadLivePids(), null);
+  assert.equal(await bridgeDiagReadImReadiness(), null);
+  assert.equal(await bridgeDiagReadFreezeFrame(), null);
+  assert.equal(await bridgeDiagReadMode06Monitors(), null);
+  assert.equal(await bridgeDiagScanEcuModules(true), null);
+  assert.equal(await bridgeDiagUdsEnterSession(0x03), null);
+  assert.equal(await bridgeDiagUdsReadDids([0xf190]), null);
+  assert.equal(await bridgeDiagUdsRoutineControl(0x01, 0xf001), null);
+  assert.equal(await bridgeDiagUdsIoControl(0x1234, 0x00), null);
+  assert.equal(await bridgeDiagMotoListPinouts(), null);
+  assert.equal(await bridgeDiagMotoReadLiveSensors('honda_kline'), null);
+  assert.equal(await bridgeDiagMotoReadDtcs('kawasaki_kds'), null);
+  assert.equal(await bridgeDiagMotoClearDtcs('suzuki_sds'), null);
+  assert.equal(await bridgeDiagMotoHondaEcmId(), null);
+});

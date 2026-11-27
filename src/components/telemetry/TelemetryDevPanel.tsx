@@ -553,6 +553,23 @@ export const TelemetryDevPanel: React.FC<TelemetryDevPanelProps> = ({
             </button>
           </div>
 
+          {(selectedDriverId.startsWith('obd2:') || selectedDriverId.startsWith('obd2_wifi:')) && (
+            <div className="flex items-center gap-2 text-[11px]">
+              <label htmlFor="driver-target-override" className="shrink-0 font-mono text-[10px] text-kiviMuted">
+                OBD Target:
+              </label>
+              <input
+                id="driver-target-override"
+                type="text"
+                disabled={isConnected || isConnecting}
+                value={selectedDriverId}
+                onChange={(e) => selectDriver(e.target.value)}
+                placeholder="obd2_wifi:192.168.0.10:35000#auto or obd2:/dev/rfcomm0@38400#kwp_fast_init"
+                className="w-full rounded border border-kiviBorder bg-kiviBg px-2 py-0.5 font-mono text-[11px] text-kiviInk disabled:opacity-60"
+              />
+            </div>
+          )}
+
           <div className="flex items-center justify-between pt-1 text-[11px] border-t border-kiviBorder/60">
             <div className="flex items-center gap-2">
               <span className="text-kiviMuted">Status:</span>

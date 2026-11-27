@@ -529,6 +529,147 @@ export interface DtcRecord {
   status_mask: number;
   status_label: string;
   source: string;
+  description?: string | null;
+}
+
+export interface DtcDescription {
+  code: string;
+  system: string;
+  summary: string;
+  probable_causes: string[];
+  severity: string;
+}
+
+export interface ObdLivePidReading {
+  pid: number;
+  pid_hex: string;
+  name: string;
+  category: string;
+  value: number;
+  display: string;
+  unit: string;
+  raw_hex: string;
+}
+
+export interface ObdLiveSnapshot {
+  protocol: string;
+  tx_can_id: number;
+  supported_pids: number[];
+  readings: ObdLivePidReading[];
+  notes: string[];
+}
+
+export interface ImReadinessMonitor {
+  name: string;
+  supported: boolean;
+  ready: boolean;
+}
+
+export interface ImReadinessSummary {
+  mil_on: boolean;
+  dtc_count: number;
+  compression_ignition: boolean;
+  monitors: ImReadinessMonitor[];
+  permanent_dtcs: DtcRecord[];
+  notes: string[];
+}
+
+export interface FreezeFrameSummary {
+  freeze_dtc: string | null;
+  freeze_dtc_description: string | null;
+  readings: ObdLivePidReading[];
+  notes: string[];
+}
+
+export interface Mode06TestResult {
+  mid: number;
+  tid: number;
+  uasid: number;
+  value: number;
+  min: number;
+  max: number;
+  passed: boolean;
+  label: string;
+}
+
+export interface DiscoveredEcuModule {
+  tx_can_id: number;
+  rx_can_id: number;
+  tx_hex: string;
+  rx_hex: string;
+  label: string;
+  is_29bit: boolean;
+  vin: string | null;
+  part_number: string | null;
+  sw_version: string | null;
+  active_session: number | null;
+  dtc_count: number | null;
+}
+
+export interface UdsDidValue {
+  did: number;
+  did_hex: string;
+  name: string;
+  raw_hex: string;
+  ascii: string | null;
+}
+
+export interface UdsRoutineOutcome {
+  routine_id: number;
+  subfunction: number;
+  acknowledged: boolean;
+  response_hex: string;
+  notes: string[];
+}
+
+export interface UdsIoControlOutcome {
+  did: number;
+  control_param: number;
+  acknowledged: boolean;
+  response_hex: string;
+  notes: string[];
+}
+
+export type MotoProtocolFamily =
+  | 'honda_kline'
+  | 'yamaha_kline'
+  | 'yamaha_euro5_obd'
+  | 'kawasaki_kds'
+  | 'suzuki_sds';
+
+export interface MotoSensorMetric {
+  key: string;
+  label: string;
+  value: number;
+  display: string;
+  unit: string;
+}
+
+export interface MotoLiveSnapshot {
+  family: MotoProtocolFamily;
+  protocol: string;
+  ecm_id: string | null;
+  matched_profile: Record<string, unknown> | null;
+  sensors: MotoSensorMetric[];
+  raw_hex: string;
+  notes: string[];
+}
+
+export interface HondaEcmIdentity {
+  ecm_id_hex: string;
+  matched_profile: Record<string, unknown> | null;
+  raw_hex: string;
+  notes: string[];
+}
+
+export interface MotoCablePinout {
+  id: string;
+  brand_models: string;
+  connector_type: string;
+  protocol: string;
+  obd16_wiring: string[];
+  recommended_adapter: string;
+  notes: string;
 }
 
 export interface EcuIdentitySummary {
@@ -561,9 +702,13 @@ export interface EcuResetOutcome {
   notes: string[];
 }
 
-export async function bridgeDiagReadEcuInfo(): Promise<EcuIdentitySummary | null> {
+export async function bridgeDiagReadEcuInfo(
+  txCanId?: number
+): Promise<EcuIdentitySummary | null> {
   if (!isDesktopApp()) return null;
-  const raw = await invoke<Record<string, unknown>>('diag_read_ecu_info');
+  const raw = await invoke<Record<string, unknown>>('diag_read_ecu_info', {
+    txCanId: txCanId ?? null,
+  });
   return {
     battery_mv:
       typeof raw.battery_mv === 'number' && Number.isFinite(raw.battery_mv)
@@ -577,9 +722,11 @@ export async function bridgeDiagReadEcuInfo(): Promise<EcuIdentitySummary | null
   };
 }
 
-export async function bridgeDiagReadDtcs(): Promise<DtcReadOutcome | null> {
+export async function bridgeDiagReadDtcs(txCanId?: number): Promise<DtcReadOutcome | null> {
   if (!isDesktopApp()) return null;
-  const raw = await invoke<Record<string, unknown>>('diag_read_dtcs');
+  const raw = await invoke<Record<string, unknown>>('diag_read_dtcs', {
+    txCanId: txCanId ?? null,
+  });
   const rawDtcs = Array.isArray(raw.dtcs) ? raw.dtcs : [];
   return {
     dtcs: rawDtcs.map((item) => {
@@ -589,6 +736,7 @@ export async function bridgeDiagReadDtcs(): Promise<DtcReadOutcome | null> {
         status_mask: Number(rec.status_mask ?? 0),
         status_label: String(rec.status_label ?? ''),
         source: String(rec.source ?? ''),
+        description: typeof rec.description === 'string' ? rec.description : null,
       };
     }),
     protocol_used: String(raw.protocol_used ?? ''),
@@ -596,9 +744,11 @@ export async function bridgeDiagReadDtcs(): Promise<DtcReadOutcome | null> {
   };
 }
 
-export async function bridgeDiagClearDtcs(): Promise<DtcClearOutcome | null> {
+export async function bridgeDiagClearDtcs(txCanId?: number): Promise<DtcClearOutcome | null> {
   if (!isDesktopApp()) return null;
-  const raw = await invoke<Record<string, unknown>>('diag_clear_dtcs');
+  const raw = await invoke<Record<string, unknown>>('diag_clear_dtcs', {
+    txCanId: txCanId ?? null,
+  });
   return {
     cleared: Boolean(raw.cleared ?? false),
     protocol_used: String(raw.protocol_used ?? ''),
@@ -607,10 +757,14 @@ export async function bridgeDiagClearDtcs(): Promise<DtcClearOutcome | null> {
 }
 
 export async function bridgeDiagEcuReset(
-  mode: EcuResetMode
+  mode: EcuResetMode,
+  txCanId?: number
 ): Promise<EcuResetOutcome | null> {
   if (!isDesktopApp()) return null;
-  const raw = await invoke<Record<string, unknown>>('diag_ecu_reset', { mode });
+  const raw = await invoke<Record<string, unknown>>('diag_ecu_reset', {
+    mode,
+    txCanId: txCanId ?? null,
+  });
   return {
     acknowledged: Boolean(raw.acknowledged ?? false),
     mode: (raw.mode as EcuResetMode) ?? mode,
@@ -630,6 +784,141 @@ export async function bridgeDiagProbeElmCapabilities(): Promise<ElmCapabilityRep
 export async function bridgeDiagSendRawCommand(command: string): Promise<string | null> {
   if (!isDesktopApp()) return null;
   return await invoke<string>('diag_send_raw_command', { command });
+}
+
+export async function bridgeDiagLookupDtc(code: string): Promise<DtcDescription | null> {
+  if (!isDesktopApp()) return null;
+  return await invoke<DtcDescription>('diag_lookup_dtc', { code });
+}
+
+export async function bridgeDiagReadLivePids(
+  txCanId?: number,
+  pids?: number[]
+): Promise<ObdLiveSnapshot | null> {
+  if (!isDesktopApp()) return null;
+  return await invoke<ObdLiveSnapshot>('diag_read_live_pids', {
+    txCanId: txCanId ?? null,
+    pids: pids ?? null,
+  });
+}
+
+export async function bridgeDiagReadImReadiness(
+  txCanId?: number
+): Promise<ImReadinessSummary | null> {
+  if (!isDesktopApp()) return null;
+  return await invoke<ImReadinessSummary>('diag_read_im_readiness', {
+    txCanId: txCanId ?? null,
+  });
+}
+
+export async function bridgeDiagReadFreezeFrame(
+  txCanId?: number
+): Promise<FreezeFrameSummary | null> {
+  if (!isDesktopApp()) return null;
+  return await invoke<FreezeFrameSummary>('diag_read_freeze_frame', {
+    txCanId: txCanId ?? null,
+  });
+}
+
+export async function bridgeDiagReadMode06Monitors(
+  txCanId?: number,
+  mids?: number[]
+): Promise<Mode06TestResult[] | null> {
+  if (!isDesktopApp()) return null;
+  return await invoke<Mode06TestResult[]>('diag_read_mode06_monitors', {
+    txCanId: txCanId ?? null,
+    mids: mids ?? null,
+  });
+}
+
+export async function bridgeDiagScanEcuModules(
+  include29bit = false
+): Promise<DiscoveredEcuModule[] | null> {
+  if (!isDesktopApp()) return null;
+  return await invoke<DiscoveredEcuModule[]>('diag_scan_ecu_modules', { include29bit });
+}
+
+export async function bridgeDiagUdsEnterSession(
+  sessionSubfunction: number,
+  txCanId?: number
+): Promise<string | null> {
+  if (!isDesktopApp()) return null;
+  return await invoke<string>('diag_uds_enter_session', {
+    txCanId: txCanId ?? null,
+    sessionSubfunction,
+  });
+}
+
+export async function bridgeDiagUdsReadDids(
+  dids?: number[],
+  txCanId?: number
+): Promise<UdsDidValue[] | null> {
+  if (!isDesktopApp()) return null;
+  return await invoke<UdsDidValue[]>('diag_uds_read_dids', {
+    txCanId: txCanId ?? null,
+    dids: dids ?? null,
+  });
+}
+
+export async function bridgeDiagUdsRoutineControl(
+  subfunction: number,
+  routineId: number,
+  optionRecord?: number[],
+  txCanId?: number
+): Promise<UdsRoutineOutcome | null> {
+  if (!isDesktopApp()) return null;
+  return await invoke<UdsRoutineOutcome>('diag_uds_routine_control', {
+    txCanId: txCanId ?? null,
+    subfunction,
+    routineId,
+    optionRecord: optionRecord ?? null,
+  });
+}
+
+export async function bridgeDiagUdsIoControl(
+  did: number,
+  controlParam: number,
+  controlState?: number[],
+  txCanId?: number
+): Promise<UdsIoControlOutcome | null> {
+  if (!isDesktopApp()) return null;
+  return await invoke<UdsIoControlOutcome>('diag_uds_io_control', {
+    txCanId: txCanId ?? null,
+    did,
+    controlParam,
+    controlState: controlState ?? null,
+  });
+}
+
+export async function bridgeDiagMotoListPinouts(): Promise<MotoCablePinout[] | null> {
+  if (!isDesktopApp()) return null;
+  return await invoke<MotoCablePinout[]>('diag_moto_list_pinouts');
+}
+
+export async function bridgeDiagMotoReadLiveSensors(
+  family: MotoProtocolFamily
+): Promise<MotoLiveSnapshot | null> {
+  if (!isDesktopApp()) return null;
+  return await invoke<MotoLiveSnapshot>('diag_moto_read_live_sensors', { family });
+}
+
+export async function bridgeDiagMotoReadDtcs(
+  family: MotoProtocolFamily
+): Promise<DtcReadOutcome | null> {
+  if (!isDesktopApp()) return null;
+  return await invoke<DtcReadOutcome>('diag_moto_read_dtcs', { family });
+}
+
+export async function bridgeDiagMotoClearDtcs(
+  family: MotoProtocolFamily
+): Promise<DtcClearOutcome | null> {
+  if (!isDesktopApp()) return null;
+  return await invoke<DtcClearOutcome>('diag_moto_clear_dtcs', { family });
+}
+
+export async function bridgeDiagMotoHondaEcmId(): Promise<HondaEcmIdentity | null> {
+  if (!isDesktopApp()) return null;
+  return await invoke<HondaEcmIdentity>('diag_moto_honda_ecm_id');
 }
 
 export type HardwareVerificationTier =

@@ -16,10 +16,39 @@ import {
   bridgeDetachTransport,
   bridgeDiagClearDtcs,
   bridgeDiagEcuReset,
+  bridgeDiagLookupDtc,
+  bridgeDiagMotoClearDtcs,
+  bridgeDiagMotoHondaEcmId,
+  bridgeDiagMotoListPinouts,
+  bridgeDiagMotoReadDtcs,
+  bridgeDiagMotoReadLiveSensors,
   bridgeDiagProbeElmCapabilities,
   bridgeDiagReadDtcs,
   bridgeDiagReadEcuInfo,
+  bridgeDiagReadFreezeFrame,
+  bridgeDiagReadImReadiness,
+  bridgeDiagReadLivePids,
+  bridgeDiagReadMode06Monitors,
+  bridgeDiagScanEcuModules,
   bridgeDiagSendRawCommand,
+  bridgeDiagUdsEnterSession,
+  bridgeDiagUdsIoControl,
+  bridgeDiagUdsReadDids,
+  bridgeDiagUdsRoutineControl,
+  type DiscoveredEcuModule,
+  type DtcDescription,
+  type DtcRecord,
+  type FreezeFrameSummary,
+  type HondaEcmIdentity,
+  type ImReadinessSummary,
+  type Mode06TestResult,
+  type MotoCablePinout,
+  type MotoLiveSnapshot,
+  type MotoProtocolFamily,
+  type ObdLiveSnapshot,
+  type UdsDidValue,
+  type UdsIoControlOutcome,
+  type UdsRoutineOutcome,
   bridgeDumpEcu,
   bridgeDumpEcuUds23,
   bridgeFlashEcu,
@@ -49,14 +78,28 @@ export type FlashDeviceView = FlashDeviceDescriptor;
 export type DiscoveredDriverView = DiscoveredDriver;
 export type SerialPortView = SerialPortRow;
 export type {
+  DiscoveredEcuModule,
   DtcClearOutcome,
+  DtcDescription,
   DtcReadOutcome,
+  DtcRecord,
   EcuIdentitySummary,
   EcuResetMode,
   EcuResetOutcome,
   ElmBusProfile,
   ElmCapabilityReport,
+  FreezeFrameSummary,
+  HondaEcmIdentity,
+  ImReadinessSummary,
+  Mode06TestResult,
+  MotoCablePinout,
+  MotoLiveSnapshot,
+  MotoProtocolFamily,
+  ObdLiveSnapshot,
   TransportChoice,
+  UdsDidValue,
+  UdsIoControlOutcome,
+  UdsRoutineOutcome,
 };
 
 export const ELM_BUS_PROFILE_OPTIONS: Array<{ value: ElmBusProfile; label: string }> = [
@@ -478,28 +521,158 @@ async function runDiagCall<T>(fn: () => Promise<T | null>): Promise<FlashState<T
 }
 
 export function runReadEcuInfo(
-  fn: () => Promise<EcuIdentitySummary | null> = bridgeDiagReadEcuInfo
+  fn: (txCanId?: number) => Promise<EcuIdentitySummary | null> = bridgeDiagReadEcuInfo,
+  txCanId?: number
 ): Promise<FlashState<EcuIdentitySummary>> {
-  return runDiagCall(fn);
+  return runDiagCall(() => fn(txCanId));
 }
 
 export function runReadDtcs(
-  fn: () => Promise<DtcReadOutcome | null> = bridgeDiagReadDtcs
+  fn: (txCanId?: number) => Promise<DtcReadOutcome | null> = bridgeDiagReadDtcs,
+  txCanId?: number
 ): Promise<FlashState<DtcReadOutcome>> {
-  return runDiagCall(fn);
+  return runDiagCall(() => fn(txCanId));
 }
 
 export function runClearDtcs(
-  fn: () => Promise<DtcClearOutcome | null> = bridgeDiagClearDtcs
+  fn: (txCanId?: number) => Promise<DtcClearOutcome | null> = bridgeDiagClearDtcs,
+  txCanId?: number
 ): Promise<FlashState<DtcClearOutcome>> {
-  return runDiagCall(fn);
+  return runDiagCall(() => fn(txCanId));
 }
 
 export function runEcuReset(
   mode: EcuResetMode,
-  fn: (m: EcuResetMode) => Promise<EcuResetOutcome | null> = bridgeDiagEcuReset
+  fn: (m: EcuResetMode, txCanId?: number) => Promise<EcuResetOutcome | null> = bridgeDiagEcuReset,
+  txCanId?: number
 ): Promise<FlashState<EcuResetOutcome>> {
-  return runDiagCall(() => fn(mode));
+  return runDiagCall(() => fn(mode, txCanId));
+}
+
+export function runLookupDtc(
+  code: string,
+  fn: (c: string) => Promise<DtcDescription | null> = bridgeDiagLookupDtc
+): Promise<FlashState<DtcDescription>> {
+  if (code.trim() === '') {
+    return Promise.resolve({ kind: 'error', message: 'Enter a DTC code first.' });
+  }
+  return runDiagCall(() => fn(code));
+}
+
+export function runReadLivePids(
+  txCanId?: number,
+  pids?: number[],
+  fn: (tx?: number, p?: number[]) => Promise<ObdLiveSnapshot | null> = bridgeDiagReadLivePids
+): Promise<FlashState<ObdLiveSnapshot>> {
+  return runDiagCall(() => fn(txCanId, pids));
+}
+
+export function runReadImReadiness(
+  txCanId?: number,
+  fn: (tx?: number) => Promise<ImReadinessSummary | null> = bridgeDiagReadImReadiness
+): Promise<FlashState<ImReadinessSummary>> {
+  return runDiagCall(() => fn(txCanId));
+}
+
+export function runReadFreezeFrame(
+  txCanId?: number,
+  fn: (tx?: number) => Promise<FreezeFrameSummary | null> = bridgeDiagReadFreezeFrame
+): Promise<FlashState<FreezeFrameSummary>> {
+  return runDiagCall(() => fn(txCanId));
+}
+
+export function runReadMode06(
+  txCanId?: number,
+  mids?: number[],
+  fn: (tx?: number, m?: number[]) => Promise<Mode06TestResult[] | null> = bridgeDiagReadMode06Monitors
+): Promise<FlashState<Mode06TestResult[]>> {
+  return runDiagCall(() => fn(txCanId, mids));
+}
+
+export function runScanEcuModules(
+  include29bit = false,
+  fn: (ext: boolean) => Promise<DiscoveredEcuModule[] | null> = bridgeDiagScanEcuModules
+): Promise<FlashState<DiscoveredEcuModule[]>> {
+  return runDiagCall(() => fn(include29bit));
+}
+
+export function runUdsEnterSession(
+  sessionSubfunction: number,
+  txCanId?: number,
+  fn: (s: number, tx?: number) => Promise<string | null> = bridgeDiagUdsEnterSession
+): Promise<FlashState<string>> {
+  return runDiagCall(() => fn(sessionSubfunction, txCanId));
+}
+
+export function runUdsReadDids(
+  dids?: number[],
+  txCanId?: number,
+  fn: (d?: number[], tx?: number) => Promise<UdsDidValue[] | null> = bridgeDiagUdsReadDids
+): Promise<FlashState<UdsDidValue[]>> {
+  return runDiagCall(() => fn(dids, txCanId));
+}
+
+export function runUdsRoutineControl(
+  subfunction: number,
+  routineId: number,
+  optionRecord?: number[],
+  txCanId?: number,
+  fn: (
+    sub: number,
+    rid: number,
+    opt?: number[],
+    tx?: number
+  ) => Promise<UdsRoutineOutcome | null> = bridgeDiagUdsRoutineControl
+): Promise<FlashState<UdsRoutineOutcome>> {
+  return runDiagCall(() => fn(subfunction, routineId, optionRecord, txCanId));
+}
+
+export function runUdsIoControl(
+  did: number,
+  controlParam: number,
+  controlState?: number[],
+  txCanId?: number,
+  fn: (
+    d: number,
+    param: number,
+    st?: number[],
+    tx?: number
+  ) => Promise<UdsIoControlOutcome | null> = bridgeDiagUdsIoControl
+): Promise<FlashState<UdsIoControlOutcome>> {
+  return runDiagCall(() => fn(did, controlParam, controlState, txCanId));
+}
+
+export function runMotoListPinouts(
+  fn: () => Promise<MotoCablePinout[] | null> = bridgeDiagMotoListPinouts
+): Promise<FlashState<MotoCablePinout[]>> {
+  return runDiagCall(fn);
+}
+
+export function runMotoReadLiveSensors(
+  family: MotoProtocolFamily,
+  fn: (f: MotoProtocolFamily) => Promise<MotoLiveSnapshot | null> = bridgeDiagMotoReadLiveSensors
+): Promise<FlashState<MotoLiveSnapshot>> {
+  return runDiagCall(() => fn(family));
+}
+
+export function runMotoReadDtcs(
+  family: MotoProtocolFamily,
+  fn: (f: MotoProtocolFamily) => Promise<DtcReadOutcome | null> = bridgeDiagMotoReadDtcs
+): Promise<FlashState<DtcReadOutcome>> {
+  return runDiagCall(() => fn(family));
+}
+
+export function runMotoClearDtcs(
+  family: MotoProtocolFamily,
+  fn: (f: MotoProtocolFamily) => Promise<DtcClearOutcome | null> = bridgeDiagMotoClearDtcs
+): Promise<FlashState<DtcClearOutcome>> {
+  return runDiagCall(() => fn(family));
+}
+
+export function runMotoHondaEcmId(
+  fn: () => Promise<HondaEcmIdentity | null> = bridgeDiagMotoHondaEcmId
+): Promise<FlashState<HondaEcmIdentity>> {
+  return runDiagCall(fn);
 }
 
 export function runProbeElmCapabilities(

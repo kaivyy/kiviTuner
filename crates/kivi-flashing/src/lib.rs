@@ -113,6 +113,7 @@ pub mod kernel_session;
 pub mod kline_serial_device;
 pub mod lzss_container;
 pub mod module_registry;
+pub mod moto_diag;
 pub mod moto_ecu_db;
 pub mod nissan_hitachi;
 pub mod oem_checksum_crypto;

@@ -617,38 +617,47 @@ export const FlashPanel: React.FC<FlashPanelProps> = ({
     [pushLog]
   );
 
-  const handleReadEcuInfo = useCallback(() => {
-    void runDiagnosticAction(
-      'Scanning battery voltage & ECU identity...',
-      runReadEcuInfo,
-      setEcuInfoState,
-      summariseEcuInfo
-    );
-  }, [runDiagnosticAction]);
+  const handleReadEcuInfo = useCallback(
+    (txCanId?: number) => {
+      void runDiagnosticAction(
+        'Scanning battery voltage & ECU identity...',
+        () => runReadEcuInfo(undefined, txCanId),
+        setEcuInfoState,
+        summariseEcuInfo
+      );
+    },
+    [runDiagnosticAction]
+  );
 
-  const handleReadDtcs = useCallback(() => {
-    void runDiagnosticAction(
-      'Reading fault codes (DTCs) via UDS 0x19 / OBD Mode 03...',
-      runReadDtcs,
-      setDtcReadState,
-      summariseDtcRead
-    );
-  }, [runDiagnosticAction]);
+  const handleReadDtcs = useCallback(
+    (txCanId?: number) => {
+      void runDiagnosticAction(
+        'Reading fault codes (DTCs) via UDS 0x19 / OBD Mode 03...',
+        () => runReadDtcs(undefined, txCanId),
+        setDtcReadState,
+        summariseDtcRead
+      );
+    },
+    [runDiagnosticAction]
+  );
 
-  const handleClearDtcs = useCallback(() => {
-    void runDiagnosticAction(
-      'Clearing stored/pending DTCs (UDS 0x14 / OBD Mode 04)...',
-      runClearDtcs,
-      setDtcClearState,
-      (res) => `DTCs cleared via ${res.protocol_used}.`
-    );
-  }, [runDiagnosticAction]);
+  const handleClearDtcs = useCallback(
+    (txCanId?: number) => {
+      void runDiagnosticAction(
+        'Clearing stored/pending DTCs (UDS 0x14 / OBD Mode 04)...',
+        () => runClearDtcs(undefined, txCanId),
+        setDtcClearState,
+        (res) => `DTCs cleared via ${res.protocol_used}.`
+      );
+    },
+    [runDiagnosticAction]
+  );
 
   const handleEcuReset = useCallback(
-    (mode: EcuResetMode) => {
+    (mode: EcuResetMode, txCanId?: number) => {
       void runDiagnosticAction(
         `Sending UDS 0x11 ECU Reset (${mode})...`,
-        () => runEcuReset(mode),
+        () => runEcuReset(mode, undefined, txCanId),
         setEcuResetState,
         (res) => `ECU reset (${res.mode}) acknowledged.`
       );
@@ -1386,10 +1395,13 @@ export const FlashPanel: React.FC<FlashPanelProps> = ({
               dtcReadState={dtcReadState}
               dtcClearState={dtcClearState}
               ecuResetState={ecuResetState}
+              elmCapabilities={elmCapabilities}
               onReadEcuInfo={handleReadEcuInfo}
               onReadDtcs={handleReadDtcs}
               onClearDtcs={handleClearDtcs}
               onEcuReset={handleEcuReset}
+              onProbeElmCapabilities={() => void handleProbeElmCapabilities()}
+              onLog={pushLog}
             />
           )}
 

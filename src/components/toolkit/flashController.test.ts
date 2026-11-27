@@ -556,3 +556,104 @@ test('Phase 1 ELM Wi-Fi, K-Line, configured serial, protocol override, and capab
     assert.equal(okCaps.data.chip_tier, 'pic18_v15_compatible');
   }
 });
+
+test('Phase 2 and Phase 3 diagnostic controller helpers validate and forward data cleanly', async () => {
+  const {
+    runLookupDtc,
+    runReadLivePids,
+    runReadImReadiness,
+    runReadFreezeFrame,
+    runReadMode06,
+    runScanEcuModules,
+    runUdsEnterSession,
+    runUdsReadDids,
+    runUdsRoutineControl,
+    runUdsIoControl,
+    runMotoListPinouts,
+    runMotoReadLiveSensors,
+    runMotoReadDtcs,
+    runMotoClearDtcs,
+    runMotoHondaEcmId,
+  } = await import('./flashController.ts');
+
+  const emptyDtc = await runLookupDtc('   ');
+  assert.equal(emptyDtc.kind, 'error');
+
+  const dtcOk = await runLookupDtc('P0171', async (code) => ({
+    code,
+    system: 'Fuel Trim',
+    summary: 'System Too Lean (Bank 1)',
+    probable_causes: ['Vacuum leak'],
+    severity: 'moderate',
+  }));
+  assert.equal(dtcOk.kind, 'ok');
+
+  const liveOk = await runReadLivePids(0x7e0, [0x0c], async () => ({
+    protocol: 'Iso15765',
+    tx_can_id: 0x7e0,
+    supported_pids: [0x0c],
+    readings: [
+      {
+        pid: 0x0c,
+        pid_hex: '0x0C',
+        name: 'Engine Speed',
+        category: 'Engine',
+        value: 2000,
+        display: '2000 RPM',
+        unit: 'RPM',
+        raw_hex: '1F 40',
+      },
+    ],
+    notes: [],
+  }));
+  assert.equal(liveOk.kind, 'ok');
+
+  assert.equal((await runReadImReadiness(0x7e0, async () => null)).kind, 'no-backend');
+  assert.equal((await runReadFreezeFrame(0x7e0, async () => null)).kind, 'no-backend');
+  assert.equal((await runReadMode06(0x7e0, undefined, async () => [])).kind, 'ok');
+  assert.equal((await runScanEcuModules(false, async () => [])).kind, 'ok');
+  assert.equal((await runUdsEnterSession(3, 0x7e0, async () => '0x03')).kind, 'ok');
+  assert.equal((await runUdsReadDids([0xf190], 0x7e0, async () => [])).kind, 'ok');
+  assert.equal(
+    (
+      await runUdsRoutineControl(1, 0xf001, undefined, 0x7e0, async () => ({
+        routine_id: 0xf001,
+        subfunction: 1,
+        acknowledged: true,
+        response_hex: '71 01 F0 01',
+        notes: [],
+      }))
+    ).kind,
+    'ok'
+  );
+  assert.equal(
+    (
+      await runUdsIoControl(0x1234, 0, undefined, 0x7e0, async () => ({
+        did: 0x1234,
+        control_param: 0,
+        acknowledged: true,
+        response_hex: '6F 12 34 00',
+        notes: [],
+      }))
+    ).kind,
+    'ok'
+  );
+  assert.equal((await runMotoListPinouts(async () => [])).kind, 'ok');
+  assert.equal(
+    (
+      await runMotoReadLiveSensors('honda_kline', async () => ({
+        family: 'honda_kline',
+        protocol: 'Honda K-Line',
+        ecm_id: '01002B0101',
+        matched_profile: null,
+        sensors: [],
+        raw_hex: '',
+        notes: [],
+      }))
+    ).kind,
+    'ok'
+  );
+  assert.equal((await runMotoReadDtcs('honda_kline', async () => null)).kind, 'no-backend');
+  assert.equal((await runMotoClearDtcs('yamaha_kline', async () => null)).kind, 'no-backend');
+  assert.equal((await runMotoHondaEcmId(async () => null)).kind, 'no-backend');
+});

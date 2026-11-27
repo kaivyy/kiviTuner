@@ -3,6 +3,11 @@
 
 use crate::flash_commands::FlashEngineState;
 use kivi_flashing::dtc_dictionary::{lookup_dtc_description, DtcDescription};
+use kivi_flashing::moto_diag::{
+    honda_kline_read_ecm_id, list_moto_cable_pinouts, moto_clear_dtcs, moto_read_dtcs,
+    moto_read_live_sensors, HondaEcmIdentity, MotoCablePinout, MotoLiveSnapshot,
+    MotoProtocolFamily,
+};
 use kivi_flashing::quick_diag::{
     clear_dtcs_for_can_id, ecu_reset_for_can_id, read_dtcs_for_can_id, read_ecu_identity_for_can_id,
     DtcClearOutcome, DtcReadOutcome, EcuIdentitySummary, EcuResetMode, EcuResetOutcome,
@@ -185,6 +190,40 @@ pub fn diag_uds_io_control_inner(
     })
 }
 
+/// Lists modified motorcycle-to-OBD16 DLC pinout guides.
+pub fn diag_moto_list_pinouts_inner() -> Vec<MotoCablePinout> {
+    list_moto_cable_pinouts()
+}
+
+/// Reads live motorcycle telemetry sensors for the selected brand/protocol family.
+pub fn diag_moto_read_live_sensors_inner(
+    family: MotoProtocolFamily,
+    state: &FlashEngineState,
+) -> Result<MotoLiveSnapshot, String> {
+    state.with_attached_device(|dev| moto_read_live_sensors(dev, family).map_err(|e| e.to_string()))
+}
+
+/// Reads motorcycle DTCs or Honda PGM-FI blink codes.
+pub fn diag_moto_read_dtcs_inner(
+    family: MotoProtocolFamily,
+    state: &FlashEngineState,
+) -> Result<DtcReadOutcome, String> {
+    state.with_attached_device(|dev| moto_read_dtcs(dev, family).map_err(|e| e.to_string()))
+}
+
+/// Clears motorcycle DTC memory for the selected protocol family.
+pub fn diag_moto_clear_dtcs_inner(
+    family: MotoProtocolFamily,
+    state: &FlashEngineState,
+) -> Result<DtcClearOutcome, String> {
+    state.with_attached_device(|dev| moto_clear_dtcs(dev, family).map_err(|e| e.to_string()))
+}
+
+/// Reads the 5-byte Honda PGM-FI ECM Identifier and matches motorcycle flash boundary profiles.
+pub fn diag_moto_honda_ecm_id_inner(state: &FlashEngineState) -> Result<HondaEcmIdentity, String> {
+    state.with_attached_device(|dev| honda_kline_read_ecm_id(dev).map_err(|e| e.to_string()))
+}
+
 /// Probes ELM327 / STN clone firmware capabilities (`ATSH`, `ATCAF0`, K-Line, `STDI`).
 pub fn diag_probe_elm_capabilities_inner(
     state: &FlashEngineState,
@@ -321,6 +360,40 @@ pub fn diag_uds_io_control(
     state: State<'_, FlashEngineState>,
 ) -> Result<UdsIoControlOutcome, String> {
     diag_uds_io_control_inner(tx_can_id, did, control_param, control_state, &state)
+}
+
+#[tauri::command]
+pub fn diag_moto_list_pinouts() -> Vec<MotoCablePinout> {
+    diag_moto_list_pinouts_inner()
+}
+
+#[tauri::command]
+pub fn diag_moto_read_live_sensors(
+    family: MotoProtocolFamily,
+    state: State<'_, FlashEngineState>,
+) -> Result<MotoLiveSnapshot, String> {
+    diag_moto_read_live_sensors_inner(family, &state)
+}
+
+#[tauri::command]
+pub fn diag_moto_read_dtcs(
+    family: MotoProtocolFamily,
+    state: State<'_, FlashEngineState>,
+) -> Result<DtcReadOutcome, String> {
+    diag_moto_read_dtcs_inner(family, &state)
+}
+
+#[tauri::command]
+pub fn diag_moto_clear_dtcs(
+    family: MotoProtocolFamily,
+    state: State<'_, FlashEngineState>,
+) -> Result<DtcClearOutcome, String> {
+    diag_moto_clear_dtcs_inner(family, &state)
+}
+
+#[tauri::command]
+pub fn diag_moto_honda_ecm_id(state: State<'_, FlashEngineState>) -> Result<HondaEcmIdentity, String> {
+    diag_moto_honda_ecm_id_inner(&state)
 }
 
 #[tauri::command]
@@ -537,5 +610,27 @@ mod tests {
         assert!(routine.acknowledged);
         let io = diag_uds_io_control_inner(None, 0x1234, 0x00, None, &state).unwrap();
         assert!(io.acknowledged);
+
+        assert!(diag_moto_list_pinouts_inner().len() >= 6);
+        let mut moto_dev = MockDevice::new(DeviceKind::KLineSerial, "Moto KKL", TransportKind::Serial);
+        moto_dev.open().unwrap();
+        moto_dev.connect(ProtocolId::Iso14230, 10_400).unwrap();
+        moto_dev.set_script(vec![
+            ScriptedReply::Message(PassThruMsg::new(ProtocolId::Iso14230, vec![0x02, 0x04, 0x00, 0xFA])),
+            ScriptedReply::Message(PassThruMsg::new(
+                ProtocolId::Iso14230,
+                vec![0x02, 0x0A, 0x71, 0x00, 0x01, 0x00, 0x2B, 0x01, 0x01, 0x57],
+            )),
+        ]);
+        let dummy = MockDevice::new(DeviceKind::KLineSerial, "Dummy", TransportKind::Serial);
+        let sess = UdsHardwareKernelSession::new(SharedDevice::new(Box::new(dummy)), 0x10_000);
+        let moto_state = FlashEngineState::default();
+        moto_state.attach_custom_transport(
+            Box::new(moto_dev),
+            Box::new(sess),
+            TransportChoice::KLineSerial,
+        );
+        let ecm = diag_moto_honda_ecm_id_inner(&moto_state).unwrap();
+        assert_eq!(ecm.ecm_id_hex, "01002B0101");
     }
 }
