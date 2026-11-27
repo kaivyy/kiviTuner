@@ -22,7 +22,7 @@ Regular commits pushed to `main` or feature branches do not run installer builds
 
 | Action | Trigger | Result |
 |---|---|---|
-| Release tag build | `git tag -a vX.Y.Z -m "kiviTuner vX.Y.Z" && git push origin vX.Y.Z` | Builds all 5 OS targets and auto-publishes the release via `publish-release` once all 5 pass. |
+| Release tag build | `git tag -a vX.Y.Z -m "kiviTuner vX.Y.Z" && git push origin vX.Y.Z` | Builds all 5 OS targets, uploads `SHA256SUMS.txt` (and signed updater metadata if `TAURI_SIGNING_PRIVATE_KEY` / `TAURI_UPDATER_PUBKEY` secrets are configured using [tauri.updater.conf.json](../../src-tauri/tauri.updater.conf.json)), and publishes the release via `publish-release`. |
 | Manual on-demand build | GitHub **Actions** -> **Build Desktop Installers** -> **Run workflow** | Builds all 5 OS targets and leaves artifacts on a Draft Release for inspection. |
 
 See [releasing.md](releasing.md) for the full manifest version-bump checklist.

@@ -4,6 +4,29 @@ All notable changes to kiviTuner are documented in this file.
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-11-28
+
+Maintenance and usability release ([v0.1.1 Release](https://github.com/kaivyy/kiviTuner/releases/tag/v0.1.1)) covering multi-transport diagnostics, structural `blind_v2` discovery upgrades, desktop windowing stability, 3D surface overhaul, and built-in app updates.
+
+### Added
+
+- Built-in desktop update checker and installer (`src-tauri/src/updater.rs`, `UpdateModal`, `Help -> Check for Updates...`) verifying downloaded packages against `SHA256SUMS.txt` and supporting one-click restart, plus optional Tauri updater signature bundles.
+- Expanded `blind_v2` structural discovery (`crates/kivi-scanner`) with `u8`-header OEM 2D/1D struct scanners, signed `i16`/`i8` zero-crossing detection, Fisher-Yates Twin-ROM null-control audit benchmarks (`modern_ecu_blind_audit_test`), and enriched starter classifier rules.
+- Full 5-tab OBD-II, UDS, and motorcycle diagnostic cockpit (54+ Mode `01` PIDs, Mode `02` freeze frames, Mode `06` monitors, Mode `0A` permanent DTCs, UDS `0x10`/`0x22`/`0x31`/`0x2F` active tests, Honda 4-pin / Euro 5 CAN / Yamaha / Kawasaki KDS / Suzuki SDS, and interactive Modified DLC Pinout Guide).
+
+### Improved
+
+- Upgraded `Surface3DView` with camera-aware 3D wireframe bounding cage, adaptive non-overlapping X/Y/Z axis ticks, right-edge calibrated color-scale legend, Lambertian quad shading, drop skirts, base ROM ghost overlay, bottom Z-Scale bar, and flex-wrapping toolbar controls.
+- Replaced flat Map Explorer text entries with recursive collapsible category folders (`Auto-Detected / 2D Tables`, `Auto-Detected / 1D Curves`, plus definition folders), `Expand all` / `Collapse all` actions, and clean parameter naming.
+- Added a 32-entry LRU matrix extraction cache (`useMapStore`) and cross-window state synchronization (`workspaceSyncBridge`) with full 10-tool desktop pop-out support and bottom `StatusBar` restore chips for minimized in-app tool windows.
+
+### Fixed
+
+- Fixed Windows WebView2 freeze / Not Responding and missing titlebar dragging when opening standalone tool windows (`How to Use kiviTuner` and siblings) by dispatching `open_tool_window` asynchronously, removing DWM blur layers, eliminating broadcast self-echoes, lazy-loading tool bundles, and adding native `startDragging` coverage across the entire titlebar.
+- Fixed crushed/overlapping 2D table columns inside `Split 3D` and `Split Wave` layouts by enforcing readable minimum cell widths and horizontal table scrolling.
+- Fixed runaway vertical canvas height / infinite downward scrollbar growth in `Full 3D` mode by isolating `ResizeObserver` to a fixed-bounds host container.
+- Fixed layout state lock preventing switching directly back from `Split 3D` or `Full 3D` to `2D Table`.
+
 ## [0.1.0] - 2026-11-27
 
 Initial public open-source release under the MIT License ([v0.1.0 Release](https://github.com/kaivyy/kiviTuner/releases/tag/v0.1.0)).

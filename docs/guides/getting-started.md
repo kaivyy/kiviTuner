@@ -19,16 +19,17 @@ When a ROM loads, kiviTuner keeps an immutable snapshot of the original bytes (`
 
 ## 3. Browse and Organize Maps in Map Explorer
 
-Use the `Map Explorer` sidebar on the left to locate tables inside your loaded definition:
+Use the `Map Explorer` sidebar on the left to locate tables inside your loaded definition or discovery scan:
 
 | Control | Purpose |
 |---|---|
-| Search box | Filters tables by parameter name or category |
+| Collapsible Category Folders | Organizes parameters into nested `/` folders (`Fuel / Main Injection`, `Auto-Detected / 2D Tables`, etc.) with `Expand all` and `Collapse all` buttons |
+| Search box | Filters tables by parameter name or category and auto-expands matching folders |
 | `All` / `2D` / `1D` / `1x1` pills | Narrows the tree to 2D matrices, 1D curves, or single-value scalars/flags |
 | `+` button or `Definition (XDF) -> Create New...` | Creates a `Table 2D/3D`, `Axis 1D`, `1x1 Scalar`, or `Bitmask Flag` manually |
-| `Potential Maps` folder | Lists map candidates discovered by heuristic or `blind_v2` scans for review |
+| `Candidate Regions` drawer | Lists heuristic and structural map candidates with jump-to-hex and one-click promote |
 
-Right-click a map in `Map Explorer` (or toggle Split View in `WorkspaceTabBar`) to place two maps side by side.
+Right-click or click the Split icon on any map in `Map Explorer` (or toggle Split View in `WorkspaceTabBar`) to inspect two maps side by side.
 
 ## 4. Discover Maps Without a Definition
 
@@ -49,7 +50,7 @@ If you open an undefined binary image, combine `Discovery Scanner`, `Hexdump Pro
 3. Modify values with `Enter`, `+` / `-` (step increment), `=` (set constant), or `%` / `*` (percentage/factor scale), or use `Edit & Table Math` in the top menu bar.
 4. Smooth transitions with `S` (3x3 Gaussian smooth) or fill between boundary cells with `I` (bilinear), `H` (horizontal), or `V` (vertical).
 5. Switch display modes between `Engineering`, `Raw Hex`, `Raw Dec`, `Delta`, and `% Delta` against the immutable stock baseline.
-6. Press `Ctrl+\` (or `View & Workspace -> Layout Presets -> Split 2D+3D`) to inspect a 3D surface mesh alongside the 2D grid. Maps sized `1xN` or `Nx1` automatically display the draggable `CurveProfileChart` with a dashed stock reference curve.
+6. Press `Ctrl+\` (or choose `Split 3D` / `Full 3D` in the workspace toolbar) to inspect a calibrated 3D surface mesh with bounding cage, axis ticks, and color legend alongside a scrollable 2D table, or click `2D Table` to switch right back. Maps sized `1xN` or `Nx1` automatically display the draggable `CurveProfileChart` with a dashed stock reference curve.
 
 ### 1x1 Scalars and Bitmask Flags
 
@@ -77,3 +78,8 @@ Use `Ctrl+Z` / `Ctrl+Y` to step through edit history. Press `Backspace` or `Dele
    - **Motorcycle Lab**: Connect to Honda 4-pin PGM-FI K-Line (`0x72` Table `0x11`/`0x73`/`0x74`/`0x60`), Euro 5 CAN, Yamaha 3/4-pin K-Line, Kawasaki KDS, or Suzuki SDS using the built-in **Modified DLC Pinout Guide**.
    - **Raw Terminal**: Send direct `AT`, OBD, or K-Line hex commands interactively.
 4. Before writing any tuned image to physical hardware, install the required interface driver from [Drivers and Hardware Interfaces](../hardware/drivers-and-interfaces.md) and complete every item in [Hardware Bench Validation Guide](hardware-bench-validation.md). Remember that ELM327 adapters are read/diagnostic-only and cannot flash ECU ROMs.
+
+## 8. Keep kiviTuner Up to Date
+
+1. Desktop builds check GitHub Releases asynchronously shortly after startup and display an update pill in the top menu bar when a newer tag is available.
+2. Open `Help -> Check for Updates...` at any time to inspect release notes, verify package integrity against `SHA256SUMS.txt`, download the platform installer, and restart straight into the updated release.
