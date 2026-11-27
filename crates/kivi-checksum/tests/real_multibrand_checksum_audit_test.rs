@@ -84,12 +84,14 @@ fn real_multibrand_oem_checksum_stock_mutate_fail_repair_diff_audit() {
         "ROM", "SizeKB", "DetectedAlgo", "StockOK", "MutateFail", "RepairOK", "RepairBytes"
     );
 
+    let mut present_roms = 0usize;
     let mut verified_roundtrips = 0usize;
     for &(label, path_str) in real_roms {
         if !Path::new(path_str).exists() {
             eprintln!("{:<24} {:>8} {:<24}", label, "-", "MISSING");
             continue;
         }
+        present_roms += 1;
         let rom = std::fs::read(path_str).expect("read ROM");
         let reports = auto_detect_oem_checksums(&rom);
         if reports.is_empty() {
@@ -185,6 +187,13 @@ fn real_multibrand_oem_checksum_stock_mutate_fail_repair_diff_audit() {
             );
             verified_roundtrips += 1;
         }
+    }
+
+    if present_roms == 0 {
+        eprintln!(
+            "Skipping real-ROM roundtrip threshold: local OEM ROM corpus is not present on this host."
+        );
+        return;
     }
 
     assert!(
