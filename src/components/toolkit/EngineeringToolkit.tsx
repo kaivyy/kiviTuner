@@ -1,6 +1,7 @@
 import React, { useState, useCallback, useRef } from 'react';
 import { Calculator, Gauge, Cpu, AlertTriangle } from 'lucide-react';
 import { FloatingWindow, useFloatingWindowContext } from '../layout/FloatingWindow';
+import { HorizontalScrollStrip } from '../layout/HorizontalScrollStrip';
 import { TOOL_WINDOW_SPECS } from '../layout/toolWindowRegistry';
 import type {
   AirMassResult,
@@ -129,10 +130,17 @@ const ToolkitResponsiveLayout: React.FC<{
   return (
     <>
       {isCompact && (
-        <div
+        <HorizontalScrollStrip
           role="tablist"
-          aria-label="Engineering calculator tools compact"
-          className="no-scrollbar flex shrink-0 items-center gap-1.5 overflow-x-auto border-b border-kiviBorder bg-kiviBg px-3 py-2"
+          ariaLabel="Engineering calculator tools compact"
+          stripTestId="toolkit-compact-tab-strip"
+          depKey={tab}
+          activeSelector='[aria-selected="true"]'
+          className="h-10 border-b border-kiviBorder bg-kiviBg px-2.5"
+          stripClassName="gap-1.5"
+          arrowSize="xs"
+          scrollLeftLabel="Scroll toolkit tools left"
+          scrollRightLabel="Scroll toolkit tools right"
         >
           {TABS.map((t) => (
             <button
@@ -141,7 +149,7 @@ const ToolkitResponsiveLayout: React.FC<{
               role="tab"
               aria-selected={tab === t.id}
               onClick={() => setTab(t.id)}
-              className={`shrink-0 whitespace-nowrap rounded-md border px-2.5 py-1 text-[11px] font-medium transition-colors ${
+              className={`flex h-7 shrink-0 items-center whitespace-nowrap rounded-md border px-2.5 text-[11px] font-medium transition-colors ${
                 tab === t.id
                   ? 'border-kiviAccent/50 bg-kiviAccent/15 text-kiviAccent'
                   : 'border-kiviBorder bg-kiviSurface text-kiviSecondary hover:text-kiviInk'
@@ -150,7 +158,7 @@ const ToolkitResponsiveLayout: React.FC<{
               {t.label}
             </button>
           ))}
-        </div>
+        </HorizontalScrollStrip>
       )}
 
       <div className="flex min-h-0 flex-1 flex-row overflow-hidden">

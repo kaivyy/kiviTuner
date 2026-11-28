@@ -198,6 +198,120 @@ pub async fn open_tool_window(spec: ToolWindowSpec, app: AppHandle) -> Result<St
     Ok(label)
 }
 
+/// Builds a deterministic window label (`kivi-tab-<sanitized>`) matching capability pattern `kivi-*`.
+pub fn sanitize_tab_window_label(tab_id: &str) -> String {
+    let mut slug = String::new();
+    for ch in tab_id.chars() {
+        if slug.len() >= 36 {
+            break;
+        }
+        if ch.is_ascii_alphanumeric() {
+            slug.push(ch.to_ascii_lowercase());
+        } else if (ch == '-' || ch == '_' || ch == ':') && !slug.ends_with('-') && !slug.is_empty() {
+            slug.push('-');
+        }
+    }
+    while slug.ends_with('-') {
+        slug.pop();
+    }
+    if slug.is_empty() {
+        slug.push_str("view");
+    }
+    format!("kivi-tab-{slug}")
+}
+
+/// Percent-encodes UTF-8 bytes for URL query parameter values without external crates.
+pub fn encode_query_component(raw: &str) -> String {
+    const HEX: &[u8; 16] = b"0123456789ABCDEF";
+    let mut out = String::with_capacity(raw.len());
+    for &b in raw.as_bytes() {
+        let is_unreserved = b.is_ascii_alphanumeric() || matches!(b, b'-' | b'_' | b'.' | b'~');
+        if is_unreserved {
+            out.push(b as char);
+        } else {
+            out.push('%');
+            out.push(HEX[(b >> 4) as usize] as char);
+            out.push(HEX[(b & 0x0F) as usize] as char);
+        }
+    }
+    out
+}
+
+/// Request payload to pop a workspace tab out into a frameless secondary desktop window.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct TabWindowSpec {
+    pub tab_id: String,
+    pub kind: String,
+    pub title: String,
+    pub map_id: Option<String>,
+    pub width: Option<f64>,
+    pub height: Option<f64>,
+}
+
+/// Opens or focuses a separate frameless OS window hosting a detached workspace tab.
+#[tauri::command]
+pub async fn open_workspace_tab_window(
+    spec: TabWindowSpec,
+    app: AppHandle,
+) -> Result<String, String> {
+    let label = sanitize_tab_window_label(&spec.tab_id);
+    if let Some(existing) = app.get_webview_window(&label) {
+        let _ = existing.unminimize();
+        let _ = existing.show();
+        existing
+            .set_focus()
+            .map_err(|e| format!("failed to focus tab window '{label}': {e}"))?;
+        return Ok(label);
+    }
+
+    let min_w = 420.0;
+    let min_h = 340.0;
+    let width = spec
+        .width
+        .filter(|w| w.is_finite())
+        .map_or(860.0, |w| w.max(min_w));
+    let height = spec
+        .height
+        .filter(|h| h.is_finite())
+        .map_or(620.0, |h| h.max(min_h));
+
+    let clean_title = if spec.title.trim().is_empty() {
+        "kiviTuner Workspace".to_string()
+    } else {
+        spec.title.trim().to_string()
+    };
+
+    let mut route = format!(
+        "index.html?window=tab&tabId={}&kind={}&title={}",
+        encode_query_component(&spec.tab_id),
+        encode_query_component(&spec.kind),
+        encode_query_component(&clean_title),
+    );
+    if let Some(ref map_id) = spec.map_id {
+        if !map_id.trim().is_empty() {
+            route.push_str("&mapId=");
+            route.push_str(&encode_query_component(map_id));
+        }
+    }
+
+    let created = WebviewWindowBuilder::new(&app, &label, WebviewUrl::App(route.into()))
+        .title(&clean_title)
+        .decorations(false)
+        .shadow(true)
+        .resizable(true)
+        .background_color(tauri::webview::Color(10, 13, 18, 255))
+        .additional_browser_args(WEBVIEW_LOW_MEM_ARGS)
+        .inner_size(width, height)
+        .min_inner_size(min_w, min_h)
+        .center()
+        .build()
+        .map_err(|e| format!("failed to create tab window '{label}': {e}"))?;
+
+    apply_native_window_chrome(&created);
+
+    Ok(label)
+}
+
 /// Closes a secondary tool window if it is currently open.
 #[tauri::command]
 pub async fn close_tool_window(tool_id: ToolWindowKind, app: AppHandle) -> Result<bool, String> {
@@ -291,5 +405,21 @@ mod tests {
             normalize_window_dimensions(&large),
             (980.0, 760.0, 600.0, 480.0)
         );
+    }
+
+    #[test]
+    fn sanitize_tab_window_label_matches_capability_prefix() {
+        assert_eq!(sanitize_tab_window_label("map:fuel_ve_16x16"), "kivi-tab-map-fuel-ve-16x16");
+        assert_eq!(sanitize_tab_window_label(":::"), "kivi-tab-view");
+        let long = "a".repeat(80);
+        let label = sanitize_tab_window_label(&long);
+        assert!(label.starts_with("kivi-tab-"));
+        assert!(label.len() <= 45);
+    }
+
+    #[test]
+    fn encode_query_component_escapes_reserved_bytes() {
+        assert_eq!(encode_query_component("Main Fuel VE (3D)"), "Main%20Fuel%20VE%20%283D%29");
+        assert_eq!(encode_query_component("map:fuel_1"), "map%3Afuel_1");
     }
 }

@@ -17,7 +17,7 @@ export type WorkspaceSyncEvent =
   | { type: 'update-map-scaling'; mapId: string; equation: string }
   | { type: 'jump-waveform'; startAddr: number; endAddr: number }
   | { type: 'diffs-updated'; diffs: DiffRegion[] }
-  | { type: 'rom-updated'; checksumOk?: boolean }
+  | { type: 'rom-updated'; checksumOk?: boolean; activeDocId?: string | null; revision?: number }
   | { type: 'request-snapshot' }
   | { type: 'workspace-snapshot'; maps: MapDef[]; selectedMapId: string | null; diffs: DiffRegion[] };
 

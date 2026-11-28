@@ -3,7 +3,7 @@ import { useMapStore } from './stores/useMapStore';
 import { useTelemetryStore } from './stores/useTelemetryStore';
 import { useCorrelationStore } from './stores/useCorrelationStore';
 import { useThemeStore, applyThemeToDocument } from './stores/useThemeStore';
-import { useWorkspaceTabsStore } from './stores/useWorkspaceTabsStore';
+import { useWorkspaceTabsStore, type WorkspaceTab } from './stores/useWorkspaceTabsStore';
 import { useUpdateStore } from './stores/useUpdateStore';
 import {
   groupMapsByCategory,
@@ -16,7 +16,10 @@ import {
 } from './components/editor';
 import { KiviMenuBar, type MenuBarCallbacks } from './components/layout';
 import { openToolOrFloating } from './components/layout/toolWindowRegistry';
-import { generateAxisLabels, resolveDisplayAxisLabels } from './lib/matrixRom';
+import { focusFloatingWindow } from './components/layout/floatingWindowModel';
+import { computePanelResize } from './components/layout/resizeModel';
+import { SplitResizeHandle } from './components/layout/SplitResizeHandle';
+import { resolveEffectiveMapAxes } from './lib/matrixRom';
 import {
   buildCalibrationReportMarkdown,
   downloadTextFile,
@@ -49,12 +52,18 @@ import {
   resolveActiveRailItem,
   type ActivityRailItemId,
 } from './components/workspace/activityRailModel';
+import {
+  resolveRightDockAnimState,
+  toggleRightDockPanel,
+  type RightDockPanel,
+} from './components/workspace/rightDockModel';
 import { MapTreeSidebar } from './components/workspace/MapTreeSidebar';
 import { WorkspaceViewport } from './components/workspace/WorkspaceViewport';
 import { ScannerDrawer } from './components/workspace/ScannerDrawer';
 import { InspectorSidebar } from './components/workspace/InspectorSidebar';
 import { StatusBar } from './components/workspace/StatusBar';
 import { WorkspaceTabBar } from './components/workspace/WorkspaceTabBar';
+import { DetachedWorkspaceWindow } from './components/workspace/DetachedWorkspaceWindow';
 import { ActivityRail, MobileBottomNav } from './components/workspace/ActivityRail';
 import { CommandPalette, type CommandPaletteAction } from './components/workspace/CommandPalette';
 import { buildCommandPaletteActions } from './lib/workspaceActions';
@@ -167,16 +176,23 @@ export const App: React.FC = () => {
 
   const {
     tabs,
+    detachedTabs,
     activeTabId,
     splitTabId,
+    splitRatio,
     openTab,
     activateTab,
     closeTab,
     togglePinTab,
     setTabKind,
+    detachTab,
+    dockTab,
+    closeDetachedTab,
+    setDetachedTabKind,
     openInSplit,
     closeSplit,
     toggleSplitView,
+    setSplitRatio,
     syncMapTab,
   } = useWorkspaceTabsStore();
 
@@ -213,14 +229,58 @@ export const App: React.FC = () => {
   const importDefInputRef = useRef<HTMLInputElement>(null);
   const heatmapActionRef = useRef<HeatmapTableHandle | null>(null);
   const noticeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const workspaceRowRef = useRef<HTMLDivElement | null>(null);
+  const explorerOriginXRef = useRef<number>(44);
+  const rightDockOriginXRef = useRef<number>(1440);
+  const explorerCollapseRef = useRef<boolean>(false);
+  const rightDockCollapseRef = useRef<boolean>(false);
+  const remoteRomSyncRef = useRef<number | null>(null);
+
+  const EXPLORER_DEFAULT_W = 264;
+  const EXPLORER_MIN_W = 180;
+  const EXPLORER_MAX_W = 440;
+  const EXPLORER_COLLAPSE_THRESHOLD = 140;
+
+  const RIGHT_DOCK_DEFAULT_W = 280;
+  const RIGHT_DOCK_MIN_W = 220;
+  const RIGHT_DOCK_MAX_W = 480;
+  const RIGHT_DOCK_COLLAPSE_THRESHOLD = 160;
+
+  const [explorerWidth, setExplorerWidth] = useState<number>(EXPLORER_DEFAULT_W);
+  const [isResizingExplorer, setIsResizingExplorer] = useState<boolean>(false);
+  const [explorerCollapsePreview, setExplorerCollapsePreview] = useState<boolean>(false);
+
+  const [rightDockWidth, setRightDockWidth] = useState<number>(RIGHT_DOCK_DEFAULT_W);
+  const [isResizingRightDock, setIsResizingRightDock] = useState<boolean>(false);
+  const [rightDockCollapsePreview, setRightDockCollapsePreview] = useState<boolean>(false);
 
   const [layoutPreset, setLayoutPreset] = useState<LayoutPreset>('standard');
   const [showMapTree, setShowMapTree] = useState<boolean>(() =>
     typeof window !== 'undefined' ? window.innerWidth >= 1024 : true
   );
-  const [showInspector, setShowInspector] = useState<boolean>(() =>
-    typeof window !== 'undefined' ? window.innerWidth >= 1400 : false
+  const [activeRightPanel, setActiveRightPanel] = useState<RightDockPanel | null>(() =>
+    typeof window !== 'undefined' && window.innerWidth >= 1400 ? 'inspector' : null
   );
+  const [lastRightPanel, setLastRightPanel] = useState<RightDockPanel>('inspector');
+  const [wasRightPanelSwapped, setWasRightPanelSwapped] = useState<boolean>(false);
+  const activeRightPanelRef = useRef<RightDockPanel | null>(activeRightPanel);
+  activeRightPanelRef.current = activeRightPanel;
+
+  const setRightPanel = useCallback((next: RightDockPanel | null) => {
+    const prev = activeRightPanelRef.current;
+    if (prev === next) return;
+    activeRightPanelRef.current = next;
+    if (next !== null) {
+      setLastRightPanel(next);
+      setWasRightPanelSwapped(prev !== null && prev !== next);
+    } else {
+      setWasRightPanelSwapped(false);
+    }
+    setActiveRightPanel(next);
+  }, []);
+
+  const showInspector = activeRightPanel === 'inspector';
+  const isScannerDrawerOpen = activeRightPanel === 'scanner';
   const [focusedRailItem, setFocusedRailItem] = useState<ActivityRailItemId | null>(null);
 
   useEffect(() => {
@@ -230,8 +290,7 @@ export const App: React.FC = () => {
       const isWide = window.innerWidth >= 1024;
       if (wasWide && !isWide) {
         setShowMapTree(false);
-        setShowInspector(false);
-        setIsScannerDrawerOpen(false);
+        setRightPanel(null);
       } else if (!wasWide && isWide) {
         setShowMapTree(true);
       }
@@ -239,7 +298,7 @@ export const App: React.FC = () => {
     };
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
-  }, []);
+  }, [setRightPanel]);
   const [tableSelection, setTableSelection] = useState<SelectionRange | null>(null);
   const [displayMode, setDisplayMode] = useState<CellDisplayMode>('engineering');
   const [palette, setPalette] = useState<TablePalette>('classic');
@@ -298,13 +357,26 @@ export const App: React.FC = () => {
   const mapTree = useMemo(() => filterMapTree(groupedMaps, mapFilter), [groupedMaps, mapFilter]);
   const totalMaps = useMemo(() => countMaps(groupedMaps), [groupedMaps]);
 
-  const [isScannerDrawerOpen, setIsScannerDrawerOpen] = useState<boolean>(false);
   const mapTreePresence = useAnimatedPresence(showMapTree, 120);
-  const inspectorPresence = useAnimatedPresence(showInspector, 120);
+  const rightDockPresence = useAnimatedPresence(activeRightPanel !== null, 120);
   const drawerBackdropPresence = useAnimatedPresence(
-    showMapTree || showInspector || isScannerDrawerOpen,
+    showMapTree || activeRightPanel !== null,
     120
   );
+
+  useEffect(() => {
+    if (!mapTreePresence.mounted || (showMapTree && !isResizingExplorer)) {
+      setExplorerCollapsePreview(false);
+      setExplorerWidth((w) => (w < EXPLORER_MIN_W ? EXPLORER_DEFAULT_W : w));
+    }
+  }, [mapTreePresence.mounted, showMapTree, isResizingExplorer]);
+
+  useEffect(() => {
+    if (!rightDockPresence.mounted || (activeRightPanel !== null && !isResizingRightDock)) {
+      setRightDockCollapsePreview(false);
+      setRightDockWidth((w) => (w < RIGHT_DOCK_MIN_W ? RIGHT_DOCK_DEFAULT_W : w));
+    }
+  }, [rightDockPresence.mounted, activeRightPanel, isResizingRightDock]);
   const [isScanning, setIsScanning] = useState<boolean>(false);
   const [scanProgress, setScanProgress] = useState<ScanProgressEvent | null>(null);
   const [scannerSensitivity, setScannerSensitivity] = useState<
@@ -405,18 +477,21 @@ export const App: React.FC = () => {
   const closeOverlayDrawersIfCompact = useCallback(() => {
     if (typeof window !== 'undefined' && window.innerWidth < 1024) {
       setShowMapTree(false);
-      setIsScannerDrawerOpen(false);
-      setShowInspector(false);
+      setRightPanel(null);
     }
-  }, []);
+  }, [setRightPanel]);
+
+  const handleCloseRightPanel = useCallback(() => {
+    setRightPanel(null);
+    setFocusedRailItem((cur) => (cur === 'inspector' || cur === 'scanner' ? null : cur));
+  }, [setRightPanel]);
 
   const handleToggleMapTree = useCallback(() => {
     setShowMapTree((prev) => {
       const next = !prev;
       if (next) {
         if (typeof window !== 'undefined' && window.innerWidth < 1024) {
-          setIsScannerDrawerOpen(false);
-          setShowInspector(false);
+          setRightPanel(null);
         }
         setFocusedRailItem('maps');
       } else {
@@ -424,39 +499,33 @@ export const App: React.FC = () => {
       }
       return next;
     });
-  }, []);
+  }, [setRightPanel]);
 
   const handleToggleScanner = useCallback(() => {
-    setIsScannerDrawerOpen((prev) => {
-      const next = !prev;
-      if (next) {
-        setShowInspector(false);
-        if (typeof window !== 'undefined' && window.innerWidth < 1024) {
-          setShowMapTree(false);
-        }
-        setFocusedRailItem('scanner');
-      } else {
-        setFocusedRailItem((cur) => (cur === 'scanner' ? null : cur));
+    const next = toggleRightDockPanel(activeRightPanelRef.current, 'scanner');
+    setRightPanel(next);
+    if (next === 'scanner') {
+      if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+        setShowMapTree(false);
       }
-      return next;
-    });
-  }, []);
+      setFocusedRailItem('scanner');
+    } else {
+      setFocusedRailItem((cur) => (cur === 'scanner' ? null : cur));
+    }
+  }, [setRightPanel]);
 
   const handleToggleInspector = useCallback(() => {
-    setShowInspector((prev) => {
-      const next = !prev;
-      if (next) {
-        setIsScannerDrawerOpen(false);
-        if (typeof window !== 'undefined' && window.innerWidth < 1024) {
-          setShowMapTree(false);
-        }
-        setFocusedRailItem('inspector');
-      } else {
-        setFocusedRailItem((cur) => (cur === 'inspector' ? null : cur));
+    const next = toggleRightDockPanel(activeRightPanelRef.current, 'inspector');
+    setRightPanel(next);
+    if (next === 'inspector') {
+      if (typeof window !== 'undefined' && window.innerWidth < 1024) {
+        setShowMapTree(false);
       }
-      return next;
-    });
-  }, []);
+      setFocusedRailItem('inspector');
+    } else {
+      setFocusedRailItem((cur) => (cur === 'inspector' ? null : cur));
+    }
+  }, [setRightPanel]);
 
   const handleSelectMap = useCallback(
     (id: string) => {
@@ -464,20 +533,25 @@ export const App: React.FC = () => {
       setFocusedRailItem((cur) => (cur === 'hex' || cur === 'waveform' ? null : cur));
       const mapDef = maps.find((m) => m.id === id);
       if (mapDef) {
-        syncMapTab(
-          mapDef,
-          layoutPreset === 'full_3d'
-            ? 'map-3d'
-            : layoutPreset === 'split_3d'
-              ? 'map-split'
-              : 'map-table'
-        );
+        const detachedId = `map:${mapDef.id}`;
+        if (detachedTabs.some((d) => d.id === detachedId)) {
+          focusFloatingWindow(`tab-${detachedId}`);
+        } else {
+          syncMapTab(
+            mapDef,
+            layoutPreset === 'full_3d'
+              ? 'map-3d'
+              : layoutPreset === 'split_3d'
+                ? 'map-split'
+                : 'map-table'
+          );
+        }
       }
       if (typeof window !== 'undefined' && window.innerWidth < 1024) {
         setShowMapTree(false);
       }
     },
-    [maps, selectMap, syncMapTab, layoutPreset]
+    [maps, selectMap, detachedTabs, syncMapTab, layoutPreset]
   );
 
   const handleOpenMapInSplit = useCallback(
@@ -494,11 +568,10 @@ export const App: React.FC = () => {
     [maps, openInSplit]
   );
 
-  const handleActivateWorkspaceTab = useCallback(
-    (id: string) => {
-      activateTab(id);
-      const tab = tabs.find((t) => t.id === id);
-      if (tab?.kind === 'map-table' || tab?.kind === 'map-3d' || tab?.kind === 'map-split') {
+  const syncStudioToTab = useCallback(
+    (tab: WorkspaceTab | undefined) => {
+      if (!tab) return;
+      if (tab.kind === 'map-table' || tab.kind === 'map-3d' || tab.kind === 'map-split') {
         setFocusedRailItem((cur) => (cur === 'hex' || cur === 'waveform' ? null : cur));
         setLayoutPreset(
           tab.kind === 'map-3d'
@@ -507,17 +580,43 @@ export const App: React.FC = () => {
               ? 'split_3d'
               : 'standard'
         );
-      } else if (tab?.kind === 'waveform') {
+      } else if (tab.kind === 'waveform') {
         setFocusedRailItem('waveform');
         setLayoutPreset('full_waveform');
-      } else if (tab?.kind === 'hex') {
+      } else if (tab.kind === 'hex') {
         setFocusedRailItem('hex');
       }
-      if (tab?.mapId && tab.mapId !== selectedMapId) {
+      if (tab.mapId && tab.mapId !== selectedMapId) {
         selectMap(tab.mapId);
       }
     },
-    [activateTab, tabs, selectedMapId, selectMap]
+    [selectedMapId, selectMap]
+  );
+
+  const handleActivateWorkspaceTab = useCallback(
+    (id: string) => {
+      activateTab(id);
+      syncStudioToTab(tabs.find((t) => t.id === id));
+    },
+    [activateTab, tabs, syncStudioToTab]
+  );
+
+  const handleCloseWorkspaceTab = useCallback(
+    (id: string) => {
+      closeTab(id);
+      const { tabs: nextTabs, activeTabId: nextActiveId } = useWorkspaceTabsStore.getState();
+      syncStudioToTab(nextTabs.find((t) => t.id === nextActiveId));
+    },
+    [closeTab, syncStudioToTab]
+  );
+
+  const handleDetachWorkspaceTab = useCallback(
+    (id: string) => {
+      detachTab(id);
+      const { tabs: nextTabs, activeTabId: nextActiveId } = useWorkspaceTabsStore.getState();
+      syncStudioToTab(nextTabs.find((t) => t.id === nextActiveId));
+    },
+    [detachTab, syncStudioToTab]
   );
 
   const handleOpenWorkbench = useCallback(() => {
@@ -750,23 +849,10 @@ export const App: React.FC = () => {
     }
   }, [exportDatalogCsv, notify]);
 
-  const { xLabels, yLabels, xAxisName, yAxisName } = useMemo(() => {
-    if (!selectedMap) return { xLabels: [], yLabels: [], xAxisName: 'TPS', yAxisName: 'RPM' };
-    const resolved = resolveDisplayAxisLabels(selectedMap);
-    const hasX = Boolean(
-      selectedMap.x_axis?.values && selectedMap.x_axis.values.length === selectedMap.cols
-    );
-    const hasY = Boolean(
-      selectedMap.y_axis?.values && selectedMap.y_axis.values.length === selectedMap.rows
-    );
-    const synth = generateAxisLabels(selectedMap.rows, selectedMap.cols, selectedMap.name);
-    return {
-      xLabels: hasX ? resolved.xLabels : synth.xLabels,
-      yLabels: hasY ? resolved.yLabels : synth.yLabels,
-      xAxisName: hasX ? resolved.xAxisName : synth.xAxisName,
-      yAxisName: hasY ? resolved.yAxisName : synth.yAxisName,
-    };
-  }, [selectedMap]);
+  const { xLabels, yLabels, xAxisName, yAxisName } = useMemo(
+    () => resolveEffectiveMapAxes(selectedMap),
+    [selectedMap]
+  );
 
   const interpolationAxes = useMemo(() => {
     if (!selectedMap) return { x: null, y: null };
@@ -794,6 +880,14 @@ export const App: React.FC = () => {
       diffs: diffRegions,
     });
   }, [isDesktop, maps, selectedMapId, diffRegions]);
+
+  useEffect(() => {
+    if (!isDesktop || romRevision === 0) return;
+    if (remoteRomSyncRef.current !== null && romRevision <= remoteRomSyncRef.current) {
+      return;
+    }
+    void emitWorkspaceSyncEvent({ type: 'rom-updated', activeDocId, revision: romRevision });
+  }, [isDesktop, romRevision, activeDocId]);
 
   useEffect(() => {
     const unsub = subscribeWorkspaceSyncEvents((ev) => {
@@ -825,7 +919,10 @@ export const App: React.FC = () => {
       } else if (ev.type === 'diffs-updated') {
         setDiffRegions(ev.diffs);
       } else if (ev.type === 'rom-updated') {
-        if (isDesktopApp()) void refreshRomSession();
+        if (isDesktopApp()) {
+          remoteRomSyncRef.current = useMapStore.getState().romRevision + 1;
+          void refreshRomSession();
+        }
         if (ev.checksumOk !== undefined) {
           useMapStore.getState().setChecksumStatus(ev.checksumOk ? 'valid' : 'invalid');
         }
@@ -919,9 +1016,8 @@ export const App: React.FC = () => {
     if (!hasRom) return;
     setIsScanning(true);
     setScanProgress({ stage: 'starting', percent: 5, message: 'Scanning ROM heuristics' });
-    setShowInspector(false);
     closeOverlayDrawersIfCompact();
-    setIsScannerDrawerOpen(true);
+    setRightPanel('scanner');
     setFocusedRailItem('scanner');
     try {
       const minConfidence =
@@ -1149,7 +1245,7 @@ export const App: React.FC = () => {
       void redoEdit();
     },
     onCloseActiveTab: () => {
-      if (activeTabId) closeTab(activeTabId);
+      if (activeTabId) handleCloseWorkspaceTab(activeTabId);
     },
   });
 
@@ -1255,9 +1351,8 @@ export const App: React.FC = () => {
     },
     onRollbackProject: () => void handleRevertToOriginal(null),
     onViewLedger: () => {
-      setIsScannerDrawerOpen(false);
       closeOverlayDrawersIfCompact();
-      setShowInspector(true);
+      setRightPanel('inspector');
       setFocusedRailItem('inspector');
     },
     onCopy: () => runTableAction((h) => h.copySelection()),
@@ -1282,6 +1377,9 @@ export const App: React.FC = () => {
     onResetLayout: () => {
       handleLayoutChange('standard');
       closeSplit();
+      setExplorerWidth(EXPLORER_DEFAULT_W);
+      setRightDockWidth(RIGHT_DOCK_DEFAULT_W);
+      setSplitRatio(0.52);
     },
     onExtractWaveformMap: handleExtractMap,
     onRunScanner: handleRunScanner,
@@ -1302,6 +1400,9 @@ export const App: React.FC = () => {
       setScannerSensitivity('balanced');
       setCrosshairSync(true);
       closeSplit();
+      setExplorerWidth(EXPLORER_DEFAULT_W);
+      setRightDockWidth(RIGHT_DOCK_DEFAULT_W);
+      setSplitRatio(0.52);
       clearRecentRoms();
       notify('Reset workspace view and settings');
     },
@@ -1356,6 +1457,13 @@ export const App: React.FC = () => {
   menuCallbacksRef.current = menuCallbacks;
 
   useEffect(() => subscribeNativeMenuEvents(() => menuCallbacksRef.current), []);
+
+  const displayedRightPanel: RightDockPanel | null =
+    activeRightPanel ?? (rightDockPresence.mounted ? lastRightPanel : null);
+  const rightDockAnimState = resolveRightDockAnimState(
+    rightDockPresence.state,
+    wasRightPanelSwapped
+  );
 
   return (
     <div className="flex h-screen w-screen flex-col bg-kiviBg text-kiviInk select-none">
@@ -1460,8 +1568,9 @@ export const App: React.FC = () => {
         activeTabId={activeTabId}
         splitTabId={splitTabId}
         onActivateTab={handleActivateWorkspaceTab}
-        onCloseTab={closeTab}
+        onCloseTab={handleCloseWorkspaceTab}
         onTogglePinTab={togglePinTab}
+        onDetachTab={handleDetachWorkspaceTab}
         onToggleSplitView={handleToggleSplitView}
         onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
       />
@@ -1535,14 +1644,16 @@ export const App: React.FC = () => {
         </div>
       )}
 
-      <div className="relative flex min-h-0 flex-1 overflow-hidden bg-kiviBg">
+      <div
+        ref={workspaceRowRef}
+        className="relative flex min-h-0 flex-1 overflow-hidden bg-kiviBg"
+      >
         {drawerBackdropPresence.mounted && (
           <div
             aria-hidden="true"
             onClick={() => {
               setShowMapTree(false);
-              setShowInspector(false);
-              setIsScannerDrawerOpen(false);
+              handleCloseRightPanel();
             }}
             className={`absolute inset-0 md:left-11 z-30 bg-slate-950/35 lg:hidden ${
               drawerBackdropPresence.state === 'closing'
@@ -1597,6 +1708,9 @@ export const App: React.FC = () => {
         {mapTreePresence.mounted && (
           <MapTreeSidebar
             animState={mapTreePresence.state}
+            desktopWidth={explorerWidth}
+            isResizing={isResizingExplorer}
+            collapsePreview={explorerCollapsePreview}
             totalMaps={totalMaps}
             mapsCount={maps.length}
             mapFilter={mapFilter}
@@ -1617,9 +1731,54 @@ export const App: React.FC = () => {
           />
         )}
 
+        {showMapTree && mapTreePresence.state !== 'closing' && (
+          <SplitResizeHandle
+            orientation="vertical"
+            ariaLabel="Resize Map Explorer sidebar"
+            testId="resize-handle-explorer"
+            className="hidden lg:flex"
+            collapseWarning={explorerCollapsePreview}
+            onDragStart={() => {
+              const row = workspaceRowRef.current;
+              const aside = row?.querySelector<HTMLElement>('[data-testid="drawer-map-explorer"]');
+              if (aside) explorerOriginXRef.current = aside.getBoundingClientRect().left;
+              explorerCollapseRef.current = false;
+              setExplorerCollapsePreview(false);
+              setIsResizingExplorer(true);
+            }}
+            onDragMove={(clientX) => {
+              const outcome = computePanelResize({
+                rawWidth: clientX - explorerOriginXRef.current,
+                minWidth: EXPLORER_MIN_W,
+                maxWidth: EXPLORER_MAX_W,
+                collapseThreshold: EXPLORER_COLLAPSE_THRESHOLD,
+                minPreviewWidth: 96,
+              });
+              explorerCollapseRef.current = outcome.willCollapse;
+              setExplorerCollapsePreview(outcome.willCollapse);
+              setExplorerWidth(outcome.width);
+            }}
+            onDragEnd={() => {
+              setIsResizingExplorer(false);
+              if (explorerCollapseRef.current) {
+                explorerCollapseRef.current = false;
+                setShowMapTree(false);
+                setFocusedRailItem((cur) => (cur === 'maps' ? null : cur));
+              } else {
+                setExplorerCollapsePreview(false);
+              }
+            }}
+            onStep={(delta) =>
+              setExplorerWidth((w) => Math.max(EXPLORER_MIN_W, Math.min(EXPLORER_MAX_W, w + delta)))
+            }
+            onReset={() => setExplorerWidth(EXPLORER_DEFAULT_W)}
+          />
+        )}
+
         <WorkspaceViewport
           layoutPreset={layoutPreset}
           setLayoutPreset={handleLayoutChange}
+          maps={maps}
           selectedMap={selectedMap}
           activeMatrix={activeMatrix}
           baseMatrix={baseMatrix}
@@ -1636,6 +1795,9 @@ export const App: React.FC = () => {
           setTableSelection={setTableSelection}
           onChangeMatrix={handleChangeMatrix}
           onPatchCells={handlePatchCells}
+          onPatchByte={(offset, value) =>
+            patchRomBytes([{ offset, bytes: [value] }], `Hex edit 0x${offset.toString(16).toUpperCase()}`)
+          }
           romData={romData}
           romLoaded={romLoaded}
           romSize={romSize}
@@ -1646,10 +1808,14 @@ export const App: React.FC = () => {
           onCreateMapFromHex={handleCreateMapFromHex}
           heatmapActionRef={heatmapActionRef}
           onRevertToOriginal={(sel) => void handleRevertToOriginal(sel)}
+          onRevertMapToOriginal={(targetMap, sel) => void revertMapToOriginal(targetMap, sel ?? null)}
           onEditMapProperties={
             selectedMap
               ? () => setMapPropsModal({ open: true, mode: 'edit', map: selectedMap })
               : undefined
+          }
+          onEditTargetMapProperties={(targetMap) =>
+            setMapPropsModal({ open: true, mode: 'edit', map: targetMap })
           }
           waveformPitch={waveformPitch}
           setWaveformPitch={setWaveformPitch}
@@ -1665,39 +1831,99 @@ export const App: React.FC = () => {
           onRunScanner={handleRunScanner}
           activeTab={activeTab}
           splitTab={splitTab}
+          splitRatio={splitRatio}
+          onSplitRatioChange={setSplitRatio}
           onCloseSplit={closeSplit}
         />
 
-        <ScannerDrawer
-          isOpen={isScannerDrawerOpen}
-          onClose={() => setIsScannerDrawerOpen(false)}
-          isDesktop={isDesktop}
-          romData={romData}
-          scannerSensitivity={scannerSensitivity}
-          onChangeSensitivity={setScannerSensitivity}
-          isScanning={isScanning}
-          onRunScanner={handleRunScanner}
-          scanProgress={scanProgress}
-          hasRomData={hasRom}
-          isWindowScanning={isWindowScanning}
-          onRunWindowScanner={() => void handleRunWindowScanner()}
-          windowScanError={windowScanError}
-          windowCandidates={windowCandidates}
-          detectedCandidates={detectedCandidates}
-          onLoadCandidate={handleLoadCandidate}
-          onAddMaps={(newMaps, selectFirst) => {
-            addMaps(newMaps);
-            if (selectFirst && newMaps.length > 0) {
-              selectMap(newMaps[0].id);
-              syncMapTab(newMaps[0], 'map-table');
+        {activeRightPanel !== null && rightDockAnimState !== 'closing' && (
+          <SplitResizeHandle
+            orientation="vertical"
+            ariaLabel="Resize right dock panel"
+            testId="resize-handle-right-dock"
+            className="hidden lg:flex"
+            collapseWarning={rightDockCollapsePreview}
+            onDragStart={() => {
+              const row = workspaceRowRef.current;
+              const aside = row?.querySelector<HTMLElement>(
+                '[data-testid="drawer-inspector"], [data-testid="drawer-scanner"]'
+              );
+              rightDockOriginXRef.current = aside
+                ? aside.getBoundingClientRect().right
+                : row?.getBoundingClientRect().right ?? window.innerWidth;
+              rightDockCollapseRef.current = false;
+              setRightDockCollapsePreview(false);
+              setIsResizingRightDock(true);
+            }}
+            onDragMove={(clientX) => {
+              const outcome = computePanelResize({
+                rawWidth: rightDockOriginXRef.current - clientX,
+                minWidth: RIGHT_DOCK_MIN_W,
+                maxWidth: RIGHT_DOCK_MAX_W,
+                collapseThreshold: RIGHT_DOCK_COLLAPSE_THRESHOLD,
+                minPreviewWidth: 108,
+              });
+              rightDockCollapseRef.current = outcome.willCollapse;
+              setRightDockCollapsePreview(outcome.willCollapse);
+              setRightDockWidth(outcome.width);
+            }}
+            onDragEnd={() => {
+              setIsResizingRightDock(false);
+              if (rightDockCollapseRef.current) {
+                rightDockCollapseRef.current = false;
+                handleCloseRightPanel();
+              } else {
+                setRightDockCollapsePreview(false);
+              }
+            }}
+            onStep={(delta) =>
+              setRightDockWidth((w) =>
+                Math.max(RIGHT_DOCK_MIN_W, Math.min(RIGHT_DOCK_MAX_W, w - delta))
+              )
             }
-          }}
-          onJumpToWaveform={handleJumpToWaveform}
-        />
+            onReset={() => setRightDockWidth(RIGHT_DOCK_DEFAULT_W)}
+          />
+        )}
 
-        {inspectorPresence.mounted && (
+        {rightDockPresence.mounted && displayedRightPanel === 'scanner' && (
+          <ScannerDrawer
+            isOpen={activeRightPanel === 'scanner'}
+            animState={rightDockAnimState}
+            desktopWidth={rightDockWidth}
+            isResizing={isResizingRightDock}
+            collapsePreview={rightDockCollapsePreview}
+            onClose={handleCloseRightPanel}
+            isDesktop={isDesktop}
+            romData={romData}
+            scannerSensitivity={scannerSensitivity}
+            onChangeSensitivity={setScannerSensitivity}
+            isScanning={isScanning}
+            onRunScanner={handleRunScanner}
+            scanProgress={scanProgress}
+            hasRomData={hasRom}
+            isWindowScanning={isWindowScanning}
+            onRunWindowScanner={() => void handleRunWindowScanner()}
+            windowScanError={windowScanError}
+            windowCandidates={windowCandidates}
+            detectedCandidates={detectedCandidates}
+            onLoadCandidate={handleLoadCandidate}
+            onAddMaps={(newMaps, selectFirst) => {
+              addMaps(newMaps);
+              if (selectFirst && newMaps.length > 0) {
+                selectMap(newMaps[0].id);
+                syncMapTab(newMaps[0], 'map-table');
+              }
+            }}
+            onJumpToWaveform={handleJumpToWaveform}
+          />
+        )}
+
+        {rightDockPresence.mounted && displayedRightPanel === 'inspector' && (
           <InspectorSidebar
-            animState={inspectorPresence.state}
+            animState={rightDockAnimState}
+            desktopWidth={rightDockWidth}
+            isResizing={isResizingRightDock}
+            collapsePreview={rightDockCollapsePreview}
             selectedRange={selectedRange}
             waveformPitch={waveformPitch}
             onExtractMap={handleExtractMap}
@@ -1716,7 +1942,7 @@ export const App: React.FC = () => {
             }
             onViewInHex={handleJumpToHex}
             onRevertMapToOriginal={() => void handleRevertToOriginal(null)}
-            onClose={() => setShowInspector(false)}
+            onClose={handleCloseRightPanel}
           />
         )}
       </div>
@@ -1749,6 +1975,57 @@ export const App: React.FC = () => {
         onUndo={() => void undoEdit()}
         onRedo={() => void redoEdit()}
       />
+
+      {detachedTabs.map((tab, idx) => (
+        <DetachedWorkspaceWindow
+          key={tab.id}
+          tab={tab}
+          cascadeIndex={idx}
+          mapDef={tab.mapId ? maps.find((m) => m.id === tab.mapId) : undefined}
+          displayMode={displayMode}
+          onCellDisplayModeChange={setDisplayMode}
+          palette={palette}
+          onPaletteChange={setPalette}
+          hexMarks={hexMarks}
+          hexJumpAddress={hexJumpAddress}
+          onCreateMapFromHex={handleCreateMapFromHex}
+          onPatchByte={(offset, value) =>
+            patchRomBytes([{ offset, bytes: [value] }], `Hex edit 0x${offset.toString(16).toUpperCase()}`)
+          }
+          waveformPitch={waveformPitch}
+          onWaveformPitchChange={setWaveformPitch}
+          waveformIs16Bit={waveformIs16Bit}
+          waveformIsBigEndian={waveformIsBigEndian}
+          diffRegions={diffRegions}
+          detectedCandidates={detectedCandidates}
+          onSelectWaveformRange={handleSelectRange}
+          onJumpToWaveform={handleJumpToWaveform}
+          onRevertToOriginal={(targetMap, sel) =>
+            void revertMapToOriginal(targetMap, sel ?? null)
+          }
+          onEditMapProperties={(targetMap) =>
+            setMapPropsModal({ open: true, mode: 'edit', map: targetMap })
+          }
+          onSetKind={setDetachedTabKind}
+          onDock={(id) => {
+            dockTab(id);
+            const docked = detachedTabs.find((d) => d.id === id);
+            if (docked?.kind === 'map-table' || docked?.kind === 'map-3d' || docked?.kind === 'map-split') {
+              setLayoutPreset(
+                docked.kind === 'map-3d'
+                  ? 'full_3d'
+                  : docked.kind === 'map-split'
+                    ? 'split_3d'
+                    : 'standard'
+              );
+              if (docked.mapId) selectMap(docked.mapId);
+            } else if (docked?.kind === 'waveform') {
+              setLayoutPreset('full_waveform');
+            }
+          }}
+          onClose={closeDetachedTab}
+        />
+      ))}
 
       <CommandPalette
         isOpen={isCommandPaletteOpen}

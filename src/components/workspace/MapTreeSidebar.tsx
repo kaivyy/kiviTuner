@@ -44,6 +44,9 @@ interface MapTreeSidebarProps {
   onPromotePotentialMap?: (candidate: DetectedMapCandidate) => void;
   onClose?: () => void;
   animState?: 'open' | 'closing';
+  desktopWidth?: number;
+  isResizing?: boolean;
+  collapsePreview?: boolean;
 }
 
 interface FolderBranchProps {
@@ -202,6 +205,9 @@ export const MapTreeSidebar: React.FC<MapTreeSidebarProps> = React.memo(({
   onPromotePotentialMap,
   onClose,
   animState = 'open',
+  desktopWidth = 264,
+  isResizing = false,
+  collapsePreview = false,
 }) => {
   const [paramTypeFilter, setParamTypeFilter] = useState<MapParamTypeFilter>('all');
   const [potentialOpen, setPotentialOpen] = useState<boolean>(false);
@@ -275,9 +281,11 @@ export const MapTreeSidebar: React.FC<MapTreeSidebarProps> = React.memo(({
 
   return (
     <aside
-      className={`absolute inset-y-0 left-0 md:left-11 z-40 flex w-[min(85vw,16.5rem)] flex-col overflow-hidden rounded-none kivi-panel-surface bg-kiviSurface lg:static lg:inset-y-auto lg:left-auto lg:z-auto lg:w-64 lg:shrink-0 lg:shadow-none lg:border-r lg:border-kiviBorder/60 xl:w-72 ${
+      data-testid="drawer-map-explorer"
+      style={{ '--kivi-panel-w': `${desktopWidth}px` } as React.CSSProperties}
+      className={`absolute inset-y-0 left-0 md:left-11 z-40 flex w-[min(85vw,16.5rem)] flex-col overflow-hidden rounded-none kivi-panel-surface bg-kiviSurface lg:static lg:inset-y-auto lg:left-auto lg:z-auto lg:w-[var(--kivi-panel-w)] lg:shrink-0 lg:shadow-none lg:border-r lg:border-kiviBorder/60 ${
         animState === 'closing' ? 'kivi-anim-slide-left-out' : 'kivi-anim-slide-left-in'
-      }`}
+      } ${collapsePreview ? 'opacity-55' : 'opacity-100'} ${isResizing ? 'transition-none' : 'transition-opacity duration-150'}`}
     >
       <div
         data-testid="panel-titlebar-map-explorer"

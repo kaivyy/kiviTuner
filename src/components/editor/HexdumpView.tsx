@@ -718,12 +718,15 @@ export const HexdumpView: React.FC<HexdumpViewProps> = ({
                         <input
                           key={cell.offset}
                           type="text"
+                          size={1}
                           autoFocus
                           maxLength={cellSpan === 2 ? (numFormat === 'dec' ? 5 : 4) : numFormat === 'dec' ? 3 : 2}
                           value={editingCell.value}
                           onChange={(e) =>
                             setEditingCell({ ...editingCell, value: e.target.value })
                           }
+                          onFocus={(e) => e.currentTarget.select()}
+                          onMouseDown={(e) => e.stopPropagation()}
                           onBlur={() => void commitByteEdit()}
                           onKeyDown={(e) => {
                             if (e.key === 'Enter') {
@@ -734,7 +737,7 @@ export const HexdumpView: React.FC<HexdumpViewProps> = ({
                               setEditingCell(null);
                             }
                           }}
-                          className={`${cellWidthClass} rounded border border-kiviAccent bg-kiviBg text-center text-[11px] font-bold text-kiviAccent focus-visible:outline-2 focus-visible:outline-kiviAccent`}
+                          className={`${cellWidthClass} min-w-0 shrink-0 rounded border border-kiviAccent bg-kiviBg text-center text-[11px] font-bold text-kiviAccent focus-visible:outline-2 focus-visible:outline-kiviAccent`}
                         />
                       );
                     }

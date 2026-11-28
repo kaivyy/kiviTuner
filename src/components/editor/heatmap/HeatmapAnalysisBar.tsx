@@ -7,6 +7,7 @@ import {
   type ChecksumPanelState,
 } from '../checksumPanel';
 import type { SmoothingPreviewState } from '../smoothingPreview';
+import { HorizontalScrollStrip } from '../../layout/HorizontalScrollStrip';
 import {
   describeInterpolation,
   describeAxisDomain,
@@ -118,12 +119,21 @@ export const HeatmapAnalysisBar: React.FC<HeatmapAnalysisBarProps> = ({
   return (
     <div
       data-testid="heatmap-analysis-bar"
-      className="border-b border-kiviBorder/60 bg-kiviBg/80 px-3 py-1.5 text-[11px]"
+      className="shrink-0 border-b border-kiviBorder/60 bg-kiviBg/80 px-2.5 text-[11px]"
     >
-      {/* Compact 1-Row Collapsible Pill Strip */}
-      <div className="flex flex-wrap items-center justify-between gap-1.5">
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span className="mr-0.5 whitespace-nowrap text-[10px] font-semibold uppercase tracking-wider text-kiviMuted">
+      {/* Compact 1-Row Scrollable Pill Strip (locked h-8 height) */}
+      <div className="flex h-8 shrink-0 items-center justify-between gap-2 overflow-hidden">
+        <HorizontalScrollStrip
+          ariaLabel="Heatmap analysis tools"
+          stripTestId="heatmap-analysis-strip"
+          depKey={`${activeTool ?? ''}:${showChecksum}:${enableSmoothingPreview}:${showInterpolation}:${previewEnabled}`}
+          className="h-8 min-w-0 flex-1"
+          stripClassName="gap-1.5"
+          arrowSize="xs"
+          scrollLeftLabel="Scroll analysis tools left"
+          scrollRightLabel="Scroll analysis tools right"
+        >
+          <span className="mr-0.5 shrink-0 whitespace-nowrap text-[10px] font-semibold uppercase tracking-wider text-kiviMuted">
             Tools
           </span>
 
@@ -132,7 +142,7 @@ export const HeatmapAnalysisBar: React.FC<HeatmapAnalysisBarProps> = ({
               type="button"
               aria-expanded={activeTool === 'checksum'}
               onClick={() => toggleTool('checksum')}
-              className={`inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md border px-2 py-0.5 text-[11px] font-medium transition-colors ${
+              className={`inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border px-2 text-[11px] font-medium transition-colors ${
                 activeTool === 'checksum'
                   ? 'border-kiviAccent/60 bg-kiviAccent/15 text-kiviAccent'
                   : 'border-kiviBorder/70 bg-kiviSurface text-kiviSecondary hover:text-kiviInk'
@@ -153,7 +163,7 @@ export const HeatmapAnalysisBar: React.FC<HeatmapAnalysisBarProps> = ({
               type="button"
               aria-expanded={activeTool === 'smoothing'}
               onClick={() => toggleTool('smoothing')}
-              className={`inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md border px-2 py-0.5 text-[11px] font-medium transition-colors ${
+              className={`inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border px-2 text-[11px] font-medium transition-colors ${
                 activeTool === 'smoothing' || previewEnabled
                   ? 'border-kiviAccent/60 bg-kiviAccent/15 text-kiviAccent'
                   : 'border-kiviBorder/70 bg-kiviSurface text-kiviSecondary hover:text-kiviInk'
@@ -177,7 +187,7 @@ export const HeatmapAnalysisBar: React.FC<HeatmapAnalysisBarProps> = ({
               type="button"
               aria-expanded={activeTool === 'interpolate'}
               onClick={() => toggleTool('interpolate')}
-              className={`inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md border px-2 py-0.5 text-[11px] font-medium transition-colors ${
+              className={`inline-flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md border px-2 text-[11px] font-medium transition-colors ${
                 activeTool === 'interpolate'
                   ? 'border-kiviAccent/60 bg-kiviAccent/15 text-kiviAccent'
                   : 'border-kiviBorder/70 bg-kiviSurface text-kiviSecondary hover:text-kiviInk'
@@ -192,10 +202,10 @@ export const HeatmapAnalysisBar: React.FC<HeatmapAnalysisBarProps> = ({
               />
             </button>
           )}
-        </div>
+        </HorizontalScrollStrip>
 
         {!activeTool && collapsedSummary && (
-          <span className="truncate font-mono text-[10px] text-kiviSecondary tabular-nums">
+          <span className="max-w-[180px] shrink-0 truncate font-mono text-[10px] text-kiviSecondary tabular-nums">
             {collapsedSummary}
           </span>
         )}

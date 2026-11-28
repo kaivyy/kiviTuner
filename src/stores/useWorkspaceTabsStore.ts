@@ -23,6 +23,7 @@ export interface WorkspaceTab {
 
 export interface WorkspaceTabsState {
   tabs: WorkspaceTab[];
+  detachedTabs: WorkspaceTab[];
   activeTabId: string | null;
   splitTabId: string | null;
   splitRatio: number;
@@ -32,6 +33,10 @@ export interface WorkspaceTabsState {
   closeTab: (id: string) => void;
   togglePinTab: (id: string) => void;
   setTabKind: (id: string, kind: WorkspaceTabKind) => void;
+  detachTab: (id: string) => void;
+  dockTab: (id: string) => void;
+  closeDetachedTab: (id: string) => void;
+  setDetachedTabKind: (id: string, kind: WorkspaceTabKind) => void;
   openInSplit: (tab: WorkspaceTab) => void;
   closeSplit: () => void;
   toggleSplitView: (fallbackTab?: WorkspaceTab) => void;
@@ -46,6 +51,7 @@ export interface WorkspaceTabsState {
 }
 
 const MAX_TABS = 24;
+const MAX_DETACHED_TABS = 8;
 
 function trimOverflowTabs(tabs: WorkspaceTab[], activeId: string | null, splitId: string | null): WorkspaceTab[] {
   if (tabs.length <= MAX_TABS) return tabs;
@@ -60,12 +66,14 @@ function trimOverflowTabs(tabs: WorkspaceTab[], activeId: string | null, splitId
 
 export const useWorkspaceTabsStore = create<WorkspaceTabsState>((set, get) => ({
   tabs: [],
+  detachedTabs: [],
   activeTabId: null,
   splitTabId: null,
   splitRatio: 0.52,
 
   openTab: (tab) =>
     set((state) => {
+      const nextDetached = state.detachedTabs.filter((d) => d.id !== tab.id);
       const existing = state.tabs.find((t) => t.id === tab.id);
       if (existing) {
         const updated = state.tabs.map((t) =>
@@ -73,6 +81,7 @@ export const useWorkspaceTabsStore = create<WorkspaceTabsState>((set, get) => ({
         );
         return {
           tabs: updated,
+          detachedTabs: nextDetached,
           activeTabId: tab.id,
           splitTabId: state.splitTabId === tab.id ? null : state.splitTabId,
         };
@@ -82,7 +91,7 @@ export const useWorkspaceTabsStore = create<WorkspaceTabsState>((set, get) => ({
         tab.id,
         state.splitTabId
       );
-      return { tabs: added, activeTabId: tab.id };
+      return { tabs: added, detachedTabs: nextDetached, activeTabId: tab.id };
     }),
 
   activateTab: (id) =>
@@ -127,8 +136,57 @@ export const useWorkspaceTabsStore = create<WorkspaceTabsState>((set, get) => ({
       tabs: state.tabs.map((t) => (t.id === id ? { ...t, kind } : t)),
     })),
 
+  detachTab: (id) =>
+    set((state) => {
+      if (state.detachedTabs.some((d) => d.id === id)) return state;
+      const target = state.tabs.find((t) => t.id === id);
+      if (!target || state.detachedTabs.length >= MAX_DETACHED_TABS) return state;
+      const idx = state.tabs.indexOf(target);
+      const nextTabs = state.tabs.filter((t) => t.id !== id);
+      let nextActive = state.activeTabId;
+      if (nextActive === id) {
+        nextActive = nextTabs.length === 0 ? null : nextTabs[Math.min(idx, nextTabs.length - 1)].id;
+      }
+      const nextSplit =
+        state.splitTabId === id || state.splitTabId === nextActive ? null : state.splitTabId;
+      return {
+        tabs: nextTabs,
+        detachedTabs: [...state.detachedTabs, { ...target, pinned: false }],
+        activeTabId: nextActive,
+        splitTabId: nextSplit,
+      };
+    }),
+
+  dockTab: (id) =>
+    set((state) => {
+      const target = state.detachedTabs.find((d) => d.id === id);
+      if (!target) return state;
+      const nextDetached = state.detachedTabs.filter((d) => d.id !== id);
+      const alreadyInTabs = state.tabs.some((t) => t.id === id);
+      const nextTabs = alreadyInTabs
+        ? state.tabs.map((t) => (t.id === id ? { ...target } : t))
+        : trimOverflowTabs([...state.tabs, target], target.id, state.splitTabId);
+      return {
+        tabs: nextTabs,
+        detachedTabs: nextDetached,
+        activeTabId: target.id,
+        splitTabId: state.splitTabId === target.id ? null : state.splitTabId,
+      };
+    }),
+
+  closeDetachedTab: (id) =>
+    set((state) => ({
+      detachedTabs: state.detachedTabs.filter((d) => d.id !== id),
+    })),
+
+  setDetachedTabKind: (id, kind) =>
+    set((state) => ({
+      detachedTabs: state.detachedTabs.map((d) => (d.id === id ? { ...d, kind } : d)),
+    })),
+
   openInSplit: (tab) =>
     set((state) => {
+      const nextDetached = state.detachedTabs.filter((d) => d.id !== tab.id);
       const hasTab = state.tabs.some((t) => t.id === tab.id);
       const nextTabs = hasTab
         ? state.tabs.map((t) => (t.id === tab.id ? { ...t, ...tab } : t))
@@ -138,12 +196,12 @@ export const useWorkspaceTabsStore = create<WorkspaceTabsState>((set, get) => ({
             tab.id
           );
       if (!state.activeTabId) {
-        return { tabs: nextTabs, activeTabId: tab.id, splitTabId: null };
+        return { tabs: nextTabs, detachedTabs: nextDetached, activeTabId: tab.id, splitTabId: null };
       }
       if (state.activeTabId === tab.id) {
-        return { tabs: nextTabs };
+        return { tabs: nextTabs, detachedTabs: nextDetached };
       }
-      return { tabs: nextTabs, splitTabId: tab.id };
+      return { tabs: nextTabs, detachedTabs: nextDetached, splitTabId: tab.id };
     }),
 
   closeSplit: () => set({ splitTabId: null }),
@@ -202,5 +260,5 @@ export const useWorkspaceTabsStore = create<WorkspaceTabsState>((set, get) => ({
     return id;
   },
 
-  reset: () => set({ tabs: [], activeTabId: null, splitTabId: null, splitRatio: 0.52 }),
+  reset: () => set({ tabs: [], detachedTabs: [], activeTabId: null, splitTabId: null, splitRatio: 0.52 }),
 }));

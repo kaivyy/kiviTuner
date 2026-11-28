@@ -16,6 +16,7 @@ import {
   Footprints,
 } from 'lucide-react';
 import type { CellDisplayMode, TablePalette } from '../HeatmapTable';
+import { HorizontalScrollStrip } from '../../layout/HorizontalScrollStrip';
 
 interface HeatmapToolbarProps {
   title: string;
@@ -78,25 +79,41 @@ export const HeatmapToolbar: React.FC<HeatmapToolbarProps> = ({
   onChangeDisplayMode,
   onChangePalette,
 }) => (
-  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-kiviBorder/60 bg-kiviElevated/45 px-3 py-2">
-    <div className="flex min-w-0 items-center gap-2">
-      <Grid className="h-4 w-4 shrink-0 text-kiviAccent" />
-      <h3 className="truncate text-sm font-semibold text-kiviInk">{title}</h3>
-      <span className="shrink-0 whitespace-nowrap rounded-md border border-kiviBorder/60 bg-kiviBg px-2 py-0.5 font-mono text-[11px] text-kiviSecondary">
-        {unit}
-      </span>
-      <span className="shrink-0 whitespace-nowrap text-xs text-kiviMuted tabular-nums">
-        {numRows} &times; {numCols}
-      </span>
+  <div
+    data-testid="heatmap-toolbar-card"
+    className="flex shrink-0 flex-col border-b border-kiviBorder/60 bg-kiviElevated/45"
+  >
+    <div className="flex h-9 shrink-0 items-center justify-between gap-2 px-3">
+      <div className="flex min-w-0 items-center gap-2">
+        <Grid className="h-4 w-4 shrink-0 text-kiviAccent" />
+        <h3 className="truncate text-sm font-semibold text-kiviInk">{title}</h3>
+      </div>
+      <div className="flex shrink-0 items-center gap-2">
+        <span className="shrink-0 whitespace-nowrap rounded-md border border-kiviBorder/60 bg-kiviBg px-2 py-0.5 font-mono text-[11px] text-kiviSecondary">
+          {unit}
+        </span>
+        <span className="shrink-0 whitespace-nowrap text-xs text-kiviMuted tabular-nums">
+          {numRows} &times; {numCols}
+        </span>
+      </div>
     </div>
 
-    <div className="flex flex-wrap items-center gap-1.5 text-xs">
-      <div className="flex shrink-0 items-center rounded-lg border border-kiviBorder/60 bg-kiviSurface p-0.5">
+    <HorizontalScrollStrip
+      ariaLabel="Table editing tools"
+      stripTestId="heatmap-toolbar-strip"
+      depKey={`${displayMode}:${palette}:${hitTraceEnabled}:${hitTotalCount}:${showSliceChart}:${is1D}:${stepSize}`}
+      className="h-10 border-t border-kiviBorder/40 px-2.5"
+      stripClassName="gap-1.5 text-xs"
+      arrowSize="xs"
+      scrollLeftLabel="Scroll table tools left"
+      scrollRightLabel="Scroll table tools right"
+    >
+      <div className="flex h-7 shrink-0 items-center rounded-lg border border-kiviBorder/60 bg-kiviSurface p-0.5">
         <button
           type="button"
           onClick={() => onStepAdjust(stepSize)}
           title="Increment selection (+ / =)"
-          className="flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md px-2 py-1 text-kiviSecondary hover:bg-kiviElevated hover:text-kiviInk transition-colors"
+          className="flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md px-2 text-kiviSecondary hover:bg-kiviElevated hover:text-kiviInk transition-colors"
         >
           <Plus className="h-3.5 w-3.5 shrink-0 text-kiviGreen" />
           <span>+{stepSize}</span>
@@ -105,19 +122,19 @@ export const HeatmapToolbar: React.FC<HeatmapToolbarProps> = ({
           type="button"
           onClick={() => onStepAdjust(-stepSize)}
           title="Decrement selection (-)"
-          className="flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md px-2 py-1 text-kiviSecondary hover:bg-kiviElevated hover:text-kiviInk transition-colors"
+          className="flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md px-2 text-kiviSecondary hover:bg-kiviElevated hover:text-kiviInk transition-colors"
         >
           <Minus className="h-3.5 w-3.5 shrink-0 text-kiviRed" />
           <span>-{stepSize}</span>
         </button>
       </div>
 
-      <div className="flex flex-wrap items-center rounded-lg border border-kiviBorder/60 bg-kiviSurface p-0.5">
+      <div className="flex h-7 shrink-0 items-center rounded-lg border border-kiviBorder/60 bg-kiviSurface p-0.5">
         <button
           type="button"
           onClick={onInterpolate2D}
           title="2D Bilinear Interpolate selection [I]"
-          className="flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md px-2 py-1 text-kiviSecondary hover:bg-kiviElevated hover:text-kiviInk transition-colors"
+          className="flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md px-2 text-kiviSecondary hover:bg-kiviElevated hover:text-kiviInk transition-colors"
         >
           <Grid className="h-3.5 w-3.5 shrink-0 text-kiviAccent" />
           <span>Bilinear (I)</span>
@@ -126,7 +143,7 @@ export const HeatmapToolbar: React.FC<HeatmapToolbarProps> = ({
           type="button"
           onClick={onInterpolateHorizontal}
           title="Horizontal Interpolate row endpoints [H]"
-          className="flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md px-2 py-1 text-kiviSecondary hover:bg-kiviElevated hover:text-kiviInk transition-colors"
+          className="flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md px-2 text-kiviSecondary hover:bg-kiviElevated hover:text-kiviInk transition-colors"
         >
           <ArrowLeftRight className="h-3.5 w-3.5 shrink-0 text-kiviAccent" />
           <span>H</span>
@@ -135,7 +152,7 @@ export const HeatmapToolbar: React.FC<HeatmapToolbarProps> = ({
           type="button"
           onClick={onInterpolateVertical}
           title="Vertical Interpolate column endpoints [V]"
-          className="flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md px-2 py-1 text-kiviSecondary hover:bg-kiviElevated hover:text-kiviInk transition-colors"
+          className="flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md px-2 text-kiviSecondary hover:bg-kiviElevated hover:text-kiviInk transition-colors"
         >
           <ArrowUpDown className="h-3.5 w-3.5 shrink-0 text-kiviAccent" />
           <span>V</span>
@@ -144,7 +161,7 @@ export const HeatmapToolbar: React.FC<HeatmapToolbarProps> = ({
           type="button"
           onClick={onSmooth3x3}
           title="Smooth 3x3 Gaussian filter [S]"
-          className="flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md px-2 py-1 text-kiviWarn hover:bg-kiviElevated hover:text-kiviInk transition-colors"
+          className="flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md px-2 text-kiviWarn hover:bg-kiviElevated hover:text-kiviInk transition-colors"
         >
           <SlidersHorizontal className="h-3.5 w-3.5 shrink-0 text-kiviWarn" />
           <span>Smooth 3x3 (S)</span>
@@ -155,18 +172,18 @@ export const HeatmapToolbar: React.FC<HeatmapToolbarProps> = ({
         type="button"
         onClick={onOpenPercentModal}
         title="Adjust selection by percentage [P or %]"
-        className="flex shrink-0 items-center gap-1 whitespace-nowrap rounded-lg border border-kiviBorder/60 bg-kiviSurface px-2.5 py-1.5 text-kiviSecondary hover:bg-kiviElevated hover:text-kiviInk transition-colors"
+        className="flex h-7 shrink-0 items-center gap-1 whitespace-nowrap rounded-lg border border-kiviBorder/60 bg-kiviSurface px-2.5 text-kiviSecondary hover:bg-kiviElevated hover:text-kiviInk transition-colors"
       >
         <Percent className="h-3.5 w-3.5 shrink-0 text-kiviWarn" />
         <span>% Adjust</span>
       </button>
 
-      <div className="flex shrink-0 items-center rounded-lg border border-kiviBorder/60 bg-kiviSurface p-0.5">
+      <div className="flex h-7 shrink-0 items-center rounded-lg border border-kiviBorder/60 bg-kiviSurface p-0.5">
         <button
           type="button"
           onClick={onCopyTSV}
           title="Copy selection as TSV [Ctrl+C]"
-          className="shrink-0 rounded-md p-1 text-kiviSecondary transition-colors hover:bg-kiviElevated hover:text-kiviInk"
+          className="flex h-6 shrink-0 items-center rounded-md px-1.5 text-kiviSecondary transition-colors hover:bg-kiviElevated hover:text-kiviInk"
         >
           <Copy className="h-3.5 w-3.5" />
         </button>
@@ -174,7 +191,7 @@ export const HeatmapToolbar: React.FC<HeatmapToolbarProps> = ({
           type="button"
           onClick={onPasteTSV}
           title="Paste TSV [Ctrl+V]"
-          className="shrink-0 rounded-md p-1 text-kiviSecondary transition-colors hover:bg-kiviElevated hover:text-kiviInk"
+          className="flex h-6 shrink-0 items-center rounded-md px-1.5 text-kiviSecondary transition-colors hover:bg-kiviElevated hover:text-kiviInk"
         >
           <ClipboardPaste className="h-3.5 w-3.5" />
         </button>
@@ -182,7 +199,7 @@ export const HeatmapToolbar: React.FC<HeatmapToolbarProps> = ({
           type="button"
           onClick={onOpenPasteSpecial}
           title="Paste Special (Add / Multiply) [Ctrl+Shift+V]"
-          className="flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md px-1.5 py-1 text-[11px] text-kiviAccent transition-colors hover:bg-kiviElevated hover:text-kiviInk"
+          className="flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md px-1.5 text-[11px] text-kiviAccent transition-colors hover:bg-kiviElevated hover:text-kiviInk"
         >
           <ClipboardList className="h-3.5 w-3.5 shrink-0" />
           <span>Special</span>
@@ -190,13 +207,13 @@ export const HeatmapToolbar: React.FC<HeatmapToolbarProps> = ({
       </div>
 
       {(onRevertToOriginal || onEditMapProperties || (!is1D && onToggleSliceChart)) && (
-        <div className="flex shrink-0 items-center rounded-lg border border-kiviBorder/60 bg-kiviSurface p-0.5">
+        <div className="flex h-7 shrink-0 items-center rounded-lg border border-kiviBorder/60 bg-kiviSurface p-0.5">
           {!is1D && onToggleSliceChart && (
             <button
               type="button"
               onClick={onToggleSliceChart}
               title="Toggle 2D Row Slice Profile Chart"
-              className={`shrink-0 rounded-md p-1 transition-colors ${
+              className={`flex h-6 shrink-0 items-center rounded-md px-1.5 transition-colors ${
                 showSliceChart
                   ? 'bg-kiviAccent/20 text-kiviAccent'
                   : 'text-kiviSecondary hover:bg-kiviElevated hover:text-kiviInk'
@@ -211,7 +228,7 @@ export const HeatmapToolbar: React.FC<HeatmapToolbarProps> = ({
                 type="button"
                 onClick={onToggleHitTrace}
                 title="Toggle live cell hit-trace dwell overlay"
-                className={`flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md px-1.5 py-1 text-[11px] transition-colors ${
+                className={`flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md px-1.5 text-[11px] transition-colors ${
                   hitTraceEnabled
                     ? 'bg-kiviAccent/20 text-kiviAccent'
                     : 'text-kiviSecondary hover:bg-kiviElevated hover:text-kiviInk'
@@ -228,7 +245,7 @@ export const HeatmapToolbar: React.FC<HeatmapToolbarProps> = ({
                   type="button"
                   onClick={onResetHitTrace}
                   title="Clear live hit counts"
-                  className="shrink-0 whitespace-nowrap rounded-md px-1.5 py-1 text-[10px] text-kiviMuted hover:bg-kiviElevated hover:text-kiviInk transition-colors"
+                  className="flex h-6 shrink-0 items-center whitespace-nowrap rounded-md px-1.5 text-[10px] text-kiviMuted hover:bg-kiviElevated hover:text-kiviInk transition-colors"
                 >
                   Clear Hits
                 </button>
@@ -241,7 +258,7 @@ export const HeatmapToolbar: React.FC<HeatmapToolbarProps> = ({
               disabled={!hasBaseMatrix}
               onClick={onRevertToOriginal}
               title="Revert selected cells to stock baseline [Backspace]"
-              className="flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md px-1.5 py-1 text-[11px] text-kiviWarn transition-colors hover:bg-kiviElevated disabled:opacity-40"
+              className="flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md px-1.5 text-[11px] text-kiviWarn transition-colors hover:bg-kiviElevated disabled:opacity-40"
             >
               <RotateCcw className="h-3.5 w-3.5 shrink-0" />
               <span>Revert</span>
@@ -252,7 +269,7 @@ export const HeatmapToolbar: React.FC<HeatmapToolbarProps> = ({
               type="button"
               onClick={onEditMapProperties}
               title="Edit Map Definition Properties"
-              className="flex shrink-0 items-center gap-1 whitespace-nowrap rounded-md px-1.5 py-1 text-[11px] text-kiviSecondary transition-colors hover:bg-kiviElevated hover:text-kiviInk"
+              className="flex h-6 shrink-0 items-center gap-1 whitespace-nowrap rounded-md px-1.5 text-[11px] text-kiviSecondary transition-colors hover:bg-kiviElevated hover:text-kiviInk"
             >
               <Settings2 className="h-3.5 w-3.5 shrink-0" />
               <span>Props</span>
@@ -265,7 +282,7 @@ export const HeatmapToolbar: React.FC<HeatmapToolbarProps> = ({
         aria-label="Cell Display Mode"
         value={displayMode}
         onChange={(e) => onChangeDisplayMode(e.target.value as CellDisplayMode)}
-        className="cursor-pointer shrink-0 whitespace-nowrap rounded-lg border border-kiviBorder/70 bg-kiviSurface px-2 py-1 text-[11px] text-kiviInk focus-visible:outline-2 focus-visible:outline-kiviAccent"
+        className="h-7 cursor-pointer shrink-0 whitespace-nowrap rounded-lg border border-kiviBorder/70 bg-kiviSurface px-2 text-[11px] text-kiviInk focus-visible:outline-2 focus-visible:outline-kiviAccent"
         title="Cell Display Mode"
       >
         <option value="engineering">Engineering</option>
@@ -279,7 +296,7 @@ export const HeatmapToolbar: React.FC<HeatmapToolbarProps> = ({
         aria-label="Heatmap Palette"
         value={palette}
         onChange={(e) => onChangePalette(e.target.value as TablePalette)}
-        className="cursor-pointer shrink-0 whitespace-nowrap rounded-lg border border-kiviBorder/70 bg-kiviSurface px-2 py-1 text-[11px] text-kiviInk focus-visible:outline-2 focus-visible:outline-kiviAccent"
+        className="h-7 cursor-pointer shrink-0 whitespace-nowrap rounded-lg border border-kiviBorder/70 bg-kiviSurface px-2 text-[11px] text-kiviInk focus-visible:outline-2 focus-visible:outline-kiviAccent"
         title="Heatmap Palette"
       >
         <option value="classic">Classic</option>
@@ -287,6 +304,6 @@ export const HeatmapToolbar: React.FC<HeatmapToolbarProps> = ({
         <option value="spectrum">Spectrum</option>
         <option value="monochrome">Monochrome</option>
       </select>
-    </div>
+    </HorizontalScrollStrip>
   </div>
 );

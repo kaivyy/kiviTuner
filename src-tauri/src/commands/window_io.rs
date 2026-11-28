@@ -1007,6 +1007,28 @@ pub fn get_rom_session_summary(state: State<'_, AppState>) -> Result<RomSessionS
     get_rom_session_summary_inner(&state)
 }
 
+pub fn sync_workspace_maps_inner(maps: Vec<MapDef>, state: &AppState) -> Result<usize, String> {
+    let mut maps_guard = super::lock_or_err(&state.maps, "maps")?;
+    let count = maps.len();
+    *maps_guard = maps;
+    Ok(count)
+}
+
+pub fn get_workspace_maps_inner(state: &AppState) -> Result<Vec<MapDef>, String> {
+    let maps_guard = super::lock_or_err(&state.maps, "maps")?;
+    Ok(maps_guard.clone())
+}
+
+#[tauri::command]
+pub fn sync_workspace_maps(maps: Vec<MapDef>, state: State<'_, AppState>) -> Result<usize, String> {
+    sync_workspace_maps_inner(maps, &state)
+}
+
+#[tauri::command]
+pub fn get_workspace_maps(state: State<'_, AppState>) -> Result<Vec<MapDef>, String> {
+    get_workspace_maps_inner(&state)
+}
+
 #[tauri::command]
 pub fn save_bin_raw(state: State<'_, AppState>) -> Result<tauri::ipc::Response, String> {
     let bytes = super::rom::save_bin_data_inner(&state)?;
@@ -1259,5 +1281,39 @@ mod tests {
         assert_eq!(total, 512);
         assert_eq!(bins, 64);
         assert_eq!(packed.len(), 16 + 64 * 3);
+    }
+
+    #[test]
+    fn sync_workspace_maps_updates_summary_and_survives_document_switch() {
+        let state = AppState::default();
+        let s1 = open_rom_document_bytes_inner(
+            Some("doc-1"),
+            Some("Stock.bin"),
+            None,
+            &[0x11u8; 128],
+            &state,
+        )
+        .unwrap();
+        assert_eq!(s1.map_count, 0);
+
+        let count = sync_workspace_maps_inner(vec![sample_map()], &state).unwrap();
+        assert_eq!(count, 1);
+        assert_eq!(get_workspace_maps_inner(&state).unwrap().len(), 1);
+        assert_eq!(get_rom_session_summary_inner(&state).unwrap().map_count, 1);
+
+        let s2 = open_rom_document_bytes_inner(
+            Some("doc-2"),
+            Some("Alt.bin"),
+            None,
+            &[0x22u8; 128],
+            &state,
+        )
+        .unwrap();
+        assert_eq!(s2.map_count, 0);
+        assert_eq!(s2.documents.iter().find(|d| d.id == "doc-1").unwrap().map_count, 1);
+
+        let back = switch_rom_document_inner("doc-1", &state).unwrap();
+        assert_eq!(back.map_count, 1);
+        assert_eq!(get_workspace_maps_inner(&state).unwrap()[0].id, "fuel");
     }
 }

@@ -17,6 +17,7 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { HorizontalScrollStrip } from '../layout/HorizontalScrollStrip';
 import {
   ChevronDown,
   ChevronRight,
@@ -994,23 +995,30 @@ export const FlashPanel: React.FC<FlashPanelProps> = ({
           <FlashSafetyFlightCard onLog={pushLog} />
 
           {/* Mode Tabs ---------------------------------------------------- */}
-          <div
+          <HorizontalScrollStrip
             role="tablist"
-            aria-label="ECU Flash and Diagnostics modes"
-            className="flex flex-wrap gap-1.5 rounded-lg border border-kiviBorder bg-kiviBg/70 p-1"
+            ariaLabel="ECU Flash and Diagnostics modes"
+            stripTestId="flash-mode-tab-strip"
+            depKey={panelTab}
+            activeSelector='[aria-selected="true"]'
+            className="h-10 rounded-lg border border-kiviBorder bg-kiviBg/70 px-1.5"
+            stripClassName="gap-1.5"
+            arrowSize="xs"
+            scrollLeftLabel="Scroll mode tabs left"
+            scrollRightLabel="Scroll mode tabs right"
           >
             <button
               type="button"
               role="tab"
               aria-selected={panelTab === 'flash'}
               onClick={() => setPanelTab('flash')}
-              className={`inline-flex min-h-[34px] flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-1.5 font-mono text-[11px] font-medium transition-colors focus-visible:ring-2 focus-visible:ring-kiviAccent ${
+              className={`inline-flex h-7 min-w-fit flex-1 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-md px-3 font-mono text-[11px] font-medium transition-colors focus-visible:ring-2 focus-visible:ring-kiviAccent ${
                 panelTab === 'flash'
                   ? 'bg-kiviAccent/20 text-kiviAccent'
                   : 'text-kiviMuted hover:bg-kiviElevated hover:text-kiviInk'
               }`}
             >
-              <HardDriveDownload className="h-3.5 w-3.5" />
+              <HardDriveDownload className="h-3.5 w-3.5 shrink-0" />
               <span>Read &amp; Flash ROM</span>
             </button>
             <button
@@ -1018,16 +1026,16 @@ export const FlashPanel: React.FC<FlashPanelProps> = ({
               role="tab"
               aria-selected={panelTab === 'diagnostics'}
               onClick={() => setPanelTab('diagnostics')}
-              className={`inline-flex min-h-[34px] flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-1.5 font-mono text-[11px] font-medium transition-colors focus-visible:ring-2 focus-visible:ring-kiviAccent ${
+              className={`inline-flex h-7 min-w-fit flex-1 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-md px-3 font-mono text-[11px] font-medium transition-colors focus-visible:ring-2 focus-visible:ring-kiviAccent ${
                 panelTab === 'diagnostics'
                   ? 'bg-kiviAccent/20 text-kiviAccent'
                   : 'text-kiviMuted hover:bg-kiviElevated hover:text-kiviInk'
               }`}
             >
-              <Wrench className="h-3.5 w-3.5" />
+              <Wrench className="h-3.5 w-3.5 shrink-0" />
               <span>Diagnostics (ELM327 / OBD)</span>
             </button>
-          </div>
+          </HorizontalScrollStrip>
 
           {panelTab === 'flash' ? (
             <>

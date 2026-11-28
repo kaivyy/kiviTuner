@@ -18,6 +18,13 @@ export const TOOL_WINDOW_IDS = [
 
 export type ToolWindowId = (typeof TOOL_WINDOW_IDS)[number];
 
+export interface StandaloneTabParams {
+  tabId: string;
+  kind: string;
+  title: string;
+  mapId?: string;
+}
+
 export interface OpenToolWindowOptions {
   toolId: ToolWindowId;
   title: string;
@@ -81,6 +88,50 @@ export function getStandaloneWindowId(search?: string): ToolWindowId | null {
   const value = params.get('window');
   if (!value) return null;
   return (TOOL_WINDOW_IDS as readonly string[]).includes(value) ? (value as ToolWindowId) : null;
+}
+
+/** Extracts validated `?window=tab&tabId=...` parameters when running in a popped-out tab window. */
+export function getStandaloneTabParams(search?: string): StandaloneTabParams | null {
+  const rawSearch =
+    search !== undefined
+      ? search
+      : typeof window !== 'undefined'
+        ? window.location.search
+        : '';
+  if (!rawSearch) return null;
+  const params = new URLSearchParams(rawSearch.startsWith('?') ? rawSearch : `?${rawSearch}`);
+  if (params.get('window') !== 'tab') return null;
+  const tabId = params.get('tabId')?.trim();
+  const kind = params.get('kind')?.trim();
+  const title = params.get('title')?.trim() || 'kiviTuner Workspace';
+  const mapId = params.get('mapId')?.trim() || undefined;
+  if (!tabId || !kind) return null;
+  return { tabId, kind, title, mapId };
+}
+
+/** Spawns or focuses a frameless secondary desktop window for a detached studio tab. */
+export async function bridgeOpenWorkspaceTabWindow(
+  opts: StandaloneTabParams & { width?: number; height?: number },
+  deps?: WindowControlsDeps
+): Promise<boolean> {
+  if (!defaultIsDesktop(deps)) return false;
+  try {
+    const call = deps?.invokeFn ?? invoke;
+    await call<string>('open_workspace_tab_window', {
+      spec: {
+        tab_id: opts.tabId,
+        kind: opts.kind,
+        title: opts.title,
+        map_id: opts.mapId ?? null,
+        width: opts.width ?? null,
+        height: opts.height ?? null,
+      },
+    });
+    return true;
+  } catch (err) {
+    console.warn('open_workspace_tab_window IPC error:', err);
+    return false;
+  }
 }
 
 /** Spawns or focuses a frameless separate Tauri desktop window; returns `false` in browsers. */

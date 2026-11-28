@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { BookOpen, ChevronLeft, ChevronRight, Lightbulb, Search, X } from 'lucide-react';
 import { FloatingWindow, useFloatingWindowContext } from '../layout/FloatingWindow';
+import { HorizontalScrollStrip } from '../layout/HorizontalScrollStrip';
 import { TOOL_WINDOW_SPECS } from '../layout/toolWindowRegistry';
 import {
   TUTORIAL_CHAPTERS,
@@ -84,7 +85,7 @@ const HowToUseBody: React.FC<{
         className={`flex items-center gap-2 rounded-lg border text-left text-[11px] transition-colors ${
           isWide
             ? 'w-full px-2.5 py-2'
-            : 'min-h-[44px] shrink-0 whitespace-nowrap px-2.5 py-1.5 sm:min-h-[34px]'
+            : 'h-7 shrink-0 whitespace-nowrap px-2.5'
         } ${
           selected
             ? 'border-kiviAccent bg-kiviElevated font-semibold text-kiviInk'
@@ -122,11 +123,25 @@ const HowToUseBody: React.FC<{
           </nav>
         </aside>
       ) : (
-        <div className="shrink-0 space-y-2 border-b border-kiviBorder bg-kiviBg p-3">
+        <div
+          data-testid="guide-compact-nav-card"
+          className="flex shrink-0 flex-col gap-1.5 border-b border-kiviBorder bg-kiviBg px-3 pt-2.5 pb-1.5"
+        >
           {searchBox}
-          <nav aria-label="Daftar bab tutorial" className="no-scrollbar flex items-center gap-1.5 overflow-x-auto pb-0.5">
+          <HorizontalScrollStrip
+            as="nav"
+            ariaLabel="Daftar bab tutorial"
+            stripTestId="guide-chapter-strip"
+            depKey={`${activeChapter?.id ?? ''}:${filteredChapters.length}`}
+            activeSelector='[aria-current="step"]'
+            className="h-10"
+            stripClassName="gap-1.5"
+            arrowSize="xs"
+            scrollLeftLabel="Gulir langkah ke kiri"
+            scrollRightLabel="Gulir langkah ke kanan"
+          >
             {chapterButtons}
-          </nav>
+          </HorizontalScrollStrip>
         </div>
       )}
 

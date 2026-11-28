@@ -171,28 +171,34 @@ const HeatmapRowComponent: React.FC<HeatmapRowProps> = ({
                 <span className="w-1.5 h-1.5 rounded-full bg-kiviWarn opacity-90 shadow-sm" />
               </span>
             )}
-            {isEditing ? (
+            <span
+              aria-hidden={isEditing || undefined}
+              className={`flex flex-col items-center leading-tight ${isEditing ? 'invisible' : ''}`}
+            >
+              <span>{displayStr}</span>
+              {previewVal !== undefined && (
+                <span
+                  data-testid="smoothing-preview-value"
+                  className="text-[10px] font-normal text-kiviWarn"
+                >
+                  {previewVal.toFixed(decimals)}
+                </span>
+              )}
+            </span>
+            {isEditing && (
               <input
                 type="text"
+                size={1}
                 autoFocus
                 aria-label={`Edit cell row ${rIdx} column ${cIdx}`}
                 value={editingValue}
                 onChange={(e) => onChangeEditingValue(e.target.value)}
+                onFocus={(e) => e.currentTarget.select()}
+                onMouseDown={(e) => e.stopPropagation()}
+                onDoubleClick={(e) => e.stopPropagation()}
                 onBlur={onCommitEdit}
-                className="w-full text-center bg-kiviBg text-kiviInk rounded px-0.5 py-0 border border-kiviAccent focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-kiviAccent font-bold"
+                className="absolute inset-0 z-20 h-full w-full min-w-0 bg-kiviBg px-1 text-center font-mono text-xs font-bold text-kiviInk outline-none ring-2 ring-inset ring-kiviAccent"
               />
-            ) : (
-              <span className="flex flex-col items-center leading-tight">
-                <span>{displayStr}</span>
-                {previewVal !== undefined && (
-                  <span
-                    data-testid="smoothing-preview-value"
-                    className="text-[10px] font-normal text-kiviWarn"
-                  >
-                    {previewVal.toFixed(decimals)}
-                  </span>
-                )}
-              </span>
             )}
           </td>
         );

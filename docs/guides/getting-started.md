@@ -13,7 +13,7 @@ Native hardware adapters (SAE J2534 with automatic Win64-to-Win32 bridging, Tact
 1. Press `Ctrl+O` or open `File -> Open ROM...` (on macOS, use the global menu bar next to the Apple icon) to load a firmware image (`.bin`, `.rom`, Intel `.hex`, Motorola `.s19`, or `.vbf`).
 2. Press `Ctrl+D` or open `Definition (XDF) -> Load XDF...` to import an existing definition file (`.xdf`, `.a2l`, `.kp`, `.ini`, or `.kivi.json`).
 3. Confirm the checksum indicator in the top menu bar reads green before making calibration edits.
-4. Open the Command Palette (`Ctrl+K`) at any time to run menu actions without searching through submenus, and scroll horizontally across `WorkspaceTabBar` with mouse wheel gestures or overflow arrow buttons when many tabs are open.
+4. Open the Command Palette (`Ctrl+K`) at any time to run menu actions without searching through submenus. Any toolbar or tab strip with overflow buttons (`WorkspaceTabBar`, view modes, toolkit tools, and tutorial steps) supports mouse-wheel scrolling, slim horizontal scrollbars, and borderless chevron steppers, and individual studio tabs can be popped out into floating windows or standalone desktop OS windows (`?window=tab`) with live ROM sync.
 
 When a ROM loads, kiviTuner keeps an immutable snapshot of the original bytes (`original_memory` on desktop, `originalRomData` in browser mode) separate from the editable working buffer.
 
@@ -29,15 +29,15 @@ Use the `Map Explorer` sidebar on the left to locate tables inside your loaded d
 | `+` button or `Definition (XDF) -> Create New...` | Creates a `Table 2D/3D`, `Axis 1D`, `1x1 Scalar`, or `Bitmask Flag` manually |
 | `Candidate Regions` drawer | Lists heuristic and structural map candidates with jump-to-hex and one-click promote |
 
-Right-click or click the Split icon on any map in `Map Explorer` (or toggle Split View in `WorkspaceTabBar`) to inspect two maps side by side.
+Right-click or click the Split icon on any map in `Map Explorer` (or toggle Split View in `WorkspaceTabBar`) to inspect two independent maps side by side, or click the Detach icon on a tab to pop it out into a floating window or standalone OS window. Drag the vertical divider edge on `Map Explorer` or the right dock (`Inspector` / `Discovery Scanner`) to resize panels smoothly, drag past the narrow threshold to auto-collapse, or double-click any divider to restore its default width.
 
 ## 4. Discover Maps Without a Definition
 
 If you open an undefined binary image, combine `Discovery Scanner`, `Hexdump Pro`, and `KiviWaveform`:
 
-1. Open `Discovery Scanner` from the left `ActivityRail` (`Ctrl+F`) to run `blind_v2` structural 2D/1D discovery (desktop), Heuristic scan, or the 16-bit Window scanner (`Discovery Scanner` and `Inspector` share the right sidebar slot cleanly). Candidate addresses populate `Potential Maps`.
-2. Switch to the `Hex` tab from `WorkspaceTabBar` or `ActivityRail`.
-3. Toggle `8b` / `16b` word width and `Hex` / `Dec` display, then adjust column alignment with `-` / `+` (or `W` / `M`) until repeating row patterns line up vertically.
+1. Open `Discovery Scanner` from the left `ActivityRail` (`Ctrl+F`) to run `blind_v2` structural 2D/1D discovery (desktop), Heuristic scan, or the 16-bit Window scanner (`Discovery Scanner` and `Inspector` share the unified resizable right dock with smooth zero-overlap switching). Candidate addresses populate `Potential Maps`.
+2. Switch to the `Hex` tab from `WorkspaceTabBar` or `ActivityRail` (or detach it into its own window).
+3. Toggle `8b` / `16b` word width and `Hex` / `Dec` display, double-click or press `Enter` on any hex cell for inline byte editing without column width shifts, and adjust column alignment with `-` / `+` (or `W` / `M`) until repeating row patterns line up vertically.
 4. Enable `Diff` to highlight bytes changed relative to stock in green, and press `F` / `Shift+F` to jump across amber `Potential Maps` blocks.
 5. Drag a byte range in the hex view (or click a candidate block) and click `Promote Map` to turn that region into an editable table definition. Check the bottom Data Inspector bar to read `u8`, `i8`, `u16`, `i16`, `u32`, `i32`, and `f32` values in both Big Endian and Little Endian at the cursor.
 
@@ -47,10 +47,10 @@ If you open an undefined binary image, combine `Discovery Scanner`, `Hexdump Pro
 
 1. Select any 2D map or `1xN` / `Nx1` curve from `Map Explorer`.
 2. Drag across cells (or use `Arrows` / `Shift+Arrows`) to select a working range.
-3. Modify values with `Enter`, `+` / `-` (step increment), `=` (set constant), or `%` / `*` (percentage/factor scale), or use `Edit & Table Math` in the top menu bar.
+3. Modify values inline by double-clicking any cell (table column widths stay locked during editing), or with `Enter`, `+` / `-` (step increment), `=` (set constant), or `%` / `*` (percentage/factor scale), or use `Edit & Table Math` in the top menu bar.
 4. Smooth transitions with `S` (3x3 Gaussian smooth) or fill between boundary cells with `I` (bilinear), `H` (horizontal), or `V` (vertical).
 5. Switch display modes between `Engineering`, `Raw Hex`, `Raw Dec`, `Delta`, and `% Delta` against the immutable stock baseline.
-6. Press `Ctrl+\` (or choose `Split 3D` / `Full 3D` in the workspace toolbar) to inspect a calibrated 3D surface mesh with bounding cage, axis ticks, and color legend alongside a scrollable 2D table, or click `2D Table` to switch right back. Maps sized `1xN` or `Nx1` automatically display the draggable `CurveProfileChart` with a dashed stock reference curve.
+6. Press `Ctrl+\` (or choose `Split 3D` / `Full 3D` in the workspace toolbar) to inspect a calibrated 3D surface mesh with floating click-to-expand Camera angle menu (`Iso` / `Top` / `Front` / `Side` / `Reset`), Layers popover (`Mesh` / `Solid` / `Wire`, `Cage`, `Ghost`, `Color Scale`, `Palette`, `Z-Scale`), vertical zoom capsule, and compact cell telemetry pill; drag split dividers to resize or click `2D Table` to switch right back. Maps sized `1xN` or `Nx1` automatically display the draggable `CurveProfileChart` with a dashed stock reference curve.
 
 ### 1x1 Scalars and Bitmask Flags
 

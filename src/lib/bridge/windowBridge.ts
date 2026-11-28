@@ -278,6 +278,26 @@ export async function bridgeGetRomSessionSummary(): Promise<RomSessionSummary | 
   return await invoke<RomSessionSummary>('get_rom_session_summary');
 }
 
+export async function bridgeSyncWorkspaceMaps(maps: MapDef[]): Promise<number | null> {
+  if (!isDesktopApp()) return null;
+  try {
+    return await invoke<number>('sync_workspace_maps', { maps });
+  } catch (err) {
+    console.warn('Tauri sync_workspace_maps IPC error:', err);
+    return null;
+  }
+}
+
+export async function bridgeGetWorkspaceMaps(): Promise<MapDef[] | null> {
+  if (!isDesktopApp()) return null;
+  try {
+    return await invoke<MapDef[]>('get_workspace_maps');
+  } catch (err) {
+    console.warn('Tauri get_workspace_maps IPC error:', err);
+    return null;
+  }
+}
+
 export async function bridgeSaveBinRaw(fallbackRom?: Uint8Array | null): Promise<Uint8Array | null> {
   if (isDesktopApp()) {
     try {

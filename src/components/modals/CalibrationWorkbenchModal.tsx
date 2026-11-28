@@ -8,6 +8,7 @@
 import React, { useEffect, useState } from 'react';
 import { Activity, Calculator, Cpu, FileCode, GitCompare, ShieldCheck, Sliders } from 'lucide-react';
 import { FloatingWindow } from '../layout/FloatingWindow';
+import { HorizontalScrollStrip } from '../layout/HorizontalScrollStrip';
 import { TOOL_WINDOW_SPECS } from '../layout/toolWindowRegistry';
 import type { SelectionRange } from '../editor';
 import type { MapDef } from '../../types/kivi';
@@ -572,27 +573,40 @@ export const CalibrationWorkbenchModal: React.FC<CalibrationWorkbenchModalProps>
       titlebarTone="sidebar"
       closeLabel="Close calibration workbench"
     >
-      <div className="flex shrink-0 flex-wrap gap-1 border-b border-kiviBorder bg-kiviBg px-3 py-2">
-          {tabButtons.map((item) => (
-            <button
-              key={item.id}
-              type="button"
-              onClick={() => {
-                setTab(item.id);
-                setBannerState(null);
-                setInfoMessage(null);
-              }}
-              className={`flex items-center gap-1.5 rounded px-2.5 py-1 text-xs font-medium transition-colors ${
-                tab === item.id
-                  ? 'border border-kiviAccent/30 bg-kiviAccent/20 text-kiviAccent'
-                  : 'border border-transparent text-kiviMuted hover:text-kiviInk'
-              }`}
-            >
-              {item.icon}
-              <span>{item.label}</span>
-            </button>
-          ))}
-        </div>
+      <HorizontalScrollStrip
+        role="tablist"
+        ariaLabel="Calibration workbench tabs"
+        stripTestId="workbench-tab-strip"
+        depKey={tab}
+        activeSelector='[aria-selected="true"]'
+        className="h-10 border-b border-kiviBorder bg-kiviBg px-2.5"
+        stripClassName="gap-1"
+        arrowSize="xs"
+        scrollLeftLabel="Scroll workbench tabs left"
+        scrollRightLabel="Scroll workbench tabs right"
+      >
+        {tabButtons.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            role="tab"
+            aria-selected={tab === item.id}
+            onClick={() => {
+              setTab(item.id);
+              setBannerState(null);
+              setInfoMessage(null);
+            }}
+            className={`flex h-7 shrink-0 items-center gap-1.5 whitespace-nowrap rounded px-2.5 text-xs font-medium transition-colors ${
+              tab === item.id
+                ? 'border border-kiviAccent/30 bg-kiviAccent/20 text-kiviAccent'
+                : 'border border-transparent text-kiviMuted hover:text-kiviInk'
+            }`}
+          >
+            {item.icon}
+            <span>{item.label}</span>
+          </button>
+        ))}
+      </HorizontalScrollStrip>
 
         <div className="flex-1 space-y-3 overflow-y-auto p-4 text-xs">
           <FeedbackBanner state={bannerState} infoMessage={infoMessage} />

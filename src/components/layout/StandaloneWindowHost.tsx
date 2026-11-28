@@ -1,7 +1,13 @@
-import React, { Suspense, lazy, useEffect, useMemo, useState } from 'react';
+import React, { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
+import { Activity, Binary, Box, Columns, Table2 } from 'lucide-react';
 import { applyThemeToDocument, useThemeStore, type KiviTheme } from '../../stores/useThemeStore';
 import { useMapStore } from '../../stores/useMapStore';
-import { bridgeWindowClose, type ToolWindowId } from '../../lib/windowControlsBridge';
+import type { WorkspaceTab, WorkspaceTabKind } from '../../stores/useWorkspaceTabsStore';
+import {
+  bridgeWindowClose,
+  type StandaloneTabParams,
+  type ToolWindowId,
+} from '../../lib/windowControlsBridge';
 import {
   bridgeConvertDiffToMap,
   isDesktopApp,
@@ -12,6 +18,8 @@ import {
   subscribeWorkspaceSyncEvents,
 } from '../../lib/workspaceSyncBridge';
 import type { MapDef } from '../../types/kivi';
+import { FloatingWindow } from './FloatingWindow';
+import { WorkspaceTabContent } from '../workspace/WorkspaceTabContent';
 
 const TelemetryDevPanel = lazy(() =>
   import('../telemetry/TelemetryDevPanel').then((m) => ({ default: m.TelemetryDevPanel }))
@@ -47,7 +55,8 @@ const AutoTuneReviewModal = lazy(() =>
 );
 
 export interface StandaloneWindowHostProps {
-  toolId: ToolWindowId;
+  toolId?: ToolWindowId;
+  tabParams?: StandaloneTabParams;
 }
 
 function useSyncedWindowTheme(): void {
@@ -76,6 +85,7 @@ const StandaloneRomWindowHost: React.FC<{ toolId: ToolWindowId; onClose: () => v
   const hashes = useMapStore((s) => s.hashes);
   const maps = useMapStore((s) => s.maps);
   const selectedMapId = useMapStore((s) => s.selectedMapId);
+  const romRevision = useMapStore((s) => s.romRevision);
   const activeMatrix = useMapStore((s) => s.activeMatrix);
   const checksumAlgorithmName = useMapStore((s) => s.checksumAlgorithmName);
   const [syncedDiffs, setSyncedDiffs] = useState<DiffRegion[]>([]);
@@ -93,7 +103,7 @@ const StandaloneRomWindowHost: React.FC<{ toolId: ToolWindowId; onClose: () => v
     }
     const unsub = subscribeWorkspaceSyncEvents((ev) => {
       if (ev.type === 'workspace-snapshot') {
-        useMapStore.getState().setMaps(ev.maps);
+        useMapStore.getState().setMaps(ev.maps, false);
         useMapStore.getState().selectMap(ev.selectedMapId);
         setSyncedDiffs(ev.diffs);
       } else if (ev.type === 'diffs-updated') {
@@ -110,7 +120,7 @@ const StandaloneRomWindowHost: React.FC<{ toolId: ToolWindowId; onClose: () => v
     if ((toolId === 'workbench' || toolId === 'autotune') && selectedMap && (romLoaded || romData)) {
       void useMapStore.getState().extractMatrix(selectedMap);
     }
-  }, [toolId, selectedMap, romLoaded, romData]);
+  }, [toolId, selectedMap, romLoaded, romData, romRevision]);
 
   switch (toolId) {
     case 'telemetry':
@@ -240,12 +250,136 @@ const StandaloneRomWindowHost: React.FC<{ toolId: ToolWindowId; onClose: () => v
   }
 };
 
+const StandaloneWorkspaceTabHost: React.FC<{
+  tabParams: StandaloneTabParams;
+  onClose: () => void;
+}> = ({ tabParams, onClose }) => {
+  const maps = useMapStore((s) => s.maps);
+  const romRevision = useMapStore((s) => s.romRevision);
+  const activeDocId = useMapStore((s) => s.activeDocId);
+  const [tabKind, setTabKind] = useState<WorkspaceTabKind>(
+    (tabParams.kind as WorkspaceTabKind) || 'map-table'
+  );
+  const [syncedDiffs, setSyncedDiffs] = useState<DiffRegion[]>([]);
+  const remoteRomRevRef = useRef<number>(romRevision);
+
+  useEffect(() => {
+    if (isDesktopApp()) {
+      void useMapStore.getState().refreshRomSession();
+    }
+    const unsub = subscribeWorkspaceSyncEvents((ev) => {
+      if (ev.type === 'workspace-snapshot') {
+        useMapStore.getState().setMaps(ev.maps, false);
+        setSyncedDiffs(ev.diffs);
+      } else if (ev.type === 'diffs-updated') {
+        setSyncedDiffs(ev.diffs);
+      } else if (ev.type === 'rom-updated' && isDesktopApp()) {
+        remoteRomRevRef.current = useMapStore.getState().romRevision + 1;
+        void useMapStore.getState().refreshRomSession();
+      }
+    });
+    void emitWorkspaceSyncEvent({ type: 'request-snapshot' });
+    return unsub;
+  }, []);
+
+  useEffect(() => {
+    if (!isDesktopApp()) return;
+    if (romRevision === 0 || romRevision === remoteRomRevRef.current) return;
+    void emitWorkspaceSyncEvent({ type: 'rom-updated', activeDocId, revision: romRevision });
+  }, [romRevision, activeDocId]);
+
+  const mapDef = useMemo(
+    () => (tabParams.mapId ? maps.find((m) => m.id === tabParams.mapId) : undefined),
+    [maps, tabParams.mapId]
+  );
+
+  const tab: WorkspaceTab = useMemo(
+    () => ({
+      id: tabParams.tabId,
+      kind: tabKind,
+      title: mapDef?.name ?? tabParams.title,
+      mapId: tabParams.mapId,
+    }),
+    [tabParams.tabId, tabParams.title, tabParams.mapId, mapDef?.name, tabKind]
+  );
+
+  const isMapTab =
+    tabKind === 'map-table' || tabKind === 'map-3d' || tabKind === 'map-split';
+
+  const icon =
+    tabKind === 'map-3d' ? (
+      <Box className="h-3.5 w-3.5" />
+    ) : tabKind === 'map-split' ? (
+      <Columns className="h-3.5 w-3.5" />
+    ) : tabKind === 'hex' ? (
+      <Binary className="h-3.5 w-3.5" />
+    ) : tabKind === 'waveform' ? (
+      <Activity className="h-3.5 w-3.5" />
+    ) : (
+      <Table2 className="h-3.5 w-3.5" />
+    );
+
+  return (
+    <FloatingWindow
+      windowId={`tab-${tabParams.tabId}`}
+      isOpen
+      standalone
+      onClose={onClose}
+      title={tab.title}
+      badge={mapDef ? `0x${mapDef.address.toString(16).toUpperCase()}` : undefined}
+      icon={icon}
+      titlebarTone="sidebar"
+      headerActions={
+        isMapTab ? (
+          <div className="flex items-center rounded bg-kiviSurface/80 p-0.5 text-[10px]">
+            {(
+              [
+                { kind: 'map-table', label: '2D' },
+                { kind: 'map-split', label: 'Split' },
+                { kind: 'map-3d', label: '3D' },
+              ] as const
+            ).map((item) => (
+              <button
+                key={item.kind}
+                type="button"
+                onClick={() => setTabKind(item.kind)}
+                className={`rounded px-1.5 py-0.5 font-medium transition-colors ${
+                  tabKind === item.kind
+                    ? 'bg-kiviAccent text-kiviAccentFg'
+                    : 'text-kiviSecondary hover:text-kiviInk'
+                }`}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+        ) : undefined
+      }
+    >
+      <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-kiviBg p-2.5">
+        <WorkspaceTabContent
+          tab={tab}
+          mapDef={mapDef}
+          diffRegions={syncedDiffs}
+          onPatchByte={(offset, value) =>
+            useMapStore
+              .getState()
+              .patchRomBytes([{ offset, bytes: [value] }], `Hex edit 0x${offset.toString(16).toUpperCase()}`)
+          }
+          onRevertToOriginal={(targetMap, sel) => {
+            void useMapStore.getState().revertMapToOriginal(targetMap, sel);
+          }}
+        />
+      </div>
+    </FloatingWindow>
+  );
+};
+
 /**
- * Renders an independent tool popup directly as the root of a standalone
- * frameless Tauri desktop window (`?window=<id>`), lazy-loading only the active
- * tool view and skipping heavy workspace ROM subscriptions for static tools.
+ * Renders an independent tool or popped-out workspace tab directly as the root of a
+ * standalone frameless Tauri desktop window (`?window=<id>` or `?window=tab&...`).
  */
-export const StandaloneWindowHost: React.FC<StandaloneWindowHostProps> = ({ toolId }) => {
+export const StandaloneWindowHost: React.FC<StandaloneWindowHostProps> = ({ toolId, tabParams }) => {
   useSyncedWindowTheme();
 
   const handleClose = () => {
@@ -253,29 +387,33 @@ export const StandaloneWindowHost: React.FC<StandaloneWindowHostProps> = ({ tool
   };
 
   let content: React.ReactNode;
-  switch (toolId) {
-    case 'toolkit':
-      content = <EngineeringToolkit isOpen standalone onClose={handleClose} />;
-      break;
-    case 'catalogue':
-      content = <CataloguePanel isOpen standalone onClose={handleClose} />;
-      break;
-    case 'guide':
-      content = <HowToUseModal isOpen standalone onClose={handleClose} />;
-      break;
-    case 'shortcuts':
-      content = <ShortcutsModal isOpen standalone onClose={handleClose} />;
-      break;
-    default:
-      content = <StandaloneRomWindowHost toolId={toolId} onClose={handleClose} />;
-      break;
+  if (tabParams) {
+    content = <StandaloneWorkspaceTabHost tabParams={tabParams} onClose={handleClose} />;
+  } else {
+    switch (toolId) {
+      case 'toolkit':
+        content = <EngineeringToolkit isOpen standalone onClose={handleClose} />;
+        break;
+      case 'catalogue':
+        content = <CataloguePanel isOpen standalone onClose={handleClose} />;
+        break;
+      case 'guide':
+        content = <HowToUseModal isOpen standalone onClose={handleClose} />;
+        break;
+      case 'shortcuts':
+        content = <ShortcutsModal isOpen standalone onClose={handleClose} />;
+        break;
+      default:
+        content = <StandaloneRomWindowHost toolId={toolId ?? 'about'} onClose={handleClose} />;
+        break;
+    }
   }
 
   return (
     <Suspense
       fallback={
         <div className="fixed inset-0 flex h-screen w-screen items-center justify-center bg-kiviSurface font-mono text-xs text-kiviMuted">
-          Loading {toolId}...
+          Loading {tabParams?.title ?? toolId ?? 'window'}...
         </div>
       }
     >

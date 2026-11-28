@@ -1872,7 +1872,7 @@ dependencies = [
 
 [[package]]
 name = "kivi-checksum"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "crc32fast",
  "kivi-core",
@@ -1884,7 +1884,7 @@ dependencies = [
 
 [[package]]
 name = "kivi-core"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "byteorder",
  "md-5",
@@ -1896,7 +1896,7 @@ dependencies = [
 
 [[package]]
 name = "kivi-defs"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "evalexpr",
  "kivi-core",
@@ -1908,7 +1908,7 @@ dependencies = [
 
 [[package]]
 name = "kivi-diff"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "kivi-core",
  "kivi-defs",
@@ -1919,7 +1919,7 @@ dependencies = [
 
 [[package]]
 name = "kivi-flashing"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "kivi-checksum",
  "kivi-core",
@@ -1936,7 +1936,7 @@ dependencies = [
 
 [[package]]
 name = "kivi-formats"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "kivi-checksum",
  "miniz_oxide 0.8.9",
@@ -1945,14 +1945,14 @@ dependencies = [
 
 [[package]]
 name = "kivi-j2534-bridge"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "kivi-flashing",
 ]
 
 [[package]]
 name = "kivi-physics"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "kivi-defs",
  "thiserror 2.0.21",
@@ -1960,7 +1960,7 @@ dependencies = [
 
 [[package]]
 name = "kivi-project"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "kivi-core",
  "kivi-defs",
@@ -1971,7 +1971,7 @@ dependencies = [
 
 [[package]]
 name = "kivi-protocol"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "async-trait",
  "kivi-core",
@@ -1988,7 +1988,7 @@ dependencies = [
 
 [[package]]
 name = "kivi-scanner"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "kivi-core",
  "kivi-defs",
@@ -2002,7 +2002,7 @@ dependencies = [
 
 [[package]]
 name = "kivi-telemetry"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "kivi-defs",
  "thiserror 2.0.21",
@@ -2010,7 +2010,7 @@ dependencies = [
 
 [[package]]
 name = "kivituner"
-version = "0.1.2"
+version = "0.1.3"
 dependencies = [
  "chrono",
  "futures-util",

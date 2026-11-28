@@ -4,6 +4,30 @@ All notable changes to kiviTuner are documented in this file.
 
 ## [Unreleased]
 
+## [0.1.3] - 2026-11-28
+
+Multi-document detachable studio tabs, resizable panels and split views, floating 3D HUD controls, horizontal scroll strips, and table/hex editing polish ([v0.1.3 Release](https://github.com/kaivyy/kiviTuner/releases/tag/v0.1.3)).
+
+### Added
+
+- Detachable studio tabs (`useWorkspaceTabsStore`, `DetachedWorkspaceWindow`, `WorkspaceTabContent`, `open_workspace_tab_window` in `src-tauri/src/window_manager.rs`, and `?window=tab` support in `StandaloneWindowHost`) allowing individual map, Hex, and Waveform tabs to pop out into floating workspace windows or standalone desktop OS windows with live cross-window map and ROM synchronization (`sync_workspace_maps` / `get_workspace_maps` and echo-guarded `rom-updated` events).
+- Draggable panel and split resizers (`SplitResizeHandle`, `resizeModel.ts`) across `Map Explorer` (180 to 440 px, auto-collapse below 140 px), right dock (`Inspector` / `Discovery Scanner`, 220 to 480 px, auto-collapse below 160 px), `Split 3D`, `Split Wave`, and side-by-side `Workspace Split` with double-click reset.
+- Reusable `HorizontalScrollStrip` (`useHorizontalStripScroll`) with wheel scrolling, compact slim scrollbar (`.kivi-tab-scrollbar`), and clean borderless, backgroundless prev/next chevron steppers wired across `WorkspaceTabBar`, `WorkspaceViewport`, `HeatmapToolbar`, `HeatmapAnalysisBar`, `HowToUseModal`, `EngineeringToolkit`, `CalibrationWorkbenchModal`, `CataloguePanel`, `FlashPanel`, `FlashDiagnosticsSection`, and `StatusBar`.
+
+### Improved
+
+- Overhauled `Surface3DView` with map-style click-to-expand floating overlays (`ViewportOverlayControls`): compact single-line top-left cell readout pill, top-right Camera menu (`Iso`, `Top`, `Front`, `Side`, `Reset`) and Layers popover (`Mesh`, `Solid`, `Wire`, `Cage`, `Ghost`, `Color Scale`, `Palette`, `Z-Scale`), bottom-right vertical zoom/reset capsule, and bottom-left compact horizontal color scale pill while preserving centered geometry and clear Z-axis elevation ticks across zoom levels and detached split windows.
+- Unified right dock state resolver (`rightDockModel.ts`) eliminating alternating toggle glitches and overlap frames when switching between `Inspector` and `ROM Discovery Scanner`.
+- Wired live inline hex byte editing (`onPatchByte`) into `HexdumpView` alongside synchronized multi-window updates.
+- Updated user and architecture documentation (`README.md`, `DESIGN.md`, `docs/guides/getting-started.md`, and `howToUseData.ts`).
+
+### Fixed
+
+- Fixed desktop menubar and floating window dragging lockups (`data-tauri-drag-region="deep"`, `"core:window:allow-internal-toggle-maximize"` capability, and 4-direction pointer-capture dragging on `FloatingWindow`).
+- Fixed 2D table column width expansion during inline cell editing (`HeatmapRow.tsx`) and inline hex byte editing (`HexdumpView.tsx`) by keeping the formatted cell span in flow and mounting `<input size={1}>` as an `absolute inset-0` overlay.
+- Fixed `Map Explorer` and right dock auto-collapse visual jump where drawers briefly snapped back to default width during slide-out exit animations.
+- Fixed `WorkspaceViewport` secondary split pane rendering the primary selected map instead of its independent split map (`useMapMatrix`, `resolveEffectiveMapAxes`).
+
 ## [0.1.2] - 2026-11-28
 
 UI refinement, macOS menu bar integration, responsive layout parity, and WebView memory optimization release ([v0.1.2 Release](https://github.com/kaivyy/kiviTuner/releases/tag/v0.1.2)).

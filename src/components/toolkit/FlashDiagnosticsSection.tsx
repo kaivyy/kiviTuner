@@ -5,6 +5,7 @@
  */
 
 import React, { useState } from 'react';
+import { HorizontalScrollStrip } from '../layout/HorizontalScrollStrip';
 import {
   Activity,
   AlertTriangle,
@@ -227,10 +228,17 @@ export const FlashDiagnosticsSection: React.FC<FlashDiagnosticsSectionProps> = (
       </div>
 
       {/* Diagnostic Sub-tabs */}
-      <div
+      <HorizontalScrollStrip
         role="tablist"
-        aria-label="Diagnostic workspace sub-tabs"
-        className="flex flex-wrap gap-1 rounded-lg border border-kiviBorder bg-kiviBg/70 p-1"
+        ariaLabel="Diagnostic workspace sub-tabs"
+        stripTestId="flash-diag-subtab-strip"
+        depKey={subtab}
+        activeSelector='[aria-selected="true"]'
+        className="h-10 rounded-lg border border-kiviBorder bg-kiviBg/70 px-1.5"
+        stripClassName="gap-1"
+        arrowSize="xs"
+        scrollLeftLabel="Scroll diagnostic tabs left"
+        scrollRightLabel="Scroll diagnostic tabs right"
       >
         {SUBTABS.map((t) => (
           <button
@@ -239,7 +247,7 @@ export const FlashDiagnosticsSection: React.FC<FlashDiagnosticsSectionProps> = (
             role="tab"
             aria-selected={subtab === t.id}
             onClick={() => setSubtab(t.id)}
-            className={`min-h-[30px] flex-1 whitespace-nowrap rounded px-2 py-1 font-mono text-[10px] font-medium transition-colors focus-visible:ring-2 focus-visible:ring-kiviAccent ${
+            className={`h-7 min-w-fit flex-1 shrink-0 whitespace-nowrap rounded px-2 font-mono text-[10px] font-medium transition-colors focus-visible:ring-2 focus-visible:ring-kiviAccent ${
               subtab === t.id
                 ? 'bg-kiviAccent/20 text-kiviAccent'
                 : 'text-kiviMuted hover:bg-kiviElevated hover:text-kiviInk'
@@ -248,7 +256,7 @@ export const FlashDiagnosticsSection: React.FC<FlashDiagnosticsSectionProps> = (
             {t.label}
           </button>
         ))}
-      </div>
+      </HorizontalScrollStrip>
 
       {subtab === 'overview' && (
         <div className="space-y-3">

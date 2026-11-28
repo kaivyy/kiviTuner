@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useEffect } from 'react';
 import {
   Activity,
   Binary,
@@ -8,6 +8,7 @@ import {
   Columns,
   FileCode2,
   GitCompare,
+  PictureInPicture2,
   Pin,
   Plus,
   Search,
@@ -18,6 +19,7 @@ import {
 } from 'lucide-react';
 import type { RomDocumentSummary } from '../../lib/bridge/windowBridge';
 import type { WorkspaceTab, WorkspaceTabKind } from '../../stores/useWorkspaceTabsStore';
+import { useHorizontalStripScroll } from '../../hooks/useHorizontalStripScroll';
 
 export interface WorkspaceTabBarProps {
   romDocuments: RomDocumentSummary[];
@@ -32,6 +34,7 @@ export interface WorkspaceTabBarProps {
   onActivateTab: (id: string) => void;
   onCloseTab: (id: string) => void;
   onTogglePinTab: (id: string) => void;
+  onDetachTab?: (id: string) => void;
   onToggleSplitView: () => void;
   onOpenCommandPalette: () => void;
 }
@@ -69,53 +72,6 @@ function formatRomBytes(bytes: number): string {
   return `${bytes} B`;
 }
 
-function useHorizontalStripScroll(depKey: string) {
-  const ref = useRef<HTMLDivElement | null>(null);
-  const [scrollState, setScrollState] = useState({
-    hasOverflow: false,
-    canLeft: false,
-    canRight: false,
-  });
-
-  const refresh = useCallback(() => {
-    const el = ref.current;
-    if (!el) return;
-    const hasOverflow = el.scrollWidth > el.clientWidth + 2;
-    const canLeft = hasOverflow && el.scrollLeft > 2;
-    const canRight = hasOverflow && el.scrollLeft + el.clientWidth < el.scrollWidth - 2;
-    setScrollState((prev) =>
-      prev.hasOverflow === hasOverflow && prev.canLeft === canLeft && prev.canRight === canRight
-        ? prev
-        : { hasOverflow, canLeft, canRight }
-    );
-  }, []);
-
-  useEffect(() => {
-    refresh();
-    const el = ref.current;
-    if (!el || typeof ResizeObserver === 'undefined') return;
-    const ro = new ResizeObserver(refresh);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [refresh, depKey]);
-
-  const scrollByDelta = useCallback((delta: number) => {
-    const el = ref.current;
-    if (!el) return;
-    el.scrollBy({ left: delta, behavior: 'smooth' });
-  }, []);
-
-  const handleWheel = useCallback((e: React.WheelEvent<HTMLDivElement>) => {
-    const el = ref.current;
-    if (!el || el.scrollWidth <= el.clientWidth + 2) return;
-    if (Math.abs(e.deltaY) > Math.abs(e.deltaX) && e.deltaY !== 0) {
-      el.scrollLeft += e.deltaY;
-    }
-  }, []);
-
-  return { ref, refresh, scrollByDelta, handleWheel, ...scrollState };
-}
-
 export const WorkspaceTabBar: React.FC<WorkspaceTabBarProps> = React.memo(({
   romDocuments,
   activeDocId,
@@ -128,6 +84,7 @@ export const WorkspaceTabBar: React.FC<WorkspaceTabBarProps> = React.memo(({
   onActivateTab,
   onCloseTab,
   onTogglePinTab,
+  onDetachTab,
   onToggleSplitView,
   onOpenCommandPalette,
 }) => {
@@ -160,15 +117,14 @@ export const WorkspaceTabBar: React.FC<WorkspaceTabBarProps> = React.memo(({
               aria-label="Scroll ROM tabs left"
               disabled={!romStrip.canLeft}
               onClick={() => romStrip.scrollByDelta(-160)}
-              className="flex h-5 w-5 shrink-0 items-center justify-center rounded border border-kiviBorder/60 bg-kiviSurface text-kiviSecondary hover:text-kiviInk disabled:opacity-35"
+              className="flex h-6 w-5 shrink-0 items-center justify-center rounded border-0 bg-transparent text-kiviMuted transition-colors hover:text-kiviInk active:scale-95 disabled:pointer-events-none disabled:opacity-25"
             >
-              <ChevronLeft className="h-3 w-3" />
+              <ChevronLeft className="h-3.5 w-3.5" />
             </button>
           )}
           <div
             ref={romStrip.ref}
             onScroll={romStrip.refresh}
-            onWheel={romStrip.handleWheel}
             className="kivi-tab-scrollbar flex h-full min-w-0 flex-1 items-center gap-1 overflow-x-auto overflow-y-hidden"
           >
             {romDocuments.map((doc) => {
@@ -233,9 +189,9 @@ export const WorkspaceTabBar: React.FC<WorkspaceTabBarProps> = React.memo(({
               aria-label="Scroll ROM tabs right"
               disabled={!romStrip.canRight}
               onClick={() => romStrip.scrollByDelta(160)}
-              className="flex h-5 w-5 shrink-0 items-center justify-center rounded border border-kiviBorder/60 bg-kiviSurface text-kiviSecondary hover:text-kiviInk disabled:opacity-35"
+              className="flex h-6 w-5 shrink-0 items-center justify-center rounded border-0 bg-transparent text-kiviMuted transition-colors hover:text-kiviInk active:scale-95 disabled:pointer-events-none disabled:opacity-25"
             >
-              <ChevronRight className="h-3 w-3" />
+              <ChevronRight className="h-3.5 w-3.5" />
             </button>
           )}
         </div>
@@ -244,7 +200,7 @@ export const WorkspaceTabBar: React.FC<WorkspaceTabBarProps> = React.memo(({
       {/* Workspace Editor Tabs Bar */}
       <div
         data-testid="workspace-editor-tabbar"
-        className="flex h-10 shrink-0 items-center justify-between gap-1.5 overflow-hidden px-2"
+        className="flex h-10 shrink-0 items-center justify-between gap-1 overflow-hidden px-2"
       >
         {tabStrip.hasOverflow && (
           <button
@@ -252,7 +208,7 @@ export const WorkspaceTabBar: React.FC<WorkspaceTabBarProps> = React.memo(({
             aria-label="Scroll tabs left"
             disabled={!tabStrip.canLeft}
             onClick={() => tabStrip.scrollByDelta(-180)}
-            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-kiviBorder/60 bg-kiviBg text-kiviSecondary hover:text-kiviInk disabled:opacity-35"
+            className="flex h-7 w-5 shrink-0 items-center justify-center rounded border-0 bg-transparent text-kiviMuted transition-colors hover:text-kiviInk active:scale-95 disabled:pointer-events-none disabled:opacity-25"
           >
             <ChevronLeft className="h-3.5 w-3.5" />
           </button>
@@ -262,7 +218,6 @@ export const WorkspaceTabBar: React.FC<WorkspaceTabBarProps> = React.memo(({
           ref={tabStrip.ref}
           data-testid="workspace-tabs-scroll-strip"
           onScroll={tabStrip.refresh}
-          onWheel={tabStrip.handleWheel}
           className="kivi-tab-scrollbar flex h-full min-w-0 flex-1 items-center gap-1 overflow-x-auto overflow-y-hidden"
         >
           {tabs.length === 0 ? (
@@ -315,6 +270,23 @@ export const WorkspaceTabBar: React.FC<WorkspaceTabBarProps> = React.memo(({
                   >
                     <Pin className="h-2.5 w-2.5" />
                   </button>
+                  {onDetachTab &&
+                    (tab.kind === 'map-table' ||
+                      tab.kind === 'map-3d' ||
+                      tab.kind === 'map-split' ||
+                      tab.kind === 'hex' ||
+                      tab.kind === 'waveform') && (
+                      <button
+                        type="button"
+                        data-testid={`detach-tab-${tab.id}`}
+                        aria-label={`Detach ${tab.title}`}
+                        onClick={() => onDetachTab(tab.id)}
+                        className="rounded p-0.5 text-kiviMuted opacity-55 transition-colors hover:bg-kiviElevated hover:text-kiviAccent hover:opacity-100"
+                        title="Detach tab into floating window"
+                      >
+                        <PictureInPicture2 className="h-2.5 w-2.5" />
+                      </button>
+                    )}
                   {!tab.pinned && tab.closable !== false && (
                     <button
                       type="button"
@@ -338,7 +310,7 @@ export const WorkspaceTabBar: React.FC<WorkspaceTabBarProps> = React.memo(({
             aria-label="Scroll tabs right"
             disabled={!tabStrip.canRight}
             onClick={() => tabStrip.scrollByDelta(180)}
-            className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-kiviBorder/60 bg-kiviBg text-kiviSecondary hover:text-kiviInk disabled:opacity-35"
+            className="flex h-7 w-5 shrink-0 items-center justify-center rounded border-0 bg-transparent text-kiviMuted transition-colors hover:text-kiviInk active:scale-95 disabled:pointer-events-none disabled:opacity-25"
           >
             <ChevronRight className="h-3.5 w-3.5" />
           </button>

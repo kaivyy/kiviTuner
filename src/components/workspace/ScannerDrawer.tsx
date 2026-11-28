@@ -13,7 +13,7 @@ import {
 } from '../../lib/workbenchBridge';
 import { blindTableToMapDef } from '../modals/calibrationWorkbenchController';
 import type { MapDef } from '../../types/kivi';
-import { useAnimatedPresence } from '../../hooks/useAnimatedPresence';
+import type { RightDockAnimState } from './rightDockModel';
 
 type ScannerTab = 'blind_v2' | 'heuristics' | 'window';
 
@@ -23,7 +23,8 @@ interface ClassifiedBlindResult {
 }
 
 interface ScannerDrawerProps {
-  isOpen: boolean;
+  isOpen?: boolean;
+  animState?: RightDockAnimState;
   onClose: () => void;
   isDesktop: boolean;
   romData: Uint8Array | null;
@@ -41,10 +42,14 @@ interface ScannerDrawerProps {
   onLoadCandidate: (candidate: DetectedMapCandidate) => void;
   onAddMaps?: (maps: MapDef[], selectFirst?: boolean) => void;
   onJumpToWaveform: (startAddr: number, endAddr: number) => void;
+  desktopWidth?: number;
+  isResizing?: boolean;
+  collapsePreview?: boolean;
 }
 
 export const ScannerDrawer: React.FC<ScannerDrawerProps> = ({
-  isOpen,
+  isOpen = true,
+  animState = 'open',
   onClose,
   isDesktop,
   romData,
@@ -62,6 +67,9 @@ export const ScannerDrawer: React.FC<ScannerDrawerProps> = ({
   onLoadCandidate,
   onAddMaps,
   onJumpToWaveform,
+  desktopWidth = 312,
+  isResizing = false,
+  collapsePreview = false,
 }) => {
   const [activeTab, setActiveTab] = useState<ScannerTab>(isDesktop ? 'blind_v2' : 'heuristics');
   const [isBlindRunning, setIsBlindRunning] = useState(false);
@@ -69,10 +77,9 @@ export const ScannerDrawer: React.FC<ScannerDrawerProps> = ({
   const [blindResults, setBlindResults] = useState<ClassifiedBlindResult[]>([]);
   const [blindError, setBlindError] = useState<string | null>(null);
   const blindSeqRef = useRef(0);
-  const presence = useAnimatedPresence(isOpen, 120);
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen || animState === 'closing') return;
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         e.preventDefault();
@@ -81,7 +88,7 @@ export const ScannerDrawer: React.FC<ScannerDrawerProps> = ({
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [isOpen, onClose]);
+  }, [isOpen, animState, onClose]);
 
   const handleRunBlindV2 = async () => {
     if (!hasRomData) return;
@@ -128,14 +135,23 @@ export const ScannerDrawer: React.FC<ScannerDrawerProps> = ({
     }
   };
 
-  if (!presence.mounted) return null;
+  if (!isOpen && animState !== 'closing') return null;
+
+  const animClass =
+    animState === 'closing'
+      ? 'kivi-anim-slide-right-out'
+      : animState === 'swap'
+        ? 'kivi-anim-fade-in'
+        : 'kivi-anim-slide-right-in';
 
   return (
     <aside
+      data-testid="drawer-scanner"
       aria-label="ROM Scanner Drawer"
-      className={`absolute inset-y-0 right-0 z-40 flex w-[min(92vw,21rem)] flex-col overflow-hidden rounded-none kivi-panel-surface bg-kiviSurface lg:static lg:inset-y-auto lg:right-auto lg:z-auto lg:w-80 lg:shrink-0 lg:shadow-none lg:border-l lg:border-kiviBorder/60 ${
-        presence.state === 'closing' ? 'kivi-anim-slide-right-out' : 'kivi-anim-slide-right-in'
-      }`}
+      style={{ '--kivi-panel-w': `${desktopWidth}px` } as React.CSSProperties}
+      className={`absolute inset-y-0 right-0 z-40 flex w-[min(92vw,21rem)] flex-col overflow-hidden rounded-none kivi-panel-surface bg-kiviSurface lg:static lg:inset-y-auto lg:right-auto lg:z-auto lg:w-[var(--kivi-panel-w)] lg:shrink-0 lg:shadow-none lg:border-l lg:border-kiviBorder/60 ${animClass} ${
+        collapsePreview ? 'opacity-55' : 'opacity-100'
+      } ${isResizing ? 'transition-none' : 'transition-opacity duration-150'}`}
     >
       <div
         data-testid="panel-titlebar-scanner"

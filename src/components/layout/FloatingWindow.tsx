@@ -10,8 +10,6 @@ import { ExternalLink, Pin, PinOff } from 'lucide-react';
 import {
   bridgeOpenToolWindow,
   bridgeSetWindowAlwaysOnTop,
-  bridgeWindowStartDragging,
-  bridgeWindowToggleMaximize,
   type ToolWindowId,
 } from '../../lib/windowControlsBridge';
 import { isDesktopApp } from '../../lib/tauriBridge';
@@ -266,14 +264,18 @@ export const FloatingWindow: React.FC<FloatingWindowProps> = ({
   const handleDragStart = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
       if (standalone || e.button !== 0 || isMaximized) return;
+      const target = e.target as HTMLElement | null;
+      if (target?.closest('button, a, input, select, textarea, [role="button"]')) return;
+      e.preventDefault();
       focusFloatingWindow(windowId);
       const startX = e.clientX;
       const startY = e.clientY;
       const origin = rectRef.current;
       const el = e.currentTarget;
+      const pointerId = e.pointerId;
       if (typeof el.setPointerCapture === 'function') {
         try {
-          el.setPointerCapture(e.pointerId);
+          el.setPointerCapture(pointerId);
         } catch {
           // Synthetic test events may lack active pointer capture targets.
         }
@@ -296,6 +298,13 @@ export const FloatingWindow: React.FC<FloatingWindowProps> = ({
         window.removeEventListener('pointermove', onMove);
         window.removeEventListener('pointerup', onUp);
         window.removeEventListener('pointercancel', onUp);
+        if (typeof el.releasePointerCapture === 'function') {
+          try {
+            el.releasePointerCapture(pointerId);
+          } catch {
+            // Pointer may already be released.
+          }
+        }
       };
 
       window.addEventListener('pointermove', onMove);
@@ -450,32 +459,14 @@ export const FloatingWindow: React.FC<FloatingWindowProps> = ({
         {/* Slim Borderless Window Titlebar */}
         <div
           data-testid={`window-titlebar-${windowId}`}
-          data-tauri-drag-region={standalone ? '' : undefined}
+          data-tauri-drag-region={standalone ? 'deep' : undefined}
           onPointerDown={standalone ? undefined : handleDragStart}
-          onMouseDown={
-            standalone
-              ? (e) => {
-                  if (e.button === 0 && e.detail === 1) {
-                    void bridgeWindowStartDragging();
-                  }
-                }
-              : undefined
-          }
-          onDoubleClick={() => {
-            if (standalone) {
-              void bridgeWindowToggleMaximize(false);
-            } else {
-              handleToggleMaximize();
-            }
-          }}
+          onDoubleClick={standalone ? undefined : handleToggleMaximize}
           className={`flex h-8 shrink-0 select-none items-center justify-between gap-2 px-3 ${
             titlebarTone === 'sidebar' ? 'bg-kiviBg' : 'bg-kiviSurface'
-          } ${standalone ? 'cursor-default' : 'cursor-grab active:cursor-grabbing'}`}
+          } ${standalone ? 'cursor-default' : 'touch-none cursor-grab active:cursor-grabbing'}`}
         >
-          <div
-            data-tauri-drag-region={standalone ? '' : undefined}
-            className="flex min-w-0 flex-1 items-center gap-2"
-          >
+          <div className="flex min-w-0 flex-1 items-center gap-2">
             {standalone ? (
               <WindowTrafficLights
                 closeLabel={closeLabel}
@@ -510,6 +501,7 @@ export const FloatingWindow: React.FC<FloatingWindowProps> = ({
           </div>
 
           <div
+            data-tauri-drag-region={standalone ? 'false' : undefined}
             className="flex shrink-0 items-center gap-1"
             onPointerDown={(e) => e.stopPropagation()}
             onMouseDown={(e) => e.stopPropagation()}

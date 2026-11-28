@@ -82,3 +82,33 @@ test('syncMapTab respects forceKind so switching from split_3d back to 2D table 
   assert.strictEqual(s.getState().tabs.find((t) => t.id === 'map:fuel_main')?.kind, 'map-table');
   s.getState().reset();
 });
+
+test('detachTab, dockTab, setDetachedTabKind, and closeDetachedTab keep tab state consistent without duplicates', () => {
+  const s = useWorkspaceTabsStore;
+  s.getState().reset();
+
+  s.getState().openTab({ id: 'map:fuel', kind: 'map-table', title: 'Fuel VE', mapId: 'fuel', pinned: true });
+  s.getState().openTab({ id: 'tool:hex', kind: 'hex', title: 'Hex Viewer' });
+  s.getState().openInSplit({ id: 'map:fuel', kind: 'map-table', title: 'Fuel VE', mapId: 'fuel' });
+
+  s.getState().detachTab('map:fuel');
+  assert.strictEqual(s.getState().tabs.length, 1);
+  assert.strictEqual(s.getState().splitTabId, null);
+  assert.strictEqual(s.getState().detachedTabs.length, 1);
+  assert.strictEqual(s.getState().detachedTabs[0].id, 'map:fuel');
+
+  s.getState().setDetachedTabKind('map:fuel', 'map-3d');
+  assert.strictEqual(s.getState().detachedTabs[0].kind, 'map-3d');
+
+  s.getState().dockTab('map:fuel');
+  assert.strictEqual(s.getState().detachedTabs.length, 0);
+  assert.strictEqual(s.getState().tabs.length, 2);
+  assert.strictEqual(s.getState().activeTabId, 'map:fuel');
+  assert.strictEqual(s.getState().tabs.find((t) => t.id === 'map:fuel')?.kind, 'map-3d');
+
+  s.getState().detachTab('tool:hex');
+  assert.strictEqual(s.getState().detachedTabs.length, 1);
+  s.getState().closeDetachedTab('tool:hex');
+  assert.strictEqual(s.getState().detachedTabs.length, 0);
+  s.getState().reset();
+});

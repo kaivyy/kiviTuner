@@ -21,6 +21,8 @@ import {
   bridgeCloseRomDocument,
   bridgeRenameRomDocument,
   bridgeGetRomSessionSummary,
+  bridgeSyncWorkspaceMaps,
+  bridgeGetWorkspaceMaps,
   bridgePatchMapCells,
   bridgePatchRomBytes,
   bridgeUndoRomEdit,
@@ -346,7 +348,7 @@ export interface MapStoreState {
   activeDocId: string | null;
   recentRoms: RecentRomEntry[];
 
-  setMaps: (maps: MapDef[]) => void;
+  setMaps: (maps: MapDef[], syncBackend?: boolean) => void;
   addMaps: (newMaps: MapDef[]) => void;
   updateMapDef: (mapDef: MapDef) => Promise<void>;
   deleteMapDef: (mapId: string) => void;
@@ -410,11 +412,14 @@ export const useMapStore = create<MapStoreState>((set, get) => ({
   isDesktop: isDesktopApp(),
   recentRoms: [],
 
-  setMaps: (maps) => {
+  setMaps: (maps, syncBackend = true) => {
     const activeSlot = getActiveBrowserSlot(get().activeDocId);
     if (activeSlot) activeSlot.maps = maps;
     set({ maps });
-    if (isDesktopApp()) saveDesktopDocMeta(get());
+    if (isDesktopApp()) {
+      saveDesktopDocMeta(get());
+      if (syncBackend) void bridgeSyncWorkspaceMaps(maps);
+    }
   },
 
   addMaps: (newMaps) => {
@@ -428,7 +433,10 @@ export const useMapStore = create<MapStoreState>((set, get) => ({
       activeSlot.selectedMapId = nextSelected;
     }
     set({ maps: merged, selectedMapId: nextSelected });
-    if (isDesktopApp()) saveDesktopDocMeta(get());
+    if (isDesktopApp()) {
+      saveDesktopDocMeta(get());
+      void bridgeSyncWorkspaceMaps(merged);
+    }
   },
 
   updateMapDef: async (mapDef) => {
@@ -441,7 +449,10 @@ export const useMapStore = create<MapStoreState>((set, get) => ({
     const activeSlot = getActiveBrowserSlot(state.activeDocId);
     if (activeSlot) activeSlot.maps = nextMaps;
     set({ maps: nextMaps });
-    if (isDesktopApp()) saveDesktopDocMeta(get());
+    if (isDesktopApp()) {
+      saveDesktopDocMeta(get());
+      void bridgeSyncWorkspaceMaps(nextMaps);
+    }
     if (get().selectedMapId === mapDef.id && (get().romLoaded || get().romData)) {
       await get().extractMatrix(mapDef);
     }
@@ -463,7 +474,10 @@ export const useMapStore = create<MapStoreState>((set, get) => ({
       selectedMapId: nextSelected,
       ...(removingSelected ? { activeMatrix: null, baseMatrix: null } : {}),
     });
-    if (isDesktopApp()) saveDesktopDocMeta(get());
+    if (isDesktopApp()) {
+      saveDesktopDocMeta(get());
+      void bridgeSyncWorkspaceMaps(nextMaps);
+    }
   },
 
   selectMap: (id) => {
@@ -1494,8 +1508,19 @@ export const useMapStore = create<MapStoreState>((set, get) => ({
     const myDocSeq = docOpSeq;
     const summary = await bridgeGetRomSessionSummary();
     if (myDocSeq !== docOpSeq || !summary) return;
+    let backendMaps: MapDef[] | null = null;
+    if (get().maps.length === 0 && summary.map_count > 0) {
+      backendMaps = await bridgeGetWorkspaceMaps();
+      if (myDocSeq !== docOpSeq) return;
+    }
     set((s) => ({
       ...applySessionSummaryState(summary, s.selectedMapId),
+      ...(backendMaps && backendMaps.length > 0 && s.maps.length === 0
+        ? {
+            maps: backendMaps,
+            selectedMapId: s.selectedMapId ?? backendMaps[0]?.id ?? null,
+          }
+        : {}),
       romRevision: s.romRevision + 1,
     }));
   },

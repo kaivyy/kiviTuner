@@ -299,3 +299,36 @@ export function generateAxisLabels(
 
   return { xLabels, yLabels, xAxisName, yAxisName };
 }
+
+/** Resolves effective display axis labels & interpolation coordinates, falling back to synthetic defaults when an axis lacks values. */
+export function resolveEffectiveMapAxes(mapDef: MapDef | undefined): {
+  xLabels: (string | number)[];
+  yLabels: (string | number)[];
+  xAxisName: string;
+  yAxisName: string;
+  interpolationAxes: { x: number[] | null; y: number[] | null };
+} {
+  if (!mapDef) {
+    return {
+      xLabels: [],
+      yLabels: [],
+      xAxisName: 'TPS',
+      yAxisName: 'RPM',
+      interpolationAxes: { x: null, y: null },
+    };
+  }
+  const resolved = resolveDisplayAxisLabels(mapDef);
+  const hasX = Boolean(mapDef.x_axis?.values && mapDef.x_axis.values.length === mapDef.cols);
+  const hasY = Boolean(mapDef.y_axis?.values && mapDef.y_axis.values.length === mapDef.rows);
+  const synth = generateAxisLabels(mapDef.rows, mapDef.cols, mapDef.name);
+  return {
+    xLabels: hasX ? resolved.xLabels : synth.xLabels,
+    yLabels: hasY ? resolved.yLabels : synth.yLabels,
+    xAxisName: hasX ? resolved.xAxisName : synth.xAxisName,
+    yAxisName: hasY ? resolved.yAxisName : synth.yAxisName,
+    interpolationAxes: {
+      x: mapDef.x_axis?.values ?? null,
+      y: mapDef.y_axis?.values ?? null,
+    },
+  };
+}

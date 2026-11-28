@@ -19,11 +19,7 @@ import {
   type MenuBarState,
 } from './menuModel.ts';
 import { WindowTrafficLights } from './WindowTrafficLights.tsx';
-import {
-  bridgeWindowStartDragging,
-  bridgeWindowToggleMaximize,
-  isMacDesktop,
-} from '../../lib/windowControlsBridge.ts';
+import { isMacDesktop } from '../../lib/windowControlsBridge.ts';
 import { APP_VERSION } from '../../lib/updaterBridge.ts';
 import { useAnimatedPresence } from '../../hooks/useAnimatedPresence';
 
@@ -171,6 +167,16 @@ export const KiviMenuBar: React.FC<KiviMenuBarProps> = ({
     <div
       ref={menuBarRef}
       data-testid="main-window-menubar"
+      data-tauri-drag-region="deep"
+      onMouseDown={(e) => {
+        if (activeRootId !== null) {
+          const target = e.target as HTMLElement | null;
+          if (target && !target.closest('[role="menu"], [role="menuitem"], button')) {
+            setActiveRootId(null);
+            setActiveSubmenuPath([]);
+          }
+        }
+      }}
       className="relative z-[90] flex h-8 w-full shrink-0 select-none items-center justify-between gap-1.5 bg-kiviSurface px-2.5 text-xs text-kiviInk md:gap-2 md:px-3"
     >
       {/* Left: Tahoe Traffic Lights + Brand Identity + Mobile Menu Trigger + Desktop Cascading Menus */}
@@ -180,15 +186,7 @@ export const KiviMenuBar: React.FC<KiviMenuBarProps> = ({
         </div>
 
         {/* Brand Logo & Name */}
-        <div
-          data-tauri-drag-region
-          onMouseDown={(e) => {
-            if (e.button === 0 && e.detail === 1) {
-              void bridgeWindowStartDragging();
-            }
-          }}
-          className="flex shrink-0 items-center gap-1.5 pr-1 cursor-default"
-        >
+        <div className="flex shrink-0 items-center gap-1.5 pr-1 cursor-default">
           <img
             src="/favicon.svg"
             alt="kiviTuner"
@@ -268,14 +266,7 @@ export const KiviMenuBar: React.FC<KiviMenuBarProps> = ({
 
       {/* Draggable frameless desktop titlebar spacer */}
       <div
-        data-tauri-drag-region
         aria-label="Window drag region"
-        onMouseDown={(e) => {
-          if (e.button === 0 && e.detail === 1) {
-            void bridgeWindowStartDragging();
-          }
-        }}
-        onDoubleClick={() => void bridgeWindowToggleMaximize(false)}
         className="h-full min-w-[4px] flex-1 cursor-default"
       />
 
@@ -384,6 +375,7 @@ export const KiviMenuBar: React.FC<KiviMenuBarProps> = ({
         <div
           role="dialog"
           aria-label="Application navigation menu"
+          data-tauri-drag-region="false"
           className={`fixed inset-x-0 top-8 bottom-0 z-50 overflow-y-auto bg-kiviSurface p-3 md:hidden ${
             mobileMenuPresence.state === 'closing' ? 'kivi-anim-sheet-out' : 'kivi-anim-sheet-in'
           }`}
@@ -510,6 +502,7 @@ const FlyoutMenuPanel: React.FC<FlyoutMenuPanelProps> = ({
   return (
     <div
       role="menu"
+      data-tauri-drag-region="false"
       className="kivi-anim-menu-in kivi-menu-flyout min-w-[220px] max-w-[280px] rounded-xl bg-kiviSurface py-1.5 text-kiviInk select-none"
     >
       {items.map((item) => (

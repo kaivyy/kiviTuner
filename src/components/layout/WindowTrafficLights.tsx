@@ -100,6 +100,7 @@ export const WindowTrafficLights: React.FC<WindowTrafficLightsProps> = ({
       className="group/lights flex shrink-0 items-center gap-[7px]"
       role="group"
       aria-label="Window controls"
+      data-tauri-drag-region="false"
       onPointerDown={(e) => e.stopPropagation()}
       onMouseDown={(e) => e.stopPropagation()}
     >

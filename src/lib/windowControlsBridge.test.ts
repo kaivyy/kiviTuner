@@ -123,6 +123,38 @@ test('getStandaloneWindowId validates known ?window= params and rejects unknown 
   assert.equal(invoked[1].cmd, 'set_current_window_always_on_top');
 });
 
+test('getStandaloneTabParams parses valid ?window=tab queries and bridgeOpenWorkspaceTabWindow delegates safely', async () => {
+  const { getStandaloneTabParams, bridgeOpenWorkspaceTabWindow } = await import(
+    './windowControlsBridge.ts'
+  );
+  assert.equal(getStandaloneTabParams('?window=telemetry'), null);
+  assert.equal(getStandaloneTabParams('?window=tab'), null);
+  assert.deepEqual(
+    getStandaloneTabParams('?window=tab&tabId=map:fuel_1&kind=map-3d&title=Main%20Fuel&mapId=fuel_1'),
+    { tabId: 'map:fuel_1', kind: 'map-3d', title: 'Main Fuel', mapId: 'fuel_1' }
+  );
+  assert.equal(
+    await bridgeOpenWorkspaceTabWindow(
+      { tabId: 'tool:hex', kind: 'hex', title: 'Hex Viewer' },
+      { isDesktop: () => false }
+    ),
+    false
+  );
+  const invoked: Array<{ cmd: string; args: unknown }> = [];
+  const fakeInvoke = (async (cmd: string, args?: unknown) => {
+    invoked.push({ cmd, args });
+    return 'kivi-tab-tool-hex';
+  }) as unknown as typeof import('@tauri-apps/api/core').invoke;
+  assert.equal(
+    await bridgeOpenWorkspaceTabWindow(
+      { tabId: 'tool:hex', kind: 'hex', title: 'Hex Viewer', width: 900, height: 640 },
+      { isDesktop: () => true, invokeFn: fakeInvoke }
+    ),
+    true
+  );
+  assert.equal(invoked[0].cmd, 'open_workspace_tab_window');
+});
+
 test('isMacDesktop identifies macOS desktop cleanly without leaking in browser or Windows/Linux', async () => {
   const { isMacDesktop } = await import('./windowControlsBridge.ts');
   assert.equal(isMacDesktop({ isDesktop: () => false, platform: 'MacIntel' }), false);

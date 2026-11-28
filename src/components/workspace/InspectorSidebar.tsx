@@ -4,6 +4,7 @@ import type { MapDef } from '../../types/kivi';
 import type { UndoStatus } from '../../lib/bridge/windowBridge';
 import { useMapStore } from '../../stores/useMapStore';
 import { computeRomDeltaLedger } from './deltaLedgerModel';
+import type { RightDockAnimState } from './rightDockModel';
 
 interface InspectorSidebarProps {
   selectedRange: { start: number; end: number } | null;
@@ -23,7 +24,10 @@ interface InspectorSidebarProps {
   onViewInHex?: (address: number) => void;
   onRevertMapToOriginal?: () => void;
   onClose?: () => void;
-  animState?: 'open' | 'closing';
+  animState?: RightDockAnimState;
+  desktopWidth?: number;
+  isResizing?: boolean;
+  collapsePreview?: boolean;
 }
 
 export const InspectorSidebar: React.FC<InspectorSidebarProps> = ({
@@ -45,6 +49,9 @@ export const InspectorSidebar: React.FC<InspectorSidebarProps> = ({
   onRevertMapToOriginal,
   onClose,
   animState = 'open',
+  desktopWidth = 272,
+  isResizing = false,
+  collapsePreview = false,
 }) => {
   const romData = useMapStore((s) => s.romData);
   const originalRomData = useMapStore((s) => s.originalRomData);
@@ -53,11 +60,20 @@ export const InspectorSidebar: React.FC<InspectorSidebarProps> = ({
     [romData, originalRomData]
   );
 
+  const animClass =
+    animState === 'closing'
+      ? 'kivi-anim-slide-right-out'
+      : animState === 'swap'
+        ? 'kivi-anim-fade-in'
+        : 'kivi-anim-slide-right-in';
+
   return (
   <aside
-    className={`absolute inset-y-0 right-0 z-40 flex w-[min(85vw,16rem)] flex-col overflow-hidden rounded-none kivi-panel-surface bg-kiviSurface lg:static lg:inset-y-auto lg:right-auto lg:z-auto lg:w-60 lg:shrink-0 lg:shadow-none lg:border-l lg:border-kiviBorder/60 xl:w-64 ${
-      animState === 'closing' ? 'kivi-anim-slide-right-out' : 'kivi-anim-slide-right-in'
-    }`}
+    data-testid="drawer-inspector"
+    style={{ '--kivi-panel-w': `${desktopWidth}px` } as React.CSSProperties}
+    className={`absolute inset-y-0 right-0 z-40 flex w-[min(85vw,16rem)] flex-col overflow-hidden rounded-none kivi-panel-surface bg-kiviSurface lg:static lg:inset-y-auto lg:right-auto lg:z-auto lg:w-[var(--kivi-panel-w)] lg:shrink-0 lg:shadow-none lg:border-l lg:border-kiviBorder/60 ${animClass} ${
+      collapsePreview ? 'opacity-55' : 'opacity-100'
+    } ${isResizing ? 'transition-none' : 'transition-opacity duration-150'}`}
   >
     <div
       data-testid="panel-titlebar-inspector"

@@ -9,6 +9,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { BookOpen, Cpu, Search } from 'lucide-react';
 import { FloatingWindow } from '../layout/FloatingWindow';
+import { HorizontalScrollStrip } from '../layout/HorizontalScrollStrip';
 import { TOOL_WINDOW_SPECS } from '../layout/toolWindowRegistry';
 import {
   MIN_QUERY_LEN,
@@ -193,13 +194,26 @@ export const CataloguePanel: React.FC<CataloguePanelProps> = ({
           />
         </div>
 
-        <div className="flex flex-wrap gap-1 border-b border-kiviBorder bg-kiviBg px-3 py-1.5">
+        <HorizontalScrollStrip
+          role="tablist"
+          ariaLabel="Reference catalogue sections"
+          stripTestId="catalogue-tab-strip"
+          depKey={`${tab}:${sData?.total_entries ?? 0}`}
+          activeSelector='[aria-selected="true"]'
+          className="h-10 border-b border-kiviBorder bg-kiviBg px-2.5"
+          stripClassName="gap-1"
+          arrowSize="xs"
+          scrollLeftLabel="Scroll catalogue tabs left"
+          scrollRightLabel="Scroll catalogue tabs right"
+        >
           {tabs.map((t) => (
             <button
               key={t.id}
               type="button"
+              role="tab"
+              aria-selected={tab === t.id}
               onClick={() => setTab(t.id)}
-              className={`flex items-center gap-1.5 rounded px-2.5 py-1 text-[11px] font-medium transition-colors ${
+              className={`flex h-7 shrink-0 items-center gap-1.5 whitespace-nowrap rounded px-2.5 text-[11px] font-medium transition-colors ${
                 tab === t.id
                   ? 'bg-kiviAccent/20 text-kiviAccent border border-kiviAccent/30'
                   : 'text-kiviMuted hover:text-kiviInk border border-transparent'
@@ -213,7 +227,7 @@ export const CataloguePanel: React.FC<CataloguePanelProps> = ({
               )}
             </button>
           ))}
-        </div>
+        </HorizontalScrollStrip>
 
         <div className="flex flex-wrap items-center gap-2 border-b border-kiviBorder px-3 py-2">
           <input

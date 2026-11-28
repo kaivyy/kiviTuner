@@ -1,18 +1,18 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   Box,
-  Grid,
-  MoveHorizontal,
-  MoveVertical,
+  Compass,
   Layers,
-  Ghost,
   RotateCcw,
+  Sliders,
   ZoomIn,
   ZoomOut,
-  Sliders,
-  Palette,
 } from 'lucide-react';
 import type { SelectionRange } from './HeatmapTable';
+import {
+  ViewportIconMenu,
+  ViewportIconPopover,
+} from './surface3d/ViewportOverlayControls';
 import {
   CAMERA_PRESETS,
   buildQuads,
@@ -56,6 +56,7 @@ export interface Surface3DViewProps {
   onChangeMatrix?: (newMatrix: number[][]) => void;
   palette?: 'classic' | 'thermal' | 'spectrum' | 'monochrome';
   readOnly?: boolean;
+  headerActions?: React.ReactNode;
 }
 
 type SurfaceRenderMode = 'shaded' | 'smooth' | 'wireframe';
@@ -95,6 +96,7 @@ export const Surface3DView: React.FC<Surface3DViewProps> = React.memo(({
   onChangeMatrix,
   palette: initialPalette = 'classic',
   readOnly = false,
+  headerActions,
 }) => {
   const canvasHostRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -167,6 +169,7 @@ export const Surface3DView: React.FC<Surface3DViewProps> = React.memo(({
   const [renderMode, setRenderMode] = useState<SurfaceRenderMode>('shaded');
   const [showCage, setShowCage] = useState<boolean>(true);
   const [showGhost, setShowGhost] = useState<boolean>(true);
+  const [showColorScale, setShowColorScale] = useState<boolean>(true);
   const [elevationMultiplier, setElevationMultiplier] = useState<number>(1.0);
   const [activePreset, setActivePreset] = useState<CameraPresetKey | null>('ISOMETRIC');
   const [hoveredCell, setHoveredCell] = useState<{ r: number; c: number } | null>(null);
@@ -207,10 +210,11 @@ export const Surface3DView: React.FC<Surface3DViewProps> = React.memo(({
       const spanX = Math.max(numCols - 1, 2);
       const spanZ = Math.max(numRows - 1, 2);
       const span = Math.max(spanX, spanZ, 5);
-      const reserveRight = w >= 360 ? 78 : 20;
-      const usableW = Math.max(140, w - reserveRight - 64);
-      const usableH = Math.max(150, h - 56);
-      return Math.max(8, Math.min(260, Math.min(usableW, usableH) / (span * 1.64)));
+      const reserveLeft = w >= 340 ? 48 : 20;
+      const reserveRight = 24;
+      const usableW = Math.max(120, w - reserveLeft - reserveRight);
+      const usableH = Math.max(110, h - 46);
+      return Math.max(6, Math.min(260, Math.min(usableW, usableH) / (span * 1.52)));
     },
     [numRows, numCols]
   );
@@ -233,8 +237,8 @@ export const Surface3DView: React.FC<Surface3DViewProps> = React.memo(({
     };
 
     const updateSize = () => {
-      const w = Math.max(240, Math.min(4096, Math.floor(host.clientWidth)));
-      const h = Math.max(220, Math.min(4096, Math.floor(host.clientHeight)));
+      const w = Math.max(220, Math.min(4096, Math.floor(host.clientWidth)));
+      const h = Math.max(130, Math.min(4096, Math.floor(host.clientHeight)));
       setDimensions((prev) => (prev.width === w && prev.height === h ? prev : { width: w, height: h }));
       refreshRect();
     };
@@ -266,8 +270,8 @@ export const Surface3DView: React.FC<Surface3DViewProps> = React.memo(({
       setCamera((prev) => ({
         ...prev,
         scale: initialScale,
-        panX: dimensions.width >= 360 ? -30 : 0,
-        panY: 8,
+        panX: dimensions.width >= 340 ? 12 : 0,
+        panY: 4,
       }));
       fitSignatureRef.current = sig;
     }
@@ -278,8 +282,8 @@ export const Surface3DView: React.FC<Surface3DViewProps> = React.memo(({
     setCamera({
       ...CAMERA_PRESETS.ISOMETRIC,
       scale,
-      panX: dimensions.width >= 360 ? -30 : 0,
-      panY: 8,
+      panX: dimensions.width >= 340 ? 12 : 0,
+      panY: 4,
     });
     setActivePreset('ISOMETRIC');
     setElevationMultiplier(1.0);
@@ -293,8 +297,8 @@ export const Surface3DView: React.FC<Surface3DViewProps> = React.memo(({
         ...prev,
         yaw: preset.yaw,
         pitch: preset.pitch,
-        panX: dimensions.width >= 360 ? -30 : 0,
-        panY: 8,
+        panX: dimensions.width >= 340 ? 12 : 0,
+        panY: 4,
       }));
     },
     [dimensions.width]
@@ -369,7 +373,6 @@ export const Surface3DView: React.FC<Surface3DViewProps> = React.memo(({
     const cageBorder = isLight ? 'rgba(100, 116, 139, 0.55)' : 'rgba(71, 85, 105, 0.65)';
     const gridMajor = isLight ? 'rgba(148, 163, 184, 0.45)' : 'rgba(51, 65, 85, 0.55)';
     const labelColor = isLight ? '#334155' : '#94A3B8';
-    const titleInk = isLight ? '#0F172A' : '#E2E8F0';
     const accentColor = isLight ? '#0369A1' : '#38BDF8';
     const warnColor = isLight ? '#B45309' : '#FBBF24';
 
@@ -407,6 +410,8 @@ export const Surface3DView: React.FC<Surface3DViewProps> = React.memo(({
       const f10 = proj(maxC, minVal, 0);
       const f11 = proj(maxC, minVal, maxR);
       const f01 = proj(0, minVal, maxR);
+
+      let zMinLabelPos: { x: number; y: number } | null = null;
 
       ctx.save();
       drawPolygon(ctx, [f00, f10, f11, f01]);
@@ -462,11 +467,16 @@ export const Surface3DView: React.FC<Surface3DViewProps> = React.memo(({
 
           if (width >= 300) {
             const lp = proj(zRailX, v, zRailZ);
-            if (lp.x >= 36) {
+            if (lp.x >= 26) {
+              const labelX = lp.x - 6;
+              const labelY = lp.y;
               ctx.fillStyle = labelColor;
               ctx.textAlign = 'right';
               ctx.textBaseline = 'middle';
-              ctx.fillText(formatCompactTick(v, decimals), lp.x - 6, lp.y);
+              ctx.fillText(formatCompactTick(v, decimals), labelX, labelY);
+              if (s === 0) {
+                zMinLabelPos = { x: labelX, y: labelY };
+              }
             }
           }
         }
@@ -496,7 +506,7 @@ export const Surface3DView: React.FC<Surface3DViewProps> = React.memo(({
       ctx.lineWidth = 1.1;
       ctx.stroke();
 
-      // X-axis tick labels along frontZ
+      // X-axis tick labels along frontZ (de-duped against Z-min label and nearby ticks)
       const xSlopeDownRight = proj(maxC, minVal, frontZ).y >= proj(0, minVal, frontZ).y;
       const xAlign: CanvasTextAlign = xSlopeDownRight ? 'right' : 'left';
       const xTickDx = xSlopeDownRight ? -6 : 6;
@@ -504,10 +514,16 @@ export const Surface3DView: React.FC<Surface3DViewProps> = React.memo(({
       ctx.fillStyle = labelColor;
       ctx.textAlign = xAlign;
       ctx.textBaseline = 'top';
+      let lastXLabelPos: { x: number; y: number } | null = null;
       for (const cIdx of xTicks) {
         const pTick = proj(cIdx, minVal, frontZ);
+        const lx = pTick.x + xTickDx;
+        const ly = pTick.y + 5;
+        if (zMinLabelPos && Math.hypot(lx - zMinLabelPos.x, ly - zMinLabelPos.y) < 26) continue;
+        if (lastXLabelPos && Math.hypot(lx - lastXLabelPos.x, ly - lastXLabelPos.y) < 22) continue;
         const rawLbl = effectiveXLabels?.[cIdx] ?? cIdx;
-        ctx.fillText(String(rawLbl), pTick.x + xTickDx, pTick.y + 4);
+        ctx.fillText(String(rawLbl), lx, ly);
+        lastXLabelPos = { x: lx, y: ly };
       }
       if (effectiveXAxisName) {
         const xTitlePos = proj(midX, minVal, frontZ);
@@ -529,10 +545,16 @@ export const Surface3DView: React.FC<Surface3DViewProps> = React.memo(({
         ctx.fillStyle = labelColor;
         ctx.textAlign = yAlign;
         ctx.textBaseline = 'top';
+        let lastYLabelPos: { x: number; y: number } | null = null;
         for (const rIdx of zTicks) {
           const pTick = proj(frontX, minVal, rIdx);
+          const lx = pTick.x + (labelOnLeft ? -8 : 8);
+          const ly = pTick.y + 5;
+          if (zMinLabelPos && Math.hypot(lx - zMinLabelPos.x, ly - zMinLabelPos.y) < 26) continue;
+          if (lastYLabelPos && Math.hypot(lx - lastYLabelPos.x, ly - lastYLabelPos.y) < 22) continue;
           const rawLbl = effectiveYLabels?.[rIdx] ?? rIdx;
-          ctx.fillText(String(rawLbl), pTick.x + (labelOnLeft ? -8 : 8), pTick.y + 4);
+          ctx.fillText(String(rawLbl), lx, ly);
+          lastYLabelPos = { x: lx, y: ly };
         }
         if (effectiveYAxisName) {
           const yTitlePos = proj(frontX, minVal, midZ);
@@ -757,46 +779,6 @@ export const Surface3DView: React.FC<Surface3DViewProps> = React.memo(({
       }
     }
 
-    // 8. Calibrated Vertical Color Scale Legend
-    if (width >= 360 && height >= 200) {
-      ctx.save();
-      const barW = 10;
-      const barH = Math.min(180, Math.max(88, Math.floor(height * 0.48)));
-      const barX = width - 58;
-      const barY = Math.round((height - barH) / 2);
-
-      for (let py = 0; py < barH; py++) {
-        const frac = 1 - py / Math.max(1, barH - 1);
-        const val = minVal + frac * (maxVal - minVal);
-        ctx.fillStyle = getPaletteColor(val, minVal, maxVal, activePalette, 1.0);
-        ctx.fillRect(barX, barY + py, barW, 1.5);
-      }
-
-      ctx.strokeStyle = cageBorder;
-      ctx.lineWidth = 1;
-      ctx.strokeRect(barX, barY, barW, barH);
-
-      ctx.font = '10px "JetBrains Mono", ui-monospace, monospace';
-      ctx.fillStyle = labelColor;
-      ctx.textAlign = 'left';
-      ctx.textBaseline = 'middle';
-      const legSteps = 4;
-      for (let i = 0; i <= legSteps; i++) {
-        const frac = i / legSteps;
-        const val = maxVal - frac * (maxVal - minVal);
-        const yPos = barY + frac * barH;
-        ctx.fillText(formatCompactTick(val, decimals), barX + barW + 5, yPos);
-      }
-
-      if (unit) {
-        ctx.fillStyle = titleInk;
-        ctx.font = '600 10px "JetBrains Mono", ui-monospace, monospace';
-        ctx.textAlign = 'center';
-        ctx.fillText(unit, barX + barW / 2, barY - 12);
-      }
-      ctx.restore();
-    }
-
     ctx.restore();
   }, [
     dimensions,
@@ -1017,169 +999,47 @@ export const Surface3DView: React.FC<Surface3DViewProps> = React.memo(({
       ? activeCellValue - activeBaseValue
       : null;
 
+  const colorScaleGradient = useMemo(() => {
+    const stops = [0, 0.25, 0.5, 0.75, 1].map((frac) => {
+      const val = minVal + frac * Math.max(maxVal - minVal, 1e-6);
+      return `${getPaletteColor(val, minVal, maxVal, activePalette, 1)} ${Math.round(frac * 100)}%`;
+    });
+    return `linear-gradient(90deg, ${stops.join(', ')})`;
+  }, [minVal, maxVal, activePalette]);
+
   return (
     <div
       tabIndex={0}
       onKeyDown={handleKeyDown}
       className="relative flex h-full w-full min-h-0 min-w-0 flex-col overflow-hidden rounded-md border border-kiviBorder/60 bg-kiviBg select-none focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-kiviAccent"
     >
-      {/* Responsive Wrapping 3D Calibration Toolbar */}
-      <div className="z-10 flex min-w-0 shrink-0 flex-wrap items-center justify-between gap-x-2 gap-y-1.5 border-b border-kiviBorder/50 bg-kiviSurface px-2.5 py-1.5">
+      {/* Slim Borderless 1-Row 3D Header */}
+      <div
+        data-testid="panel-titlebar-surface3d"
+        className="z-10 flex h-9 shrink-0 items-center justify-between gap-2 bg-kiviSurface px-3"
+      >
         <div className="flex min-w-0 items-center gap-1.5">
           <Box className="h-3.5 w-3.5 shrink-0 text-kiviAccent" />
           <span className="truncate text-xs font-semibold text-kiviInk">
             {title || '3D Surface Mesh'}
           </span>
-          <span className="shrink-0 whitespace-nowrap rounded border border-kiviBorder/70 bg-kiviElevated px-1.5 py-0.5 font-mono text-[10px] text-kiviMuted tabular-nums">
-            {origRows} &times; {origCols}
+          <span className="shrink-0 whitespace-nowrap rounded bg-kiviElevated px-1.5 py-0.5 font-mono text-[10px] text-kiviMuted tabular-nums">
+            {origRows}&times;{origCols}
           </span>
           {normalized.is1DRibbon && (
-            <span className="shrink-0 whitespace-nowrap rounded border border-kiviAccent/40 bg-kiviAccent/10 px-1.5 py-0.5 font-mono text-[10px] text-kiviAccent">
+            <span className="shrink-0 whitespace-nowrap rounded bg-kiviAccent/15 px-1.5 py-0.5 font-mono text-[10px] text-kiviAccent">
               1D Ribbon
             </span>
           )}
         </div>
-
-        <div className="flex min-w-0 flex-wrap items-center gap-1">
-          <div className="flex shrink-0 items-center rounded border border-kiviBorder bg-kiviBg p-0.5">
-            {(
-              [
-                { key: 'ISOMETRIC', label: 'Iso', title: 'Isometric Angle', Icon: Box },
-                { key: 'TOP_DOWN', label: 'Top', title: 'Top Plan View', Icon: Grid },
-                { key: 'FRONT_RPM', label: 'Front', title: 'Front Profile', Icon: MoveHorizontal },
-                { key: 'SIDE_TPS', label: 'Side', title: 'Side Profile', Icon: MoveVertical },
-              ] as const
-            ).map(({ key, label, title: tip, Icon }) => {
-              const isAct = activePreset === key;
-              return (
-                <button
-                  key={key}
-                  type="button"
-                  title={tip}
-                  onClick={() => applyPreset(key)}
-                  className={`flex shrink-0 items-center gap-1 whitespace-nowrap rounded px-1.5 py-0.5 text-[11px] font-medium transition-colors ${
-                    isAct
-                      ? 'bg-kiviAccent text-kiviAccentFg'
-                      : 'text-kiviSecondary hover:bg-kiviElevated hover:text-kiviInk'
-                  }`}
-                >
-                  <Icon className="h-3 w-3 shrink-0" />
-                  <span>{label}</span>
-                </button>
-              );
-            })}
-          </div>
-
-          <div className="flex shrink-0 items-center rounded border border-kiviBorder bg-kiviBg p-0.5">
-            {(
-              [
-                { id: 'shaded', label: 'Mesh' },
-                { id: 'smooth', label: 'Solid' },
-                { id: 'wireframe', label: 'Wire' },
-              ] as const
-            ).map((mode) => (
-              <button
-                key={mode.id}
-                type="button"
-                onClick={() => setRenderMode(mode.id)}
-                className={`shrink-0 whitespace-nowrap rounded px-1.5 py-0.5 text-[11px] font-medium transition-colors ${
-                  renderMode === mode.id
-                    ? 'bg-kiviElevated text-kiviAccent'
-                    : 'text-kiviSecondary hover:text-kiviInk'
-                }`}
-              >
-                {mode.label}
-              </button>
-            ))}
-          </div>
-
-          <button
-            type="button"
-            title="Toggle 3D Calibration Cage & Axes"
-            onClick={() => setShowCage((v) => !v)}
-            className={`flex shrink-0 items-center gap-1 whitespace-nowrap rounded border px-1.5 py-0.5 text-[11px] font-medium transition-colors ${
-              showCage
-                ? 'border-kiviAccent/40 bg-kiviAccent/10 text-kiviAccent'
-                : 'border-kiviBorder bg-kiviBg text-kiviMuted hover:text-kiviInk'
-            }`}
-          >
-            <Layers className="h-3 w-3 shrink-0" />
-            <span>Cage</span>
-          </button>
-
-          {renderBaseMatrix && (
-            <button
-              type="button"
-              title="Toggle Base ROM Ghost Wireframe"
-              onClick={() => setShowGhost((v) => !v)}
-              className={`flex shrink-0 items-center gap-1 whitespace-nowrap rounded border px-1.5 py-0.5 text-[11px] font-medium transition-colors ${
-                showGhost
-                  ? 'border-kiviWarn/40 bg-kiviWarn/15 text-kiviWarn'
-                  : 'border-kiviBorder bg-kiviBg text-kiviMuted hover:text-kiviInk'
-              }`}
-            >
-              <Ghost className="h-3 w-3 shrink-0" />
-              <span>Ghost</span>
-            </button>
-          )}
-
-          <div className="flex shrink-0 items-center gap-1 rounded border border-kiviBorder bg-kiviBg px-1.5 py-0.5">
-            <Palette className="h-3 w-3 shrink-0 text-kiviMuted" />
-            <select
-              aria-label="3D Surface Color Palette"
-              value={activePalette}
-              onChange={(e) => setActivePalette(e.target.value as SurfacePalette)}
-              className="cursor-pointer bg-transparent text-[11px] font-medium text-kiviSecondary focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-kiviAccent"
-            >
-              <option value="classic" className="bg-kiviSurface text-kiviInk">
-                Classic
-              </option>
-              <option value="thermal" className="bg-kiviSurface text-kiviInk">
-                Thermal
-              </option>
-              <option value="spectrum" className="bg-kiviSurface text-kiviInk">
-                Spectrum
-              </option>
-              <option value="monochrome" className="bg-kiviSurface text-kiviInk">
-                Mono
-              </option>
-            </select>
-          </div>
-
-          <div className="flex shrink-0 items-center rounded border border-kiviBorder bg-kiviBg p-0.5">
-            <button
-              type="button"
-              title="Zoom In"
-              onClick={() => handleZoom(1.15)}
-              className="rounded p-1 text-kiviMuted hover:bg-kiviElevated hover:text-kiviInk transition-colors"
-            >
-              <ZoomIn className="h-3.5 w-3.5" />
-            </button>
-            <button
-              type="button"
-              title="Zoom Out"
-              onClick={() => handleZoom(0.85)}
-              className="rounded p-1 text-kiviMuted hover:bg-kiviElevated hover:text-kiviInk transition-colors"
-            >
-              <ZoomOut className="h-3.5 w-3.5" />
-            </button>
-            <button
-              type="button"
-              title="Reset Camera & Zoom"
-              onClick={handleResetCamera}
-              className="rounded p-1 text-kiviMuted hover:bg-kiviElevated hover:text-kiviInk transition-colors"
-            >
-              <RotateCcw className="h-3.5 w-3.5" />
-            </button>
-          </div>
-        </div>
+        {headerActions && <div className="flex shrink-0 items-center gap-1">{headerActions}</div>}
       </div>
 
-      {/* Dedicated Fixed-Bounds Canvas Host (Immune to Resize Feedback Loops) */}
+      {/* Dedicated Fixed-Bounds Canvas Host with Craftlab + Map Overlay HUD */}
       <div
         ref={canvasHostRef}
         data-testid="surface3d-canvas-host"
-        className="relative min-h-[220px] min-w-0 flex-1 overflow-hidden"
+        className="relative min-h-[130px] min-w-0 flex-1 overflow-hidden"
       >
         <canvas
           ref={canvasRef}
@@ -1191,86 +1051,249 @@ export const Surface3DView: React.FC<Surface3DViewProps> = React.memo(({
           className="absolute inset-0 block h-full w-full cursor-grab active:cursor-grabbing touch-none"
         />
 
+        {/* Ultra-Compact Top-Left Cell Readout Pill */}
         {activeCellCoord && activeCellValue !== null && activeCellValue !== undefined && (
-          <div className="pointer-events-none absolute top-2.5 left-2.5 z-10 min-w-[168px] rounded-lg kivi-panel-surface bg-kiviSurface/95 px-2.5 py-2 tabular-nums">
-            <div className="mb-1 flex items-center justify-between gap-2 border-b border-kiviBorder pb-1 text-[10px] font-semibold text-kiviInk">
-              <span>
-                [{activeCellCoord.r}, {activeCellCoord.c}]
+          <div
+            data-testid="surface3d-cell-pill"
+            className="kivi-panel-surface pointer-events-none absolute top-2 left-2 z-10 flex max-w-[calc(100%-84px)] flex-wrap items-center gap-x-2 gap-y-0.5 rounded-md bg-kiviSurface/90 px-2 py-1 font-mono text-[11px] backdrop-blur-sm tabular-nums"
+          >
+            <span className="text-[10px] text-kiviMuted">
+              [{activeCellCoord.r},{activeCellCoord.c}]
+            </span>
+            <span className="font-semibold text-kiviAccent">
+              {typeof activeCellValue === 'number'
+                ? activeCellValue.toFixed(decimals)
+                : activeCellValue}
+              {unit ? <span className="ml-1 text-[10px] font-normal text-kiviSecondary">{unit}</span> : null}
+            </span>
+            <span className="text-[10px] text-kiviSecondary">
+              {xLabels?.[activeCellCoord.c] ?? activeCellCoord.c} &middot;{' '}
+              {yLabels?.[activeCellCoord.r] ?? activeCellCoord.r}
+            </span>
+            {activeDelta !== null && Math.abs(activeDelta) > 1e-6 && (
+              <span
+                className={`text-[10px] font-semibold ${
+                  activeDelta > 0 ? 'text-kiviGreen' : 'text-kiviRed'
+                }`}
+              >
+                {activeDelta > 0
+                  ? `+${activeDelta.toFixed(decimals)}`
+                  : activeDelta.toFixed(decimals)}
               </span>
-              <span className="font-mono text-kiviAccent">{unit}</span>
-            </div>
-            <div className="space-y-0.5 font-mono text-[10px]">
-              <div className="flex justify-between gap-2 text-kiviSecondary">
-                <span className="text-kiviMuted">{yAxisName}:</span>
-                <span>{yLabels?.[activeCellCoord.r] ?? activeCellCoord.r}</span>
-              </div>
-              <div className="flex justify-between gap-2 text-kiviSecondary">
-                <span className="text-kiviMuted">{xAxisName}:</span>
-                <span>{xLabels?.[activeCellCoord.c] ?? activeCellCoord.c}</span>
-              </div>
-              <div className="flex justify-between gap-2 border-t border-kiviBorder pt-0.5 font-bold text-kiviInk">
-                <span className="font-normal text-kiviMuted">Value:</span>
-                <span className="text-kiviAccent">
-                  {typeof activeCellValue === 'number'
-                    ? activeCellValue.toFixed(decimals)
-                    : activeCellValue}
-                </span>
-              </div>
-              {activeDelta !== null && (
-                <div className="flex justify-between gap-2">
-                  <span className="text-kiviMuted">Delta:</span>
-                  <span
-                    className={`font-semibold ${
-                      activeDelta > 0
-                        ? 'text-kiviGreen'
-                        : activeDelta < 0
-                          ? 'text-kiviRed'
-                          : 'text-kiviMuted'
-                    }`}
-                  >
-                    {activeDelta > 0
-                      ? `+${activeDelta.toFixed(decimals)}`
-                      : activeDelta.toFixed(decimals)}
-                  </span>
-                </div>
-              )}
-            </div>
+            )}
           </div>
         )}
-      </div>
 
-      {/* Bottom Instrumentation Strip (Outside Canvas so Surface is Unobstructed) */}
-      <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-t border-kiviBorder bg-kiviSurface px-2.5 py-1.5 text-[11px] text-kiviSecondary">
-        <div className="flex items-center gap-2">
-          <Sliders className="h-3 w-3 shrink-0 text-kiviAccent" />
-          <label htmlFor="surface3d-elevation" className="text-[11px] text-kiviMuted">
-            Z-Scale
-          </label>
-          <input
-            id="surface3d-elevation"
-            type="range"
-            min="0.2"
-            max="3.0"
-            step="0.1"
-            value={elevationMultiplier}
-            onChange={(e) => setElevationMultiplier(parseFloat(e.target.value))}
-            className="h-1 w-24 cursor-pointer appearance-none rounded-lg bg-kiviBorderStrong accent-kiviAccent"
+        {/* Top-Right Craftlab Click-to-Expand 3D Controls */}
+        <div
+          data-testid="surface3d-overlay-controls"
+          className="absolute top-2 right-2 z-20 flex items-center gap-1"
+        >
+          <ViewportIconMenu<CameraPresetKey>
+            testId="surface3d-camera-menu"
+            ariaLabel="3D Camera View"
+            headerLabel="Camera Angle"
+            icon={<Compass className="h-3.5 w-3.5" />}
+            value={activePreset}
+            onSelect={applyPreset}
+            extraAction={{ label: 'Reset View', onClick: handleResetCamera }}
+            items={[
+              { value: 'ISOMETRIC', label: 'Isometric', badge: 'Iso' },
+              { value: 'TOP_DOWN', label: 'Top Plan', badge: 'Top' },
+              { value: 'FRONT_RPM', label: 'Front Profile', badge: 'X' },
+              { value: 'SIDE_TPS', label: 'Side Profile', badge: 'Y' },
+            ]}
           />
-          <span className="w-8 font-mono text-[10px] text-kiviAccent tabular-nums">
-            {elevationMultiplier.toFixed(1)}&times;
-          </span>
+
+          <ViewportIconPopover
+            testId="surface3d-layers-popover"
+            ariaLabel="3D Display Options"
+            headerLabel="3D Surface Options"
+            icon={<Layers className="h-3.5 w-3.5" />}
+            active={renderMode !== 'shaded' || !showCage || activePalette !== initialPalette || Math.abs(elevationMultiplier - 1.0) > 0.05}
+            popupWidth={238}
+          >
+            <div className="space-y-2.5 text-[11px]">
+              <div>
+                <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-kiviMuted">
+                  Surface Mode
+                </div>
+                <div className="grid grid-cols-3 gap-1 rounded-md bg-kiviBg p-0.5">
+                  {(
+                    [
+                      { id: 'shaded', label: 'Mesh' },
+                      { id: 'smooth', label: 'Solid' },
+                      { id: 'wireframe', label: 'Wire' },
+                    ] as const
+                  ).map((mode) => (
+                    <button
+                      key={mode.id}
+                      type="button"
+                      onClick={() => setRenderMode(mode.id)}
+                      className={`rounded py-1 font-medium transition-colors ${
+                        renderMode === mode.id
+                          ? 'bg-kiviAccent text-kiviAccentFg'
+                          : 'text-kiviSecondary hover:text-kiviInk'
+                      }`}
+                    >
+                      {mode.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-kiviMuted">
+                  Overlays
+                </div>
+                <div className="flex flex-wrap gap-1">
+                  <button
+                    type="button"
+                    aria-pressed={showCage}
+                    onClick={() => setShowCage((v) => !v)}
+                    className={`rounded px-2 py-1 text-[11px] font-medium transition-colors ${
+                      showCage
+                        ? 'bg-kiviAccent/15 text-kiviAccent'
+                        : 'bg-kiviBg text-kiviSecondary hover:text-kiviInk'
+                    }`}
+                  >
+                    Cage &amp; Axes
+                  </button>
+                  {renderBaseMatrix && (
+                    <button
+                      type="button"
+                      aria-pressed={showGhost}
+                      onClick={() => setShowGhost((v) => !v)}
+                      className={`rounded px-2 py-1 text-[11px] font-medium transition-colors ${
+                        showGhost
+                          ? 'bg-kiviWarn/15 text-kiviWarn'
+                          : 'bg-kiviBg text-kiviSecondary hover:text-kiviInk'
+                      }`}
+                    >
+                      Base Ghost
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    aria-pressed={showColorScale}
+                    onClick={() => setShowColorScale((v) => !v)}
+                    className={`rounded px-2 py-1 text-[11px] font-medium transition-colors ${
+                      showColorScale
+                        ? 'bg-kiviAccent/15 text-kiviAccent'
+                        : 'bg-kiviBg text-kiviSecondary hover:text-kiviInk'
+                    }`}
+                  >
+                    Color Scale
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-kiviMuted">
+                  Color Palette
+                </div>
+                <div className="grid grid-cols-2 gap-1">
+                  {(
+                    [
+                      { id: 'classic', label: 'Classic' },
+                      { id: 'thermal', label: 'Thermal' },
+                      { id: 'spectrum', label: 'Spectrum' },
+                      { id: 'monochrome', label: 'Mono' },
+                    ] as const
+                  ).map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => setActivePalette(p.id)}
+                      className={`rounded px-2 py-1 text-left font-medium transition-colors ${
+                        activePalette === p.id
+                          ? 'bg-kiviAccent/15 text-kiviAccent'
+                          : 'bg-kiviBg text-kiviSecondary hover:text-kiviInk'
+                      }`}
+                    >
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <div className="mb-1 flex items-center justify-between text-[10px] font-semibold uppercase tracking-wider text-kiviMuted">
+                  <span className="flex items-center gap-1">
+                    <Sliders className="h-3 w-3 text-kiviAccent" />
+                    <label htmlFor="surface3d-elevation">Z-Scale</label>
+                  </span>
+                  <span className="font-mono text-kiviAccent tabular-nums">
+                    {elevationMultiplier.toFixed(1)}&times;
+                  </span>
+                </div>
+                <input
+                  id="surface3d-elevation"
+                  type="range"
+                  min="0.2"
+                  max="3.0"
+                  step="0.1"
+                  value={elevationMultiplier}
+                  onChange={(e) => setElevationMultiplier(parseFloat(e.target.value))}
+                  className="h-1.5 w-full cursor-pointer appearance-none rounded-lg bg-kiviBorderStrong accent-kiviAccent"
+                />
+              </div>
+            </div>
+          </ViewportIconPopover>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 font-mono text-[10px] text-kiviMuted tabular-nums">
-          <span>
-            Min {formatCompactTick(extremes.min, decimals)} | Max{' '}
-            {formatCompactTick(extremes.max, decimals)} {unit}
-          </span>
-          {!readOnly && onChangeMatrix && selectedRange && (
-            <span className="hidden sm:inline text-kiviSecondary">
-              Edit: + / - / % | Nav: Arrows | Orbit: Drag | Pan: Shift+Drag
+        {/* Bottom-Left Sleek Horizontal Color Scale Pill */}
+        {showColorScale && (
+          <div
+            data-testid="surface3d-color-scale"
+            className="kivi-panel-surface pointer-events-none absolute bottom-2.5 left-2.5 z-10 flex items-center gap-2 rounded-md bg-kiviSurface/88 px-2 py-1 font-mono text-[10px] text-kiviSecondary backdrop-blur-sm tabular-nums"
+          >
+            <span>{formatCompactTick(extremes.min, decimals)}</span>
+            <div
+              className="h-1.5 w-20 rounded-full border border-kiviBorder/60"
+              style={{ background: colorScaleGradient }}
+            />
+            <span>
+              {formatCompactTick(extremes.max, decimals)}
+              {unit ? ` ${unit}` : ''}
             </span>
-          )}
+          </div>
+        )}
+
+        {/* Bottom-Right Map-Style Vertical Zoom & Reset Capsule */}
+        <div
+          data-testid="surface3d-zoom-capsule"
+          className="kivi-panel-surface absolute right-2.5 bottom-2.5 z-20 flex flex-col overflow-hidden rounded-lg border border-kiviBorder/70 bg-kiviSurface/92 backdrop-blur-sm"
+        >
+          <button
+            type="button"
+            aria-label="Zoom In"
+            title="Zoom In"
+            onClick={() => handleZoom(1.15)}
+            className="flex h-7 w-7 items-center justify-center text-kiviSecondary transition-colors hover:bg-kiviElevated hover:text-kiviInk"
+          >
+            <ZoomIn className="h-3.5 w-3.5" />
+          </button>
+          <div className="h-px bg-kiviBorder/60" />
+          <button
+            type="button"
+            aria-label="Zoom Out"
+            title="Zoom Out"
+            onClick={() => handleZoom(0.85)}
+            className="flex h-7 w-7 items-center justify-center text-kiviSecondary transition-colors hover:bg-kiviElevated hover:text-kiviInk"
+          >
+            <ZoomOut className="h-3.5 w-3.5" />
+          </button>
+          <div className="h-px bg-kiviBorder/60" />
+          <button
+            type="button"
+            aria-label="Reset Camera & Zoom"
+            title="Reset Camera & Zoom"
+            onClick={handleResetCamera}
+            className="flex h-7 w-7 items-center justify-center text-kiviSecondary transition-colors hover:bg-kiviElevated hover:text-kiviInk"
+          >
+            <RotateCcw className="h-3.5 w-3.5" />
+          </button>
         </div>
       </div>
     </div>

@@ -1,6 +1,6 @@
 import React, { Suspense, lazy } from 'react';
 import ReactDOM from 'react-dom/client';
-import { getStandaloneWindowId } from './lib/windowControlsBridge';
+import { getStandaloneTabParams, getStandaloneWindowId } from './lib/windowControlsBridge';
 import './styles/globals.css';
 
 const App = lazy(() => import('./App'));
@@ -16,6 +16,7 @@ if (!rootElement) {
 }
 
 const standaloneTool = getStandaloneWindowId();
+const standaloneTab = getStandaloneTabParams();
 
 ReactDOM.createRoot(rootElement).render(
   <React.StrictMode>
@@ -26,7 +27,13 @@ ReactDOM.createRoot(rootElement).render(
         </div>
       }
     >
-      {standaloneTool ? <StandaloneWindowHost toolId={standaloneTool} /> : <App />}
+      {standaloneTab ? (
+        <StandaloneWindowHost tabParams={standaloneTab} />
+      ) : standaloneTool ? (
+        <StandaloneWindowHost toolId={standaloneTool} />
+      ) : (
+        <App />
+      )}
     </Suspense>
   </React.StrictMode>
 );

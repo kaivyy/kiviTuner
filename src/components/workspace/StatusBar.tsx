@@ -9,6 +9,7 @@ import {
   subscribeWindowStack,
   type MinimizedWindowEntry,
 } from '../layout/floatingWindowModel';
+import { useHorizontalStripScroll } from '../../hooks/useHorizontalStripScroll';
 
 export const EcuStatusBarIndicator: React.FC = () => {
   const connectionState = useTelemetryStore((s) => s.connectionState);
@@ -66,6 +67,9 @@ export const StatusBar: React.FC<StatusBarProps> = React.memo(({
   const [minimizedWindows, setMinimizedWindows] = useState<MinimizedWindowEntry[]>(() =>
     getMinimizedFloatingWindows()
   );
+  const statusStrip = useHorizontalStripScroll<HTMLElement>(
+    `${selectedMapName ?? ''}:${romLabel ?? ''}:${minimizedWindows.length}:${layoutPreset}:${diffRegionsCount}`
+  );
 
   useEffect(() => {
     setMinimizedWindows(getMinimizedFloatingWindows());
@@ -75,7 +79,11 @@ export const StatusBar: React.FC<StatusBarProps> = React.memo(({
   }, []);
 
   return (
-  <footer className="no-scrollbar flex h-7 shrink-0 items-center justify-between gap-2 overflow-x-auto border-t border-kiviBorder bg-kiviSurface px-2.5 text-[11px] text-kiviSecondary tabular-nums md:px-3">
+  <footer
+    ref={statusStrip.ref}
+    onScroll={statusStrip.refresh}
+    className="kivi-tab-scrollbar flex h-7 shrink-0 items-center justify-between gap-2 overflow-x-auto overflow-y-hidden border-t border-kiviBorder bg-kiviSurface px-2.5 text-[11px] text-kiviSecondary tabular-nums md:px-3"
+  >
     <div className="flex min-w-0 items-center gap-2 whitespace-nowrap md:gap-3">
       <span className="hidden shrink-0 items-center gap-1.5 whitespace-nowrap md:flex">
         <span className="inline-block h-2 w-2 shrink-0 rounded-full bg-kiviGreen" />
